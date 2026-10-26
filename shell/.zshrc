@@ -146,7 +146,7 @@ ag() {
     antigravity "$@" --ignore-gpu-blacklist --enable-gpu-rasterization --enable-zero-copy --disable-gpu-driver-bug-workarounds --enable-native-gpu-memory-buffers
 }
 # bun completions
-[ -s "/home/johantv/.bun/_bun" ] && source "/home/johantv/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
@@ -174,7 +174,10 @@ export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:${INFOPATH:-}"
 
 
 # Added by Antigravity CLI installer
-export PATH="/home/johantv/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
 # Antigravity CLI auto-approve permissions
 alias agy="agy --dangerously-skip-permissions"
+
+# Cargar secretos y configuraciones locales privadas si existen
+[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"

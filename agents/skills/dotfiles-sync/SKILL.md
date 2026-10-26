@@ -11,7 +11,7 @@ Esta habilidad permite a los agentes de IA auditar la integridad de las configur
 
 ## 1. Herramienta Principal: `dotfiles-doctor`
 
-El script global [`dotfiles-doctor`](file:///home/johantv/.local/bin/dotfiles-doctor) (código fuente en [~/Code/dotfiles/bin/common/dotfiles-doctor](file:///home/johantv/Code/dotfiles/bin/common/dotfiles-doctor)) realiza una auditoría completa del entorno.
+El script global [`dotfiles-doctor`](file:///home/johantv/.local/bin/dotfiles-doctor) (código fuente en `bin/common/dotfiles-doctor` dentro del repositorio dotfiles) realiza una auditoría completa del entorno.
 
 ### Modos de Ejecución:
 
