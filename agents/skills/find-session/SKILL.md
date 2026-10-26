@@ -15,7 +15,7 @@ Esta habilidad permite a los agentes (Gemini CLI / `agy`, Claude Code y OpenCode
 
 ## 1. Herramienta Principal: `find-session`
 
-El script global [find-session](file:///home/johantv/.local/bin/find-session) (código fuente en [~/Code/dotfiles/bin/common/find-session](file:///home/johantv/Code/dotfiles/bin/common/find-session)) inspecciona directamente las bases de datos y registros locales de los tres asistentes.
+El script global [find-session](file:///home/johantv/.local/bin/find-session) (código fuente en `bin/common/find-session` dentro del repositorio dotfiles) inspecciona directamente las bases de datos y registros locales de los tres asistentes.
 
 ### Sintaxis de Uso
 

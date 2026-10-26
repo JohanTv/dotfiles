@@ -53,7 +53,7 @@ dotfiles/
 
 ## 🚀 Instalación Rápida
 
-En cualquier máquina nueva con Ubuntu o WSL:
+En cualquier máquina nueva con Ubuntu o WSL (puedes clonarlo en `~/Code/dotfiles`, `~/.dotfiles` o la ruta que prefieras; el instalador y las herramientas son 100% agnósticos):
 
 ```bash
 git clone https://github.com/johantv/dotfiles.git ~/Code/dotfiles
