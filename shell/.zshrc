@@ -77,6 +77,16 @@ DISABLE_UNTRACKED_FILES_DIRTY="true"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
+# Homebrew environment (configuración estática para evitar forks y subprocesos al iniciar)
+if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+  export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+  export HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
+  export HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
+  export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin${PATH+:$PATH}"
+  [ -z "${MANPATH-}" ] || export MANPATH="${MANPATH%"${MANPATH##*[!:]}"}::"
+  export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:${INFOPATH:-}"
+fi
+
 plugins=(git ssh-agent zoxide fzf zsh-autosuggestions)
 
 # Optimización: acelerar compinit usando caché (-C) si el archivo de volcado tiene menos de 24 horas
@@ -125,7 +135,7 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 # source ~/.local/share/omakub/defaults/bash/rc
-source ~/.local/share/omakub/defaults/bash/functions
+[[ -f "$HOME/.local/share/omakub/defaults/bash/functions" ]] && source "$HOME/.local/share/omakub/defaults/bash/functions"
 
 alias p3="python3"
 alias bat='batcat'
@@ -138,9 +148,12 @@ alias lt='eza --tree --level=2 --long --icons --git'
 alias lta='lt -a'
 
 alias ff="fzf --preview 'batcat --style=numbers --color=always {}'"
-alias fd='fdfind'
+command -v fdfind >/dev/null 2>&1 && alias fd='fdfind'
 alias v='nvim'
 alias open='xdg-open'
+alias zj="zellij"
+alias zja="zellij attach"
+alias zjls="zellij list-sessions"
 # alias ag='antigravity --ignore-gpu-blacklist --enable-gpu-rasterization --enable-zero-copy --disable-gpu-driver-bug-workarounds --enable-native-gpu-memory-buffers'
 ag() {
     antigravity "$@" --ignore-gpu-blacklist --enable-gpu-rasterization --enable-zero-copy --disable-gpu-driver-bug-workarounds --enable-native-gpu-memory-buffers
@@ -164,13 +177,7 @@ nvm() {
   nvm "$@"
 }
 
-# Homebrew environment (configuración estática para evitar forks y subprocesos al iniciar)
-export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
-export HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
-export HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
-export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin${PATH+:$PATH}"
-[ -z "${MANPATH-}" ] || export MANPATH="${MANPATH%"${MANPATH##*[!:]}"}::"
-export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:${INFOPATH:-}"
+
 
 
 # Added by Antigravity CLI installer
@@ -181,3 +188,19 @@ alias agy="agy --dangerously-skip-permissions"
 
 # Cargar secretos y configuraciones locales privadas si existen
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+# Auto-iniciar o adjuntar sesión de Zellij en shells interactivos
+if [[ -o interactive ]] && [[ -z "$ZELLIJ" ]] && [[ "${ZELLIJ_AUTO_START:-true}" == "true" ]] && [[ "$TERM" != "dumb" ]] && command -v zellij >/dev/null 2>&1; then
+  # Evitar anidar en la terminal integrada de VS Code / Antigravity IDE a menos que se configure explícitamente
+  if [[ "$TERM_PROGRAM" != "vscode" || "${ZELLIJ_AUTO_START_IDE:-false}" == "true" ]]; then
+    if [[ "${ZELLIJ_AUTO_ATTACH:-true}" == "true" ]]; then
+      zellij attach -c
+    else
+      zellij
+    fi
+
+    if [[ "${ZELLIJ_AUTO_EXIT:-true}" == "true" ]]; then
+      exit
+    fi
+  fi
+fi
