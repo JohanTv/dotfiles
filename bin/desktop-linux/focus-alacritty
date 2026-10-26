@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Focus existing Alacritty window, or start a new one if not running
+export PATH="$HOME/.local/bin:$PATH"
+
+if ! wmctrl -x -a Alacritty; then
+    alacritty &
+fi

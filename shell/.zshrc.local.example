@@ -1,0 +1,11 @@
+# ~/.zshrc.local (Plantilla de secretos y configuraciones específicas de esta máquina)
+# Este archivo está ignorado en git (*.local).
+# Copia este archivo a ~/.zshrc.local para variables privadas.
+
+# Ejemplo de tokens o API keys privadas:
+# export GITHUB_TOKEN="ghp_xxx"
+# export OPENAI_API_KEY="sk-xxx"
+# export ANTHROPIC_API_KEY="sk-ant-xxx"
+
+# Aliases específicos de este equipo:
+# alias work-vpn="sudo openvpn /etc/openvpn/client.ovpn"

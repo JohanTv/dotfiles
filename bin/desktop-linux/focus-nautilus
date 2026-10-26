@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Focus existing Nautilus window, or start a new one if not running
+export PATH="$HOME/.local/bin:$PATH"
+
+if ! wmctrl -x -a org.gnome.Nautilus && ! wmctrl -x -a nautilus; then
+    nautilus &
+fi

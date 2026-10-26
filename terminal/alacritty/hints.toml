@@ -1,0 +1,18 @@
+# Configuration for terminal hints in Alacritty
+
+# 1. Press Ctrl+Shift+I to open images in imv
+[[hints.enabled]]
+regex = "(?i)[^\\s\"'`()\\[\\]{}<>:]+\\.(png|jpe?g|webp|svg|gif|bmp)"
+command = "/home/johantv/.local/bin/imv"
+post_processing = true
+persist = false
+mouse.enabled = true
+binding = { key = "I", mods = "Control|Shift" }
+
+# 2. Press Ctrl+Shift+Y to copy the image path to clipboard without opening it
+[[hints.enabled]]
+regex = "(?i)[^\\s\"'`()\\[\\]{}<>:]+\\.(png|jpe?g|webp|svg|gif|bmp)"
+action = "Copy"
+post_processing = true
+persist = false
+binding = { key = "Y", mods = "Control|Shift" }

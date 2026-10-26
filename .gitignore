@@ -1,0 +1,14 @@
+# Archivos locales con secretos o tokens
+*.local
+.env*
+!.env.example
+
+# Backups temporales
+*.bak
+*.backup*
+*~
+
+# Cachés y temporales
+.DS_Store
+.cache/
+node_modules/
