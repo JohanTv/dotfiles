@@ -7,5 +7,11 @@
 # export OPENAI_API_KEY="sk-xxx"
 # export ANTHROPIC_API_KEY="sk-ant-xxx"
 
+# Preferencias de Zellij:
+# export ZELLIJ_AUTO_START=false       # Desactiva auto-inicio de Zellij
+# export ZELLIJ_AUTO_ATTACH=false      # Inicia sesión nueva en vez de conectarse a la existente
+# export ZELLIJ_AUTO_EXIT=false        # Mantiene el shell abierto al salir de Zellij
+# export ZELLIJ_AUTO_START_IDE=true    # Inicia Zellij también dentro de VS Code / Antigravity IDE
+
 # Aliases específicos de este equipo:
 # alias work-vpn="sudo openvpn /etc/openvpn/client.ovpn"
