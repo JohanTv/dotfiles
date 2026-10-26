@@ -1,0 +1,95 @@
+keybinds clear-defaults=true {
+    normal {
+        bind "Ctrl b" { SwitchToMode "tmux"; }
+        bind "Ctrl f" { ToggleFloatingPanes; }
+        bind "Alt f" { ToggleFloatingPanes; }
+        bind "Alt n" { NewPane; }
+        bind "Alt -" { NewPane "down"; }
+        bind "Alt \\" { NewPane "right"; }
+        bind "Alt Left" "Alt h" { MoveFocus "left"; }
+        bind "Alt Right" "Alt l" { MoveFocus "right"; }
+        bind "Alt Down" "Alt j" { MoveFocus "down"; }
+        bind "Alt Up" "Alt k" { MoveFocus "up"; }
+        bind "Alt Shift Left" "Alt Shift h" "Alt H" { MovePane "Left"; }
+        bind "Alt Shift Right" "Alt Shift l" "Alt L" { MovePane "Right"; }
+        bind "Alt Shift Down" "Alt Shift j" "Alt J" { MovePane "Down"; }
+        bind "Alt Shift Up" "Alt Shift k" "Alt K" { MovePane "Up"; }
+    }
+    tmux {
+        bind "[" { SwitchToMode "scroll"; }
+        bind "Ctrl b" { Write 2; SwitchToMode "normal"; }
+        bind "\"" "-" { NewPane "down"; SwitchToMode "normal"; }
+        bind "%" "\\" { NewPane "right"; SwitchToMode "normal"; }
+        bind "z" { ToggleFocusFullscreen; SwitchToMode "normal"; }
+        bind "c" { NewTab; SwitchToMode "normal"; }
+        bind "," { SwitchToMode "renametab"; }
+        bind "p" { GoToPreviousTab; SwitchToMode "normal"; }
+        bind "n" { GoToNextTab; SwitchToMode "normal"; }
+        bind "1" { GoToTab 1; SwitchToMode "normal"; }
+        bind "2" { GoToTab 2; SwitchToMode "normal"; }
+        bind "3" { GoToTab 3; SwitchToMode "normal"; }
+        bind "4" { GoToTab 4; SwitchToMode "normal"; }
+        bind "5" { GoToTab 5; SwitchToMode "normal"; }
+        bind "6" { GoToTab 6; SwitchToMode "normal"; }
+        bind "7" { GoToTab 7; SwitchToMode "normal"; }
+        bind "8" { GoToTab 8; SwitchToMode "normal"; }
+        bind "9" { GoToTab 9; SwitchToMode "normal"; }
+        bind "&" { CloseTab; SwitchToMode "normal"; }
+        bind "h" { MoveFocus "left"; SwitchToMode "normal"; }
+        bind "l" { MoveFocus "right"; SwitchToMode "normal"; }
+        bind "j" { MoveFocus "down"; SwitchToMode "normal"; }
+        bind "k" { MoveFocus "up"; SwitchToMode "normal"; }
+        bind "Left" "H" { Resize "Increase Left"; }
+        bind "Right" "L" { Resize "Increase Right"; }
+        bind "Down" "J" { Resize "Increase Down"; }
+        bind "Up" "K" { Resize "Increase Up"; }
+        bind "o" { FocusNextPane; }
+        bind "d" { Detach; }
+        bind "Space" { NextSwapLayout; }
+        bind "{" { MovePaneBackwards; }
+        bind "}" { MovePane; }
+        bind "x" { CloseFocus; SwitchToMode "normal"; }
+        bind "w" "f" { ToggleFloatingPanes; SwitchToMode "normal"; }
+        bind "e" { TogglePaneEmbedOrFloating; SwitchToMode "normal"; }
+        bind "Esc" "Enter" { SwitchToMode "normal"; }
+    }
+    scroll {
+        bind "Esc" "Enter" "q" { ScrollToBottom; SwitchToMode "normal"; }
+        bind "Ctrl c" { ScrollToBottom; SwitchToMode "normal"; }
+        bind "j" "Down" { ScrollDown; }
+        bind "k" "Up" { ScrollUp; }
+        bind "Ctrl f" "PageDown" { PageScrollDown; }
+        bind "Ctrl b" "PageUp" { PageScrollUp; }
+        bind "d" { HalfPageScrollDown; }
+        bind "u" { HalfPageScrollUp; }
+        bind "s" "/" { SwitchToMode "entersearch"; SearchInput 0; }
+    }
+    search {
+        bind "Esc" "Enter" "q" { ScrollToBottom; SwitchToMode "normal"; }
+        bind "n" { Search "down"; }
+        bind "p" { Search "up"; }
+        bind "c" { SearchToggleOption "CaseSensitivity"; }
+        bind "w" { SearchToggleOption "Wrap"; }
+        bind "o" { SearchToggleOption "WholeWord"; }
+    }
+    entersearch {
+        bind "Enter" { SwitchToMode "search"; }
+        bind "Esc" { SwitchToMode "scroll"; }
+    }
+    renametab {
+        bind "Enter" { SwitchToMode "normal"; }
+        bind "Esc" { UndoRenameTab; SwitchToMode "normal"; }
+    }
+}
+
+theme "tokyo-night"
+default_layout "compact"
+default_mode "normal"
+default_shell "zsh"
+pane_frame_style "full"
+
+// Persistencia y comportamiento
+on_force_close "detach"
+attach_to_session true
+session_serialization true
+serialize_pane_viewport true
