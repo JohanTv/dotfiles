@@ -10,7 +10,7 @@ description: >-
 ## 1. Entorno del Sistema
 - **SO**: Ubuntu con GNOME Shell en sesión **X11**.
 - **Herramienta de ventana**: `wmctrl` (ubicado en `~/.local/bin/wmctrl`).
-- **Ubicación scripts**: `~/Code/toolbox/scripts/` (enlazados a `~/.local/bin/`).
+- **Ubicación scripts**: `~/Code/dotfiles/bin/desktop-linux/` (enlazados a `~/.local/bin/`).
 
 ## 2. Pasos para agregar un nuevo atajo
 
@@ -22,8 +22,8 @@ description: >-
    ```
    *La segunda columna indica el identificador de ventana, y la tercera columna (ej. `org.gnome.Nautilus.org.gnome.Nautilus` o `Alacritty.Alacritty`) es la `WM_CLASS`.*
 
-### Paso B: Crear el script en `scripts/`
-Crear `~/Code/toolbox/scripts/focus-<app>` con permisos de ejecución (`chmod +x`):
+### Paso B: Crear el script en `bin/desktop-linux/`
+Crear `~/Code/dotfiles/bin/desktop-linux/focus-<app>` con permisos de ejecución (`chmod +x`):
 ```bash
 #!/usr/bin/env bash
 # Focus existing <App> window, or start a new one if not running
@@ -33,9 +33,9 @@ if ! wmctrl -x -a <WM_CLASS>; then
     <comando_lanzamiento> &
 fi
 ```
-Crear enlace simbólico en `~/.local/bin/`:
+Crear enlace simbólico en `~/.local/bin/` (o correr `./install.sh`):
 ```bash
-ln -sf ~/Code/toolbox/scripts/focus-<app> ~/.local/bin/focus-<app>
+ln -sf ~/Code/dotfiles/bin/desktop-linux/focus-<app> ~/.local/bin/focus-<app>
 ```
 
 ### Paso C: Asignar atajo en GNOME

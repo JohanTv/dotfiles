@@ -23,6 +23,11 @@ link_file() {
     local src="$1"
     local dest="$2"
 
+    if [[ ! -e "$src" && ! -L "$src" ]]; then
+        log_warn "Origen no encontrado en dotfiles: $src"
+        return 1
+    fi
+
     mkdir -p "$(dirname "$dest")"
 
     # If already correctly symlinked, do nothing
@@ -45,7 +50,7 @@ link_file() {
 # 1. Detectar Entorno (WSL vs Ubuntu Nativo)
 # ------------------------------------------------------------------------------
 IS_WSL=false
-if grep -qi microsoft /proc/version 2>/dev/null; then
+if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null || [[ -n "${WSL_DISTRO_NAME:-}" ]]; then
     IS_WSL=true
     log_info "Entorno detectado: Windows Subsystem for Linux (WSL)"
 else
@@ -62,35 +67,40 @@ link_file "$DOTFILES_DIR/agents/rules/global-rules.md" "$HOME/.config/opencode/A
 
 # Skills de agentes
 log_info "Enlazando catálogo de skills de agentes..."
-link_file "$DOTFILES_DIR/agents/skills/find-session" "$HOME/.agents/skills/find-session"
-
-if [[ "$IS_WSL" == false ]]; then
-    link_file "$DOTFILES_DIR/agents/skills/wmctrl-focus" "$HOME/.agents/skills/wmctrl-focus"
-else
-    log_info "Omitiendo skill wmctrl-focus (requiere X11/GNOME)."
-fi
+for skill_dir in "$DOTFILES_DIR"/agents/skills/*; do
+    if [[ -d "$skill_dir" ]]; then
+        skill_name=$(basename "$skill_dir")
+        if [[ "$skill_name" == "wmctrl-focus" && "$IS_WSL" == true ]]; then
+            log_info "Omitiendo skill wmctrl-focus (requiere X11/GNOME)."
+            continue
+        fi
+        link_file "$skill_dir" "$HOME/.agents/skills/$skill_name"
+    fi
+done
 
 # ------------------------------------------------------------------------------
 # 3. Configurar Servidores MCP Globales (Chrome DevTools)
 # ------------------------------------------------------------------------------
 log_info "Configurando servidores MCP globales (Chrome DevTools)..."
 
-# Gemini CLI (~/.gemini/config/mcp_config.json requiere fusión con jq para preservar servidores locales)
+link_file "$DOTFILES_DIR/agents/mcp/opencode.json" "$HOME/.config/opencode/opencode.json"
+
 if command -v jq >/dev/null 2>&1; then
+    # Gemini CLI (~/.gemini/config/mcp_config.json requiere fusión con jq para preservar servidores locales)
     mkdir -p "$HOME/.gemini/config"
     [[ ! -f "$HOME/.gemini/config/mcp_config.json" ]] && echo '{"mcpServers":{}}' > "$HOME/.gemini/config/mcp_config.json"
     tmp_gemini=$(mktemp)
     jq -s '.[0] * .[1]' "$HOME/.gemini/config/mcp_config.json" "$DOTFILES_DIR/agents/mcp/gemini_mcp.json" > "$tmp_gemini" && mv "$tmp_gemini" "$HOME/.gemini/config/mcp_config.json"
     log_ok "chrome-devtools MCP registrado en ~/.gemini/config/mcp_config.json"
-fi
 
-link_file "$DOTFILES_DIR/agents/mcp/opencode.json" "$HOME/.config/opencode/opencode.json"
-
-# Claude Code (~/.claude.json requiere fusión con jq para preservar estado local)
-if command -v jq >/dev/null 2>&1 && [[ -f "$HOME/.claude.json" ]]; then
-    tmp_claude=$(mktemp)
-    jq '.mcpServers["chrome-devtools"] = {"type": "stdio", "command": "npx", "args": ["-y", "chrome-devtools-mcp"], "env": {}}' "$HOME/.claude.json" > "$tmp_claude" && mv "$tmp_claude" "$HOME/.claude.json"
-    log_ok "chrome-devtools MCP registrado en ~/.claude.json"
+    # Claude Code (~/.claude.json requiere fusión con jq para preservar estado local)
+    if [[ -f "$HOME/.claude.json" ]]; then
+        tmp_claude=$(mktemp)
+        jq '.mcpServers["chrome-devtools"] = {"type": "stdio", "command": "npx", "args": ["-y", "chrome-devtools-mcp"], "env": {}}' "$HOME/.claude.json" > "$tmp_claude" && mv "$tmp_claude" "$HOME/.claude.json"
+        log_ok "chrome-devtools MCP registrado en ~/.claude.json"
+    fi
+else
+    log_warn "jq no está instalado en el sistema. Se omitió la fusión de mcp_config.json y ~/.claude.json. Instala jq para registrar Chrome DevTools MCP automáticamente."
 fi
 
 # ------------------------------------------------------------------------------

@@ -28,6 +28,7 @@ dotfiles/
 │   │   └── global-rules.md     # Directrices compactas CLI, Git y seguridad
 │   ├── skills/                 # Procedimientos y runbooks bajo demanda
 │   │   ├── find-session/       # Buscador instantáneo Gemini, Claude y OpenCode
+│   │   ├── dotfiles-sync/      # Diagnóstico y auditoría de sincronización del host
 │   │   └── wmctrl-focus/       # Enfoque y lanzamiento de ventanas GNOME/X11
 │   └── mcp/                    # Servidores Model Context Protocol (MCP)
 │       ├── gemini_mcp.json     # Integración global para Gemini CLI (agy)
@@ -44,7 +45,7 @@ dotfiles/
 │       └── xxf.zsh-theme       # Tema propio modificado (branch status, host, etc.)
 │
 └── bin/                        # 🚀 Utilidades y automatizaciones
-    ├── common/                 # Scripts universales (WSL + Ubuntu): find-session
+    ├── common/                 # Scripts universales (WSL + Ubuntu): find-session, dotfiles-doctor
     └── desktop-linux/          # Scripts específicos de GNOME/X11: focus-alacritty, etc.
 ```
 
