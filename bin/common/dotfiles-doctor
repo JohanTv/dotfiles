@@ -1,0 +1,463 @@
+#!/usr/bin/env python3
+"""
+dotfiles-doctor - Audit and synchronize host configurations with the dotfiles repository.
+Verifies symlink integrity, detects local file modifications, broken links,
+and reports Git repository status in ~/Code/dotfiles.
+"""
+
+import sys
+import os
+import subprocess
+import filecmp
+import argparse
+import json
+import difflib
+
+USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+GREEN = "\033[92m" if USE_COLOR else ""
+YELLOW = "\033[93m" if USE_COLOR else ""
+RED = "\033[91m" if USE_COLOR else ""
+CYAN = "\033[96m" if USE_COLOR else ""
+BLUE = "\033[94m" if USE_COLOR else ""
+BOLD = "\033[1m" if USE_COLOR else ""
+DIM = "\033[2m" if USE_COLOR else ""
+RESET = "\033[0m" if USE_COLOR else ""
+
+DOTFILES_DIR = os.path.expanduser("~/Code/dotfiles")
+
+
+def is_wsl():
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    try:
+        with open("/proc/version", "r") as f:
+            v = f.read().lower()
+            return "microsoft" in v or "wsl" in v
+    except Exception:
+        return False
+
+
+def build_managed_targets(wsl_active):
+    """Dynamically builds the list of managed targets from dotfiles structure."""
+    targets = [
+        # Static core mappings: (Category, Home Path, Repo Rel Path, DesktopOnly)
+        ("Terminal", "~/.config/alacritty", "terminal/alacritty", False),
+        ("Terminal", "~/.config/zellij", "terminal/zellij", False),
+        ("Shell", "~/.zshrc", "shell/.zshrc", False),
+        ("Shell", "~/.oh-my-zsh/custom/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", False),
+        ("Shell", "~/.oh-my-zsh/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", False),
+        ("Agents Rules", "~/.gemini/GEMINI.md", "agents/rules/global-rules.md", False),
+        ("Agents Rules", "~/.claude/CLAUDE.md", "agents/rules/global-rules.md", False),
+        ("Agents Rules", "~/.config/opencode/AGENTS.md", "agents/rules/global-rules.md", False),
+        ("Agents MCP", "~/.config/opencode/opencode.json", "agents/mcp/opencode.json", False),
+    ]
+
+    # Dynamic discovery for skills
+    skills_dir = os.path.join(DOTFILES_DIR, "agents/skills")
+    if os.path.isdir(skills_dir):
+        for entry in sorted(os.listdir(skills_dir)):
+            full_p = os.path.join(skills_dir, entry)
+            if os.path.isdir(full_p):
+                is_desk = (entry == "wmctrl-focus")
+                targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/{entry}", is_desk))
+
+    # Dynamic discovery for common binaries
+    common_bin = os.path.join(DOTFILES_DIR, "bin/common")
+    if os.path.isdir(common_bin):
+        for entry in sorted(os.listdir(common_bin)):
+            full_p = os.path.join(common_bin, entry)
+            if os.path.isfile(full_p):
+                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/common/{entry}", False))
+
+    # Dynamic discovery for desktop-linux binaries
+    desk_bin = os.path.join(DOTFILES_DIR, "bin/desktop-linux")
+    if os.path.isdir(desk_bin):
+        for entry in sorted(os.listdir(desk_bin)):
+            full_p = os.path.join(desk_bin, entry)
+            if os.path.isfile(full_p):
+                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/desktop-linux/{entry}", True))
+
+    return targets
+
+
+def get_git_status():
+    if not os.path.isdir(os.path.join(DOTFILES_DIR, ".git")):
+        return {"clean": False, "error": "No es un repositorio Git válido"}
+
+    try:
+        # Changed files
+        res_status = subprocess.run(
+            ["git", "-C", DOTFILES_DIR, "status", "-s"],
+            capture_output=True, text=True, check=True
+        )
+        changed_lines = [l.strip() for l in res_status.stdout.splitlines() if l.strip()]
+
+        # Upstream check
+        res_up = subprocess.run(
+            ["git", "-C", DOTFILES_DIR, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+            capture_output=True, text=True
+        )
+        has_upstream = (res_up.returncode == 0 and res_up.stdout.strip() != "")
+        upstream_name = res_up.stdout.strip() if has_upstream else None
+
+        # Ahead / behind info
+        ahead = 0
+        behind = 0
+        if has_upstream:
+            res_counts = subprocess.run(
+                ["git", "-C", DOTFILES_DIR, "rev-list", "--left-right", "--count", "HEAD...@{u}"],
+                capture_output=True, text=True
+            )
+            if res_counts.returncode == 0:
+                parts = res_counts.stdout.strip().split()
+                if len(parts) == 2:
+                    ahead = int(parts[0])
+                    behind = int(parts[1])
+
+        return {
+            "clean": len(changed_lines) == 0,
+            "changed_files": changed_lines,
+            "has_upstream": has_upstream,
+            "upstream": upstream_name,
+            "ahead": ahead,
+            "behind": behind
+        }
+    except Exception as e:
+        return {"clean": False, "error": str(e)}
+
+
+def check_directory_diff_recursive(h_path, r_path):
+    """Recursively checks for differences between two directories."""
+    diffs = []
+    
+    def _scan(h_dir, r_dir, rel_prefix=""):
+        dc = filecmp.dircmp(h_dir, r_dir)
+        for item in dc.left_only:
+            diffs.append(f"Solo en local ($HOME): {os.path.join(rel_prefix, item)}")
+        for item in dc.right_only:
+            diffs.append(f"Solo en repo: {os.path.join(rel_prefix, item)}")
+        for item in dc.diff_files:
+            diffs.append(f"Modificado: {os.path.join(rel_prefix, item)}")
+        for sub in dc.common_dirs:
+            _scan(os.path.join(h_dir, sub), os.path.join(r_dir, sub), os.path.join(rel_prefix, sub))
+
+    try:
+        _scan(h_path, r_path)
+    except Exception as e:
+        diffs.append(f"Error al comparar directorios: {e}")
+    return diffs
+
+
+def get_file_diff(h_path, r_path):
+    """Returns a unified diff between home file and repo file."""
+    try:
+        with open(h_path, "r", encoding="utf-8", errors="ignore") as f1:
+            h_lines = f1.readlines()
+        with open(r_path, "r", encoding="utf-8", errors="ignore") as f2:
+            r_lines = f2.readlines()
+        diff = list(difflib.unified_diff(
+            r_lines, h_lines,
+            fromfile=f"repo:{os.path.relpath(r_path, DOTFILES_DIR)}",
+            tofile=f"local:{h_path}",
+            n=2
+        ))
+        return "".join(diff) if diff else None
+    except Exception:
+        return None
+
+
+def audit_target(home_path, repo_rel_path, is_desktop_only, wsl_active):
+    h = os.path.expanduser(home_path)
+    r = os.path.join(DOTFILES_DIR, repo_rel_path)
+
+    if is_desktop_only and wsl_active:
+        return {
+            "path": home_path,
+            "status": "SKIPPED_WSL",
+            "message": "Omitido (requiere entorno X11/GNOME nativo)"
+        }
+
+    if not os.path.exists(r) and not os.path.islink(r):
+        return {
+            "path": home_path,
+            "status": "MISSING_REPO",
+            "message": f"Archivo ausente en el repositorio: {repo_rel_path}"
+        }
+
+    if os.path.islink(h):
+        actual_dest = os.path.realpath(h)
+        expected_dest = os.path.realpath(r)
+        if actual_dest == expected_dest:
+            return {
+                "path": home_path,
+                "status": "OK",
+                "message": f"Enlazado correctamente -> {repo_rel_path}"
+            }
+        else:
+            return {
+                "path": home_path,
+                "status": "DIVERGED_LINK",
+                "message": f"Enlace apunta a destino inesperado: {actual_dest} (se esperaba {expected_dest})"
+            }
+    elif os.path.exists(h):
+        # Regular file or directory, not a symlink!
+        if os.path.isdir(h) and os.path.isdir(r):
+            diffs = check_directory_diff_recursive(h, r)
+            if not diffs:
+                return {
+                    "path": home_path,
+                    "status": "DETACHED_IDENTICAL",
+                    "message": "Existe como carpeta regular (no symlink), contenido idéntico."
+                }
+            else:
+                return {
+                    "path": home_path,
+                    "status": "DETACHED_MODIFIED",
+                    "message": f"Existe como carpeta regular con diferencias ({len(diffs)} archivos): {', '.join(diffs[:2])}"
+                }
+        else:
+            # File
+            try:
+                is_same = filecmp.cmp(h, r, shallow=False)
+                if is_same:
+                    return {
+                        "path": home_path,
+                        "status": "DETACHED_IDENTICAL",
+                        "message": "Existe como archivo regular (no symlink), contenido idéntico."
+                    }
+                else:
+                    return {
+                        "path": home_path,
+                        "status": "DETACHED_MODIFIED",
+                        "message": "Existe como archivo regular con CAMBIOS locales fuera del repositorio."
+                    }
+            except Exception:
+                return {
+                    "path": home_path,
+                    "status": "ERROR_COMPARING",
+                    "message": "Error al comparar archivos"
+                }
+    else:
+        return {
+            "path": home_path,
+            "status": "MISSING_HOST",
+            "message": "No existe en el host (ejecuta './install.sh' para crearlo)."
+        }
+
+
+def relink_target(home_path, repo_rel_path):
+    """Restores the symlink from home_path to repo_path, creating a backup if detached."""
+    h = os.path.expanduser(home_path)
+    r = os.path.join(DOTFILES_DIR, repo_rel_path)
+
+    if not os.path.exists(r) and not os.path.islink(r):
+        return False, f"No existe el origen en dotfiles: {repo_rel_path}"
+
+    os.makedirs(os.path.dirname(h), exist_ok=True)
+
+    if os.path.islink(h):
+        if os.path.realpath(h) == os.path.realpath(r):
+            return True, "Ya está correctamente enlazado."
+        os.remove(h)
+    elif os.path.exists(h):
+        backup_p = f"{h}.bak_doctor_{os.getpid()}"
+        os.rename(h, backup_p)
+
+    os.symlink(r, h)
+    return True, f"Enlace restaurado -> {repo_rel_path}"
+
+
+def audit_mcp_servers():
+    """Audits MCP servers in Gemini and Claude."""
+    mcp_results = []
+    
+    # Gemini
+    gemini_cfg = os.path.expanduser("~/.gemini/config/mcp_config.json")
+    if os.path.exists(gemini_cfg):
+        try:
+            with open(gemini_cfg, "r") as f:
+                data = json.load(f)
+            servers = list(data.get("mcpServers", {}).keys())
+            has_chrome = "chrome-devtools" in servers
+            mcp_results.append({
+                "agent": "Gemini CLI (agy)",
+                "config": "~/.gemini/config/mcp_config.json",
+                "ok": has_chrome,
+                "servers": servers,
+                "message": "chrome-devtools registrado" if has_chrome else "Falta chrome-devtools"
+            })
+        except Exception as e:
+            mcp_results.append({"agent": "Gemini CLI", "ok": False, "message": str(e)})
+    else:
+        mcp_results.append({"agent": "Gemini CLI", "ok": False, "message": "mcp_config.json ausente"})
+
+    # Claude Code
+    claude_cfg = os.path.expanduser("~/.claude.json")
+    if os.path.exists(claude_cfg):
+        try:
+            with open(claude_cfg, "r") as f:
+                data = json.load(f)
+            servers = list(data.get("mcpServers", {}).keys())
+            has_chrome = "chrome-devtools" in servers
+            mcp_results.append({
+                "agent": "Claude Code",
+                "config": "~/.claude.json",
+                "ok": has_chrome,
+                "servers": servers,
+                "message": "chrome-devtools registrado" if has_chrome else "Falta chrome-devtools"
+            })
+        except Exception as e:
+            mcp_results.append({"agent": "Claude Code", "ok": False, "message": str(e)})
+
+    # OpenCode
+    opencode_cfg = os.path.expanduser("~/.config/opencode/opencode.json")
+    if os.path.islink(opencode_cfg):
+        mcp_results.append({
+            "agent": "OpenCode",
+            "config": "~/.config/opencode/opencode.json",
+            "ok": True,
+            "servers": ["chrome-devtools"],
+            "message": "chrome-devtools enlazado vía dotfiles"
+        })
+    else:
+        mcp_results.append({"agent": "OpenCode", "ok": False, "message": "opencode.json no es symlink"})
+
+    return mcp_results
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="dotfiles-doctor - Diagnóstico y auditoría de configuraciones de dotfiles.",
+        epilog="Ejemplos:\n  dotfiles-doctor           # Auditoría visual del sistema\n  dotfiles-doctor --fix     # Repara y restablece symlinks desconectados\n  dotfiles-doctor --diff    # Muestra diffs detallados de cambios locales\n  dotfiles-doctor --json    # Salida en JSON para agentes IA"
+    )
+    parser.add_argument("--fix", "--relink", action="store_true", help="Reconstruir enlaces simbólicos desconectados o rotos.")
+    parser.add_argument("--diff", action="store_true", help="Mostrar diferencias de archivos locales modificados fuera de Git.")
+    parser.add_argument("--json", action="store_true", help="Imprimir resultados en formato JSON estructurado.")
+    args = parser.parse_args()
+
+    wsl_active = is_wsl()
+    managed_targets = build_managed_targets(wsl_active)
+
+    results_by_cat = {}
+    issues_found = []
+    diff_outputs = []
+
+    for cat, h_path, r_path, is_desk in managed_targets:
+        res = audit_target(h_path, r_path, is_desk, wsl_active)
+        res["category"] = cat
+        res["repo_path"] = r_path
+        results_by_cat.setdefault(cat, []).append(res)
+        
+        if res["status"] not in ("OK", "SKIPPED_WSL"):
+            issues_found.append(res)
+            
+            # Check diff if requested
+            if args.diff and res["status"] == "DETACHED_MODIFIED":
+                h_expanded = os.path.expanduser(h_path)
+                r_expanded = os.path.join(DOTFILES_DIR, r_path)
+                if os.path.isfile(h_expanded) and os.path.isfile(r_expanded):
+                    d_text = get_file_diff(h_expanded, r_expanded)
+                    if d_text:
+                        diff_outputs.append((h_path, d_text))
+
+    git_state = get_git_status()
+    mcp_state = audit_mcp_servers()
+
+    # Apply fixes if requested
+    fixed_count = 0
+    if args.fix:
+        for it in issues_found:
+            if it["status"] in ("DETACHED_IDENTICAL", "DETACHED_MODIFIED", "MISSING_HOST", "DIVERGED_LINK"):
+                ok, msg = relink_target(it["path"], it["repo_path"])
+                if ok:
+                    fixed_count += 1
+                    it["fixed"] = True
+                    it["fix_message"] = msg
+
+    if args.json:
+        payload = {
+            "dotfiles_dir": DOTFILES_DIR,
+            "wsl": wsl_active,
+            "git": git_state,
+            "mcp": mcp_state,
+            "targets": [item for sublist in results_by_cat.values() for item in sublist],
+            "issues_count": len(issues_found),
+            "fixed_count": fixed_count
+        }
+        print(json.dumps(payload, indent=2))
+        return
+
+    # CLI Output
+    print(f"\n{BOLD}{CYAN}🩺 Dotfiles Doctor — Diagnóstico de Entorno y Configuraciones{RESET}")
+    print(f"{DIM}Directorio del repositorio: {DOTFILES_DIR}{RESET}")
+    print(f"{DIM}Entorno detectado: {'Windows Subsystem for Linux (WSL)' if wsl_active else 'Linux Nativo (Ubuntu/GNOME)'}{RESET}\n")
+
+    # 1. Git status
+    print(f"{BOLD}1. Estado del Repositorio Git (~/Code/dotfiles):{RESET}")
+    if git_state.get("clean"):
+        print(f"   {GREEN}✔ Árbol de trabajo limpio (sin cambios locales pendientes de commit){RESET}")
+    else:
+        print(f"   {YELLOW}⚠ Hay cambios locales pendientes en el repositorio:{RESET}")
+        for ch in git_state.get("changed_files", []):
+            print(f"     {YELLOW}• {ch}{RESET}")
+
+    if not git_state.get("has_upstream"):
+        print(f"   {YELLOW}⚠ Rama local sin upstream remoto configurado{RESET}")
+    elif git_state.get("ahead", 0) > 0:
+        print(f"   {BLUE}ℹ Tienes {git_state['ahead']} commit(s) pendientes de subir a GitHub{RESET}")
+    elif git_state.get("behind", 0) > 0:
+        print(f"   {RED}⚠ Tu rama está {git_state['behind']} commit(s) por detrás del remoto (haz git pull){RESET}")
+    else:
+        print(f"   {GREEN}✔ Sincronizado con el remoto de GitHub ({git_state.get('upstream')}){RESET}")
+
+    # 2. Symlinks
+    print(f"\n{BOLD}2. Integridad de Enlaces Simbólicos ($HOME ➔ dotfiles):{RESET}")
+    for cat, items in results_by_cat.items():
+        print(f"\n  {BOLD}{CYAN}[{cat}]{RESET}")
+        for it in items:
+            p = it["path"]
+            st = it["status"]
+            msg = it["message"]
+
+            if it.get("fixed"):
+                print(f"    {GREEN}✔ (REPARADO){RESET} {p:42} {DIM}{it.get('fix_message')}{RESET}")
+            elif st == "OK":
+                print(f"    {GREEN}✔{RESET} {p:42} {DIM}➔ {msg}{RESET}")
+            elif st == "SKIPPED_WSL":
+                print(f"    {BLUE}○{RESET} {p:42} {DIM}{msg}{RESET}")
+            elif st == "DETACHED_MODIFIED":
+                print(f"    {RED}✖ {BOLD}{p:42}{RESET} {RED}{msg}{RESET}")
+            elif st == "DETACHED_IDENTICAL":
+                print(f"    {YELLOW}▲ {p:42}{RESET} {YELLOW}{msg}{RESET}")
+            else:
+                print(f"    {RED}✖ {p:42}{RESET} {RED}{msg}{RESET}")
+
+    # 3. MCP Servers
+    print(f"\n{BOLD}3. Servidores MCP Globales (Chrome DevTools):{RESET}")
+    for m in mcp_state:
+        mark = f"{GREEN}✔" if m["ok"] else f"{RED}✖"
+        print(f"   {mark}{RESET} {BOLD}{m['agent']:18}{RESET} {DIM}➔ {m['message']}{RESET}")
+
+    # Diffs
+    if diff_outputs:
+        print(f"\n{BOLD}{YELLOW}4. Diferencias detectadas en archivos desconectados:{RESET}")
+        for path, d_txt in diff_outputs:
+            print(f"\n{CYAN}--- Diffs en {path} ---{RESET}")
+            print(d_txt)
+
+    print(f"\n{DIM}{'─' * 68}{RESET}")
+    if not issues_found and git_state.get("clean"):
+        print(f"{GREEN}{BOLD}🎉 ¡Todo está en orden! Tu máquina y tu repositorio están 100% sincronizados.{RESET}\n")
+    else:
+        if fixed_count > 0:
+            print(f"{GREEN}{BOLD}🔧 Se repararon exitosamente {fixed_count} enlace(s) simbólico(s).{RESET}")
+        elif issues_found:
+            print(f"{YELLOW}{BOLD}⚠ Se detectaron {len(issues_found)} detalle(s) que requieren atención.{RESET}")
+            print(f"  {DIM}Ejecuta 'dotfiles-doctor --fix' o './install.sh' para restaurarlos.{RESET}")
+        if not git_state.get("clean"):
+            print(f"  {DIM}Hay cambios pendientes en Git. Revísalos con 'git diff' o haz commit.{RESET}")
+        print("")
+
+
+if __name__ == "__main__":
+    main()

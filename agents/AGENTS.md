@@ -21,6 +21,7 @@ Procedimientos estandarizados (*runbooks*) que los agentes cargan **bajo demanda
 | Skill | Compatibilidad | Ubicación | Descripción | Scripts asociados |
 | :--- | :---: | :--- | :--- | :--- |
 | **`find-session`** | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/find-session/SKILL.md`](file:///home/johantv/Code/dotfiles/agents/skills/find-session/SKILL.md) | Localización instantánea de IDs de conversaciones previas en Gemini, Claude Code y OpenCode. | [`bin/common/find-session`](file:///home/johantv/Code/dotfiles/bin/common/find-session) |
+| **`dotfiles-sync`** | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/dotfiles-sync/SKILL.md`](file:///home/johantv/Code/dotfiles/agents/skills/dotfiles-sync/SKILL.md) | Diagnóstico, auditoría de symlinks y detección de cambios locales en configuraciones del host. | [`bin/common/dotfiles-doctor`](file:///home/johantv/Code/dotfiles/bin/common/dotfiles-doctor) |
 | **`wmctrl-focus`** | 🐧 Desktop Linux<br>*(Ubuntu GNOME X11)* | [`skills/wmctrl-focus/SKILL.md`](file:///home/johantv/Code/dotfiles/agents/skills/wmctrl-focus/SKILL.md) | Procedimiento estándar para crear atajos de enfoque de ventanas con `wmctrl`. | [`bin/desktop-linux/focus-alacritty`](file:///home/johantv/Code/dotfiles/bin/desktop-linux/focus-alacritty)<br>[`bin/desktop-linux/focus-nautilus`](file:///home/johantv/Code/dotfiles/bin/desktop-linux/focus-nautilus) |
 
 ---
