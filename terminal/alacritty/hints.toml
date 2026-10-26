@@ -3,7 +3,7 @@
 # 1. Press Ctrl+Shift+I to open images in imv
 [[hints.enabled]]
 regex = "(?i)[^\\s\"'`()\\[\\]{}<>:]+\\.(png|jpe?g|webp|svg|gif|bmp)"
-command = "/home/johantv/.local/bin/imv"
+command = "imv"
 post_processing = true
 persist = false
 mouse.enabled = true
