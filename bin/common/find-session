@@ -1,0 +1,578 @@
+#!/usr/bin/env python3
+"""
+find-session - Fast session finder for Gemini (agy), Claude Code, and OpenCode.
+Allows instant search and retrieval of conversation IDs across agent sessions.
+"""
+
+import sys
+import os
+import re
+import json
+import sqlite3
+import argparse
+import unicodedata
+from datetime import datetime
+
+# Paths
+GEMINI_DIR = os.path.expanduser("~/.gemini/antigravity-cli")
+GEMINI_DB = os.path.join(GEMINI_DIR, "conversation_summaries.db")
+GEMINI_HIST = os.path.join(GEMINI_DIR, "history.jsonl")
+GEMINI_BRAIN = os.path.join(GEMINI_DIR, "brain")
+
+CLAUDE_DIR = os.path.expanduser("~/.claude")
+CLAUDE_HIST = os.path.join(CLAUDE_DIR, "history.jsonl")
+CLAUDE_PROJECTS = os.path.join(CLAUDE_DIR, "projects")
+
+OPENCODE_DIR = os.path.expanduser("~/.local/share/opencode")
+OPENCODE_DB = os.path.join(OPENCODE_DIR, "opencode.db")
+
+# ANSI color codes
+USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+CYAN = "\033[96m" if USE_COLOR else ""
+BLUE = "\033[94m" if USE_COLOR else ""
+GREEN = "\033[92m" if USE_COLOR else ""
+YELLOW = "\033[93m" if USE_COLOR else ""
+MAGENTA = "\033[95m" if USE_COLOR else ""
+BOLD = "\033[1m" if USE_COLOR else ""
+DIM = "\033[2m" if USE_COLOR else ""
+RESET = "\033[0m" if USE_COLOR else ""
+
+
+def strip_accents(text):
+    if not text:
+        return ""
+    return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
+
+
+def parse_timestamp(val):
+    if not val:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return val / 1000.0 if val > 1e11 else float(val)
+    if isinstance(val, str):
+        try:
+            clean = val[:26] + val[val.rfind("+"):] if "+" in val else val[:19]
+            dt = datetime.fromisoformat(clean)
+            return dt.timestamp()
+        except Exception:
+            return 0.0
+    return 0.0
+
+
+def format_dt(ts):
+    if not ts:
+        return "Fecha desconocida"
+    try:
+        dt = datetime.fromtimestamp(ts)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return "Fecha inválida"
+
+
+def clean_prompt_text(text):
+    if not text:
+        return ""
+    # Remove XML-like tags often found in agent transcripts
+    cleaned = re.sub(r"<USER_REQUEST>", "", text, flags=re.IGNORECASE)
+    cleaned = re.sub(r"</USER_REQUEST>", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<ADDITIONAL_METADATA>[\s\S]*?</ADDITIONAL_METADATA>", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<USER_SETTINGS_CHANGE>[\s\S]*?</USER_SETTINGS_CHANGE>", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"<SYSTEM_MESSAGE>[\s\S]*?</SYSTEM_MESSAGE>", "", cleaned, flags=re.IGNORECASE)
+    return " ".join(cleaned.split()).strip()
+
+
+def make_snippet(text, query, window=90):
+    if not text:
+        return ""
+    clean_text = clean_prompt_text(text)
+    if not query:
+        return (clean_text[:window * 2] + "...") if len(clean_text) > window * 2 else clean_text
+    
+    norm_text = strip_accents(clean_text).lower()
+    norm_query = strip_accents(query).lower()
+    
+    idx = norm_text.find(norm_query)
+    if idx == -1:
+        return (clean_text[:window * 2] + "...") if len(clean_text) > window * 2 else clean_text
+    
+    start = max(0, idx - window)
+    end = min(len(clean_text), idx + len(query) + window)
+    snippet = clean_text[start:end].strip()
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(clean_text):
+        snippet = snippet + "..."
+    return snippet
+
+
+def get_first_prompt_from_transcript(conv_id):
+    trans_path = os.path.join(GEMINI_BRAIN, conv_id, ".system_generated/logs/transcript.jsonl")
+    if os.path.exists(trans_path):
+        try:
+            with open(trans_path, "r", encoding="utf-8", errors="ignore") as tf:
+                for line in tf:
+                    d = json.loads(line)
+                    if d.get("type") == "USER_INPUT":
+                        return clean_prompt_text(d.get("content", ""))
+        except Exception:
+            pass
+    return ""
+
+
+def get_gemini_sessions(query="", deep=False):
+    sessions = {}
+
+    # 1. From conversation_summaries.db
+    if os.path.exists(GEMINI_DB):
+        try:
+            conn = sqlite3.connect(f"file:{GEMINI_DB}?mode=ro", uri=True)
+            c = conn.cursor()
+            cols = [col[1] for col in c.execute("PRAGMA table_info(conversation_summaries)").fetchall()]
+            wanted = ["conversation_id", "title", "preview", "last_modified_time", "workspace_uris"]
+            existing = [w for w in wanted if w in cols]
+            
+            rows = c.execute(f"SELECT {', '.join(existing)} FROM conversation_summaries").fetchall()
+            for r in rows:
+                data = dict(zip(existing, r))
+                cid = data.get("conversation_id")
+                if not cid:
+                    continue
+                ts = parse_timestamp(data.get("last_modified_time"))
+                sessions[cid] = {
+                    "agent": "gemini",
+                    "id": cid,
+                    "title": data.get("title", "").strip() or "Sin título",
+                    "preview": data.get("preview", "").strip(),
+                    "workspace": data.get("workspace_uris", "").strip(),
+                    "timestamp": ts,
+                    "prompts": [],
+                    "first_prompt": ""
+                }
+            conn.close()
+        except Exception:
+            pass
+
+    # 2. From history.jsonl
+    if os.path.exists(GEMINI_HIST):
+        try:
+            with open(GEMINI_HIST, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    try:
+                        d = json.loads(line)
+                        cid = d.get("conversationId")
+                        if not cid:
+                            continue
+                        disp = d.get("display", "").strip()
+                        ts = parse_timestamp(d.get("timestamp"))
+                        if cid not in sessions:
+                            sessions[cid] = {
+                                "agent": "gemini",
+                                "id": cid,
+                                "title": "Sin título",
+                                "preview": "",
+                                "workspace": d.get("workspace", ""),
+                                "timestamp": ts,
+                                "prompts": [],
+                                "first_prompt": ""
+                            }
+                        sessions[cid]["timestamp"] = max(sessions[cid]["timestamp"], ts)
+                        if disp:
+                            sessions[cid]["prompts"].append(disp)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Clean workspaces and extract first prompt
+    for s in sessions.values():
+        if s["workspace"].startswith("[") and "file://" in s["workspace"]:
+            m = re.search(r'file://([^"\'\]]+)', s["workspace"])
+            if m:
+                s["workspace"] = m.group(1)
+
+        first_tp = get_first_prompt_from_transcript(s["id"])
+        if first_tp:
+            s["first_prompt"] = first_tp
+            if first_tp not in s["prompts"]:
+                s["prompts"].insert(0, first_tp)
+        elif s["prompts"]:
+            s["first_prompt"] = clean_prompt_text(s["prompts"][0])
+
+    # Filter by query if provided
+    results = []
+    q_norm = strip_accents(query).lower() if query else ""
+
+    for s in sessions.values():
+        score = 0
+        match_snippet = ""
+
+        if not q_norm:
+            results.append(s)
+            continue
+
+        # Check prompts
+        for p in s["prompts"]:
+            if q_norm in strip_accents(p).lower():
+                score += 10
+                match_snippet = make_snippet(p, query)
+                break
+
+        # Check title
+        if q_norm in strip_accents(s["title"]).lower():
+            score += 8
+            if not match_snippet:
+                match_snippet = s["title"]
+
+        # Check preview
+        if score == 0 and q_norm in strip_accents(s["preview"]).lower():
+            score += 6
+            match_snippet = make_snippet(s["preview"], query)
+
+        # Check deep transcript if requested and no match yet
+        if score == 0 and deep:
+            trans_path = os.path.join(GEMINI_BRAIN, s["id"], ".system_generated/logs/transcript.jsonl")
+            if os.path.exists(trans_path):
+                try:
+                    with open(trans_path, "r", encoding="utf-8", errors="ignore") as tf:
+                        for line in tf:
+                            if q_norm in strip_accents(line).lower():
+                                score += 3
+                                match_snippet = make_snippet(line, query)
+                                break
+                except Exception:
+                    pass
+
+        if score > 0:
+            s["score"] = score
+            s["match_snippet"] = match_snippet
+            results.append(s)
+
+    return results
+
+
+def get_claude_sessions(query="", deep=False):
+    sessions = {}
+
+    if os.path.exists(CLAUDE_HIST):
+        try:
+            with open(CLAUDE_HIST, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    try:
+                        d = json.loads(line)
+                        sid = d.get("sessionId")
+                        if not sid:
+                            continue
+                        disp = d.get("display", "").strip()
+                        ts = parse_timestamp(d.get("timestamp"))
+                        proj = d.get("project", "")
+                        if sid not in sessions:
+                            sessions[sid] = {
+                                "agent": "claude",
+                                "id": sid,
+                                "title": "",
+                                "preview": "",
+                                "workspace": proj,
+                                "timestamp": ts,
+                                "prompts": [],
+                                "first_prompt": ""
+                            }
+                        sessions[sid]["timestamp"] = max(sessions[sid]["timestamp"], ts)
+                        if proj and not sessions[sid]["workspace"]:
+                            sessions[sid]["workspace"] = proj
+                        if disp:
+                            sessions[sid]["prompts"].append(disp)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    for s in sessions.values():
+        if s["prompts"]:
+            first_user = next((p for p in s["prompts"] if not p.startswith("/")), s["prompts"][0])
+            s["first_prompt"] = clean_prompt_text(first_user)
+            s["title"] = (first_user[:50] + "...") if len(first_user) > 50 else first_user
+        else:
+            s["title"] = "Sesión Claude Code"
+
+    results = []
+    q_norm = strip_accents(query).lower() if query else ""
+
+    for s in sessions.values():
+        score = 0
+        match_snippet = ""
+
+        if not q_norm:
+            results.append(s)
+            continue
+
+        # Check prompts
+        for p in s["prompts"]:
+            if q_norm in strip_accents(p).lower():
+                score += 10
+                match_snippet = make_snippet(p, query)
+                break
+
+        # Check workspace / project
+        if score == 0 and q_norm in strip_accents(s["workspace"]).lower():
+            score += 5
+            match_snippet = s["workspace"]
+
+        # Check deep transcript in projects
+        if score == 0 and deep and os.path.exists(CLAUDE_PROJECTS):
+            try:
+                for root, _, files in os.walk(CLAUDE_PROJECTS):
+                    target_file = f"{s['id']}.jsonl"
+                    if target_file in files:
+                        p_file = os.path.join(root, target_file)
+                        with open(p_file, "r", encoding="utf-8", errors="ignore") as pf:
+                            for line in pf:
+                                if q_norm in strip_accents(line).lower():
+                                    score += 3
+                                    match_snippet = make_snippet(line, query)
+                                    break
+                        break
+            except Exception:
+                pass
+
+        if score > 0:
+            s["score"] = score
+            s["match_snippet"] = match_snippet
+            results.append(s)
+
+    return results
+
+
+def get_opencode_sessions(query="", deep=False):
+    sessions = {}
+
+    if not os.path.exists(OPENCODE_DB):
+        return []
+
+    try:
+        conn = sqlite3.connect(f"file:{OPENCODE_DB}?mode=ro", uri=True)
+        c = conn.cursor()
+
+        # Query session_v2
+        rows = c.execute(
+            "SELECT id, title, slug, directory, time_created, time_updated FROM session_v2"
+        ).fetchall()
+
+        for r in rows:
+            sid, title, slug, directory, t_created, t_updated = r
+            ts = parse_timestamp(t_updated or t_created)
+
+            # Query messages for this session
+            msgs = c.execute(
+                "SELECT type, data FROM session_message WHERE session_id = ? ORDER BY time_created ASC",
+                (sid,)
+            ).fetchall()
+
+            user_prompts = []
+            deep_texts = []
+
+            for m_type, m_data in msgs:
+                try:
+                    payload = json.loads(m_data)
+                    if m_type == "user":
+                        txt = payload.get("text", "")
+                        if txt:
+                            user_prompts.append(txt)
+                    elif deep and m_type == "assistant":
+                        for item in payload.get("content", []):
+                            if isinstance(item, dict):
+                                t_content = item.get("text") or item.get("reasoning")
+                                if t_content:
+                                    deep_texts.append(t_content)
+                except Exception:
+                    pass
+
+            first_p = user_prompts[0] if user_prompts else ""
+            display_title = (title or "").strip()
+            if not display_title:
+                display_title = (first_p[:50] + "...") if len(first_p) > 50 else first_p
+            if not display_title:
+                display_title = slug or "Sesión OpenCode"
+
+            sessions[sid] = {
+                "agent": "opencode",
+                "id": sid,
+                "title": display_title,
+                "preview": clean_prompt_text(first_p),
+                "workspace": directory or "",
+                "timestamp": ts,
+                "prompts": user_prompts,
+                "first_prompt": clean_prompt_text(first_p),
+                "deep_texts": deep_texts
+            }
+
+        conn.close()
+    except Exception:
+        pass
+
+    results = []
+    q_norm = strip_accents(query).lower() if query else ""
+
+    for s in sessions.values():
+        score = 0
+        match_snippet = ""
+
+        if not q_norm:
+            results.append(s)
+            continue
+
+        # Check user prompts
+        for p in s["prompts"]:
+            if q_norm in strip_accents(p).lower():
+                score += 10
+                match_snippet = make_snippet(p, query)
+                break
+
+        # Check title
+        if score == 0 and q_norm in strip_accents(s["title"]).lower():
+            score += 8
+            match_snippet = s["title"]
+
+        # Check workspace / directory
+        if score == 0 and q_norm in strip_accents(s["workspace"]).lower():
+            score += 5
+            match_snippet = s["workspace"]
+
+        # Check deep assistant messages
+        if score == 0 and deep:
+            for dt in s.get("deep_texts", []):
+                if q_norm in strip_accents(dt).lower():
+                    score += 3
+                    match_snippet = make_snippet(dt, query)
+                    break
+
+        if score > 0:
+            s["score"] = score
+            s["match_snippet"] = match_snippet
+            results.append(s)
+
+    return results
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fast session finder for Gemini (agy), Claude Code, and OpenCode.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos de uso:
+  find-session alacritty             # Busca sesiones que hablen de alacritty
+  find-session --recent -n 5         # Muestra las 5 sesiones más recientes
+  find-session zellij -g             # Busca solo en sesiones de Gemini (agy)
+  find-session python -c             # Busca solo en sesiones de Claude Code
+  find-session helloworld -o         # Busca solo en sesiones de OpenCode
+  find-session "focus-nautilus" -d   # Búsqueda profunda en transcripciones
+  find-session --json alacritty      # Salida estructurada en JSON
+        """
+    )
+    parser.add_argument("query", nargs="*", help="Texto o palabras clave a buscar en títulos, prompts o contenido.")
+    parser.add_argument("-a", "--agent", choices=["all", "gemini", "claude", "opencode"], default="all",
+                        help="Agente a consultar: all (default), gemini, claude u opencode.")
+    parser.add_argument("-g", "--gemini", action="store_true", help="Buscar solo en Gemini (agy).")
+    parser.add_argument("-c", "--claude", action="store_true", help="Buscar solo en Claude Code.")
+    parser.add_argument("-o", "--opencode", action="store_true", help="Buscar solo en OpenCode.")
+    parser.add_argument("-r", "--recent", action="store_true", help="Listar sesiones recientes.")
+    parser.add_argument("-d", "--deep", action="store_true", help="Búsqueda profunda en transcripciones/logs.")
+    parser.add_argument("-n", "--limit", type=int, default=10, help="Límite de resultados a mostrar (default: 10).")
+    parser.add_argument("-j", "--json", action="store_true", help="Devolver resultados en formato JSON.")
+
+    args = parser.parse_args()
+
+    agent_filter = args.agent
+    if args.gemini:
+        agent_filter = "gemini"
+    elif args.claude:
+        agent_filter = "claude"
+    elif args.opencode:
+        agent_filter = "opencode"
+
+    query_str = " ".join(args.query).strip()
+
+    all_sessions = []
+    if agent_filter in ("all", "gemini"):
+        all_sessions.extend(get_gemini_sessions(query_str, deep=args.deep))
+    if agent_filter in ("all", "claude"):
+        all_sessions.extend(get_claude_sessions(query_str, deep=args.deep))
+    if agent_filter in ("all", "opencode"):
+        all_sessions.extend(get_opencode_sessions(query_str, deep=args.deep))
+
+    if query_str:
+        all_sessions.sort(key=lambda x: (x.get("score", 0), x.get("timestamp", 0)), reverse=True)
+    else:
+        all_sessions.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+
+    results = all_sessions[:args.limit]
+
+    if args.json:
+        output_data = []
+        for s in results:
+            if s["agent"] == "gemini":
+                cmd = f"agy --conversation {s['id']}"
+            elif s["agent"] == "claude":
+                cmd = f"claude --resume {s['id']}"
+            else:
+                cmd = f"opencode -s {s['id']}"
+
+            item = {
+                "agent": s["agent"],
+                "id": s["id"],
+                "title": s.get("title", ""),
+                "workspace": s.get("workspace", ""),
+                "datetime": format_dt(s.get("timestamp")),
+                "timestamp": s.get("timestamp"),
+                "context_preview": s.get("first_prompt", "") or s.get("preview", ""),
+                "resume_command": cmd
+            }
+            if s.get("match_snippet"):
+                item["match_snippet"] = s["match_snippet"]
+            output_data.append(item)
+        print(json.dumps(output_data, indent=2, ensure_ascii=False))
+        return
+
+    if not results:
+        msg = f"No se encontraron sesiones coincidentes con '{query_str}'." if query_str else "No se encontraron sesiones registradas."
+        print(f"{YELLOW}{msg}{RESET}")
+        return
+
+    header_text = f"Sesiones encontradas ({len(results)} de {len(all_sessions)})" if query_str else f"Sesiones recientes ({len(results)})"
+    print(f"\n{BOLD}{header_text}:{RESET}")
+    print(f"{DIM}{'─' * 65}{RESET}")
+
+    for idx, s in enumerate(results, 1):
+        if s["agent"] == "gemini":
+            agent_tag = f"{CYAN}[agy]{RESET}"
+        elif s["agent"] == "claude":
+            agent_tag = f"{MAGENTA}[claude]{RESET}"
+        else:
+            agent_tag = f"{YELLOW}[opencode]{RESET}"
+
+        dt_str = format_dt(s.get("timestamp"))
+        sid = s["id"]
+        title = s.get("title") or "Sin título"
+        preview_text = s.get("first_prompt") or s.get("preview") or ""
+
+        print(f"\n{BOLD}{idx}.{RESET} {agent_tag} {BOLD}{sid}{RESET}  {DIM}({dt_str}){RESET}")
+        print(f"   {BOLD}Título:{RESET} {title}")
+        if s.get("workspace"):
+            print(f"   {DIM}Directorio:{RESET} {s['workspace']}")
+        if preview_text and preview_text != title:
+            short_preview = (preview_text[:140] + "...") if len(preview_text) > 140 else preview_text
+            print(f"   {BLUE}Contexto:{RESET} \"{short_preview}\"")
+        if s.get("match_snippet") and s.get("match_snippet") != title and s.get("match_snippet") != preview_text:
+            print(f"   {YELLOW}Coincidencia:{RESET} {s['match_snippet']}")
+
+        if s["agent"] == "gemini":
+            print(f"   {GREEN}Comando:{RESET} agy --conversation {sid}   {DIM}(o /resume {sid}){RESET}")
+        elif s["agent"] == "claude":
+            print(f"   {GREEN}Comando:{RESET} claude --resume {sid}")
+        else:
+            print(f"   {GREEN}Comando:{RESET} opencode -s {sid}")
+
+    print(f"\n{DIM}{'─' * 65}{RESET}\n")
+
+
+if __name__ == "__main__":
+    main()
