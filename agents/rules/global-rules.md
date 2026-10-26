@@ -17,3 +17,7 @@
 ### Exclusiones por defecto y Seguridad:
 - **Dependencias y cachés:** Respeta siempre `.gitignore`. En búsquedas desde `$HOME` (`~`), excluye estrictamente cachés masivas: `-E ".bun" -E ".cache" -E ".npm" -E ".cargo" -E ".local/share" -E ".venv" -E "venv"`. Prioriza siempre el espacio de trabajo activo.
 - **Secretos (.env):** Nunca busques ni expongas archivos `.env*` con credenciales reales en salidas abiertas (permite únicamente `.env.example`).
+
+### Capturas de Pantalla (Flameshot):
+- Las capturas residen en `~/screenshots/` (sincronizadas desde Windows).
+- Si el usuario dice "mira la captura", "revisa el screenshot" o similar sin ruta explícita, consulta directamente el archivo más reciente en `~/screenshots/` (o `~/screenshots/latest.png`) usando `read_file`.

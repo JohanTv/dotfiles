@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# shot: Utilidad rápida para sincronizar y obtener la última captura de Flameshot en WSL
+set -euo pipefail
+
+SCREENSHOTS_DIR="$HOME/screenshots"
+WIN_SCREENSHOTS="/mnt/c/Users/Johan/Downloads/Screenshots"
+
+# Asegurar symlink si no existe
+if [[ ! -d "$SCREENSHOTS_DIR" ]]; then
+    ln -sfn "$WIN_SCREENSHOTS" "$SCREENSHOTS_DIR"
+fi
+
+# Obtener la captura más reciente excluyendo latest.png
+LATEST_FILE=$(ls -t "$SCREENSHOTS_DIR"/*.png 2>/dev/null | grep -v 'latest.png' | head -n 1 || true)
+
+if [[ -z "$LATEST_FILE" ]]; then
+    echo "❌ No se encontraron capturas de Flameshot en $SCREENSHOTS_DIR" >&2
+    exit 1
+fi
+
+# Actualizar latest.png
+cp -f "$LATEST_FILE" "$SCREENSHOTS_DIR/latest.png" 2>/dev/null || true
+
+FILENAME=$(basename "$LATEST_FILE")
+TAG="@[$SCREENSHOTS_DIR/$FILENAME]"
+
+case "${1:-}" in
+    --path|-p)
+        echo "$LATEST_FILE"
+        ;;
+    --tag|-t)
+        echo "$TAG"
+        ;;
+    *)
+        # Copiar al portapapeles de Windows vía clip.exe
+        printf "%s" "$TAG" | /mnt/c/WINDOWS/system32/clip.exe 2>/dev/null || true
+        echo "📸 Última captura: $FILENAME"
+        echo "📋 Copiado al portapapeles: $TAG"
+        echo "💡 Enlace fijo siempre disponible: @[$SCREENSHOTS_DIR/latest.png]"
+        ;;
+esac
