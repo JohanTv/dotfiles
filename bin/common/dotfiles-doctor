@@ -23,7 +23,32 @@ BOLD = "\033[1m" if USE_COLOR else ""
 DIM = "\033[2m" if USE_COLOR else ""
 RESET = "\033[0m" if USE_COLOR else ""
 
-DOTFILES_DIR = os.path.expanduser("~/Code/dotfiles")
+def find_dotfiles_dir():
+    """Dynamically finds the dotfiles root directory, agnostic to clone location."""
+    # 1. Environment variable override
+    env_dir = os.environ.get("DOTFILES_DIR")
+    if env_dir and os.path.isdir(os.path.expanduser(env_dir)):
+        return os.path.realpath(os.path.expanduser(env_dir))
+
+    # 2. Derive from this script's real path (bin/common/dotfiles-doctor -> repo root)
+    script_real = os.path.realpath(__file__)
+    candidate = os.path.dirname(os.path.dirname(os.path.dirname(script_real)))
+    if os.path.isdir(os.path.join(candidate, ".git")) or os.path.isfile(os.path.join(candidate, "install.sh")):
+        return candidate
+
+    # 3. Fallback search in standard locations
+    for fb in [
+        os.path.expanduser("~/Code/dotfiles"),
+        os.path.expanduser("~/.dotfiles"),
+        os.path.expanduser("~/dotfiles"),
+    ]:
+        if os.path.isdir(os.path.join(fb, ".git")):
+            return fb
+
+    return candidate
+
+
+DOTFILES_DIR = find_dotfiles_dir()
 
 
 def is_wsl():
@@ -393,7 +418,7 @@ def main():
     print(f"{DIM}Entorno detectado: {'Windows Subsystem for Linux (WSL)' if wsl_active else 'Linux Nativo (Ubuntu/GNOME)'}{RESET}\n")
 
     # 1. Git status
-    print(f"{BOLD}1. Estado del Repositorio Git (~/Code/dotfiles):{RESET}")
+    print(f"{BOLD}1. Estado del Repositorio Git ({DOTFILES_DIR}):{RESET}")
     if git_state.get("clean"):
         print(f"   {GREEN}✔ Árbol de trabajo limpio (sin cambios locales pendientes de commit){RESET}")
     else:

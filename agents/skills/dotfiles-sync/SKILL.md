@@ -43,9 +43,9 @@ El agente debe:
    ```
 2. **Interpretar los resultados:**
    * **`targets` con `status != "OK"`:** Indica que un archivo en `$HOME` no es un enlace simbólico o fue desconectado.
-   * **`git.changed_files`:** Muestra archivos modificados o nuevos dentro de `~/Code/dotfiles`.
+   * **`git.changed_files`:** Muestra archivos modificados o nuevos dentro del repositorio `dotfiles` (la ruta exacta viene en `.dotfiles_dir`).
 3. **Inspeccionar diferencias (`git diff`):**
-   Si hay cambios en el repositorio, usar `git -C ~/Code/dotfiles diff --stat` para revisar qué configuraciones cambiaron.
+   Si hay cambios en el repositorio, inspeccionar con `git -C <dotfiles_dir> diff --stat` para revisar qué configuraciones cambiaron.
 4. **Validar sintaxis según la herramienta afectada:**
    * Si cambió **Zellij**: Ejecutar `zellij setup --check` para garantizar cero errores de KDL.
    * Si cambió **Zsh**: Probar carga limpia con `zsh -n ~/.zshrc`.
