@@ -1,49 +1,59 @@
 ---
 name: plane-tracker
-description: Orquestador y registrador de tareas, estados, prioridades, etiquetas y bitácoras en Plane (Omnify/Operaciones) bajo el patrón dual-layer. Úsalo al iniciar tareas, al pasar a Pruebas/Revisión de PR, al cerrar sesiones o al finalizar hitos.
+description: Orquestador y registrador de tareas, estados, prioridades, etiquetas y bitácoras en Plane CE v1.2.3 bajo el patrón dual-layer (humano + telemetría analítica v2.1). Úsalo al iniciar tareas, al pasar a Pruebas/Revisión de PR, al cerrar sesiones o al finalizar hitos de desarrollo, research, tooling o deuda técnica.
 ---
 
-# Plane Session Tracker & Worklog Operator
+# Plane Session Tracker & Worklog Operator (v2.1)
 
-Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.2.3 auto-hospedada de la empresa (Omnify / Operaciones).
+Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.2.3 auto-hospedada de la empresa (Omnify / Operaciones) y alimentar el motor de telemetría y dashboard personal de `Code/plane`.
 
 ---
 
-## 1. Mapeo de Estados y Ciclo de Vida del Ticket
+## 1. Mapeo Determinista de Estados y Ciclo de Vida del Ticket
 
-El proyecto **Omnify** cuenta con 8 estados oficiales. Los asistentes deben realizar transiciones deterministas según el hito del desarrollador:
+Plane cuenta con estados oficiales por proyecto. Las transiciones de estado deben ser deterministas según el hito técnico alcanzado:
 
-| Estado en Plane | ¿Cuándo se activa? (Triggers del Asistente) | Comando CLI |
+| Estado en Plane | Trigger Técnico del Asistente | Comando CLI |
 | :--- | :--- | :--- |
-| **`Pendiente`** | Tarea asignada o planificada pero aún no iniciada. | `plane.py update OMNIFY-XXX --state Pendiente` |
-| **`Progreso`** | Johan arranca a investigar, auditar o programar la tarea. | `plane.py update OMNIFY-XXX --state Progreso` |
-| **`Pruebas`** | Código/script listo; ejecutando dry-run transaccional, tests unitarios o validación con réplica. | `plane.py update OMNIFY-XXX --state Pruebas` |
-| **`Revisión`** | **PR subido a Git / Staging en espera de aprobación del líder técnico (Pierre).** | `plane.py update OMNIFY-XXX --state Revisión` |
-| **`Pausado`** | Bloqueo externo (esperando respuesta de Meta, credenciales, acceso a servidor). | `plane.py update OMNIFY-XXX --state Pausado` |
-| **`Completado`** | PR mergeado, migración ejecutada o entregable verificado en producción. | `plane.py update OMNIFY-XXX --state Completado` |
-| **`Backlog`** | Idea o deuda técnica sin fecha de ejecución inmediata. | `plane.py update OMNIFY-XXX --state Backlog` |
+| **`Pendiente`** | Tarea asignada en el sprint pero aún no comenzada. | `plane.py update OMNIFY-XXX --state Pendiente` |
+| **`Progreso`** | Johan inicia actividades de Auditoría, Spike, RFC, Tooling o Desarrollo activo. | `plane.py update OMNIFY-XXX --state Progreso` |
+| **`Pruebas`** | Código/script listo; ejecutando dry-run transaccional, test suite o réplica. | `plane.py update OMNIFY-XXX --state Pruebas` |
+| **`Revisión`** | **PR subido a Git o Staging esperando aprobación del líder técnico (Pierre).** | `plane.py update OMNIFY-XXX --state Revisión` |
+| **`Pausado`** | **Stopper externo activo** (esperando respuesta de Meta, credenciales, accesos). | `plane.py update OMNIFY-XXX --state Pausado` |
+| **`Completado`** | PR mergeado, migración aplicada o entregable validado en producción. | `plane.py update OMNIFY-XXX --state Completado` |
+| **`Backlog`** | Idea, deuda técnica descubierta o requerimiento sin fecha inmediata. | `plane.py update OMNIFY-XXX --state Backlog` |
+| **`Cancelado`** | Tarea descartada por obsolescencia o cambio de prioridades. | `plane.py update OMNIFY-XXX --state Cancelado` |
 
 ---
 
-## 2. Taxonomía de Etiquetas (Labels) y Prioridades en Omnify
+## 2. Taxonomía de Proyectos, Etiquetas y Prioridades
 
-### Etiquetas Disponibles:
+### A. Proyectos Oficiales:
+* **`OMNIFY`:** Código fuente, plataformas web, backend, APIs, integraciones y auditorías de producto.
+* **`OPERACIONES` (`OPS`):** Soporte L2/L3 a usuarios, mantenimiento ad-hoc, cuentas Meta, servidores y tickets paraguas semanales.
+
+### B. Etiquetas Humanas (Labels) en Omnify:
 * **Componentes / Servicios:** `sms`, `backend`, `frontend`, `bd`, `infra`, `n8n`, `whatsapp`, `acortador`, `tts`, `correo`, `whatsapp-sender`.
-* **Área / Tipo de Esfuerzo:** `bug`, `deuda-tecnica`, `seguridad`, `docs`, `question`.
+* **Naturaleza del Trabajo:** `bug`, `deuda-tecnica`, `seguridad`, `docs`, `question`.
 
-### Prioridades Disponibles:
-* `urgent` (Caídas de producción, incidentes críticos, subfacturación activa).
-* `high` (Tareas del sprint o módulo actual comprometidas para entrega).
-* `medium` (Desarrollo estándar o mejoras planificadas).
-* `low` / `none` (Deuda técnica menor, cosméticos).
+### C. Prioridades Oficiales:
+* `urgent` (Caídas de producción, incidentes de facturación, fallos de seguridad).
+* `high` (Compromisos del sprint en curso o módulos con bloqueo directo).
+* `medium` (Desarrollo estándar o mejoras técnicas programadas).
+* `low` / `none` (Deuda técnica menor, optimizaciones cosméticas).
 
 ---
 
 ## 3. Comandos CLI Disponibles (`scripts/plane.py`)
 
-El script auto-carga variables desde `~/.zshrc.local` si no están en el entorno.
+El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`) y carga variables seguras desde `~/.zshrc.local`.
 
-### A. Actualizar Estado, Prioridad o Etiquetas
+### A. Publicar Bitácora Dual-Layer (Comentario)
+```bash
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py comment OMNIFY-162 -f /tmp/worklog.md
+```
+
+### B. Actualizar Estado, Prioridad o Etiquetas
 ```bash
 python3 ~/.agents/skills/plane-tracker/scripts/plane.py update OMNIFY-162 \
   --state "Revisión" \
@@ -51,60 +61,114 @@ python3 ~/.agents/skills/plane-tracker/scripts/plane.py update OMNIFY-162 \
   --labels "sms,backend,bug"
 ```
 
-### B. Publicar Bitácora Dual-Layer (Comentario)
-```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py comment OMNIFY-162 -f /tmp/worklog.md
-```
-
 ### C. Consultar Detalles de un Ticket
 ```bash
 python3 ~/.agents/skills/plane-tracker/scripts/plane.py get OMNIFY-162
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py get OPS-44
 ```
 
-### D. Listar Tickets Recientes del Proyecto
+### D. Listar Tickets Recientes
 ```bash
 python3 ~/.agents/skills/plane-tracker/scripts/plane.py list
 ```
 
 ---
 
-## 4. Estándar de la Bitácora Dual-Layer (Comentario)
+## 4. Estándar de Bitácora Dual-Layer (Humano + Telemetría v2.1)
 
-Todo comentario generado por el asistente debe seguir este formato exacto:
+Todo comentario generado por el asistente al cerrar una sesión debe seguir estrictamente este estándar:
 
-```markdown
-### ⏱️ Registro de Sesión | [FASE: Auditoría / Análisis / Dev / QA / Soporte]
+````markdown
+### ⏱️ Bitácora de Sesión | [FASE: Auditoría / RFC / PoC / Dev / QA / Soporte / Tooling / Research / Deuda Técnica]
 
-| Métrica | Detalle |
+| Parámetro | Detalle |
 | :--- | :--- |
-| **Fecha** | YYYY-MM-DD |
-| **Horario** | HH:MM - HH:MM (Xh Ym) |
-| **Tipo de Trabajo** | `Auditoría` / `Análisis` / `Construcción` / `QA` / `Soporte` |
-| **Responsable** | Johan Tanta |
-| **Estado Resultante** | ✅ [Estado actual: Progreso / Pruebas / Revisión / Completado] |
+| **Fecha & Horario** | YYYY-MM-DD \| HH:MM - HH:MM (Xh Ym) |
+| **Capacidad & Balde** | 🧠 `Deep Work` / 🚀 `Tooling & DX` / 🔬 `Research & I+D` / 🧹 `Tech Debt Paydown` / 🔧 `Toil & Soporte` / 🤝 `Coordinación` |
+| **Rol Ejercido** | `Auditor Forense` / `Backend` / `DevOps` / `QA` / `Tooling Architect` / `R&D Researcher` / `Soporte` |
+| **Tiempo de Foco** | **Xh Ym netos** (Z min bloqueo / interrupción) |
+| **Estado Resultante** | ✅ [Estado actual: Progreso / Pruebas / Revisión / Pausado / Completado] |
 
-#### 🎯 Resumen Ejecutivo para Gerencia
-- Resumen conciso de 2-3 puntos clave con impacto de negocio.
+#### 🎯 Resumen Ejecutivo de Impacto (Para Gerencia y Jefatura)
+- **Diagnóstico / Acción:** Resumen claro y contundente en 2 viñetas comprensibles para líderes.
+- **Impacto de Negocio & Retorno:** Riesgo mitigado, créditos salvados, velocidad multiplicada o blindaje de plataforma.
+- **Validación / PoC:** Métodos de validación ejecutados (Dry-Run en réplica, tests, simulación o script).
 
 #### 📦 Entregables Verificables
-- Archivos generados, scripts SQL, commits o PR (#XX).
+- `ruta/al/archivo_o_script`
+- Commit o PR asociado (#XX)
 
-#### ⏭️ Próxima Acción
-- Siguiente paso (ej. *"Esperando aprobación de PR por Pierre Vicente"*).
+#### ⏭️ Próxima Acción & Dependencias
+- Responsable: `Johan Tanta` / `Pierre Vicente` / `Meta`
+- Paso siguiente para desbloquear o avanzar.
 
 <!-- PLANE_WORKLOG_METADATA
 {
-  "version": "1.0",
-  "ticket": "OMNIFY-XXX",
+  "schema_version": "2.1",
+  "session_id": "auto-inferido-o-uuid",
+  "ticket_id": "OMNIFY-XXX",
+  "project": "OMNIFY",
   "date": "YYYY-MM-DD",
   "start_time": "HH:MM",
   "end_time": "HH:MM",
-  "duration_minutes": 0,
-  "phase": "auditoria|analisis|construccion|qa|soporte",
-  "developer": "johantv",
+  "duration_gross_minutes": 120,
+  "duration_net_minutes": 110,
+  "focus_time_minutes": 95,
+  "interrupted_minutes": 15,
+  "bucket": "deep_work",
+  "phase": "spike_audit",
+  "role": "forensic_auditor",
+  "poc_delivered": true,
+  "poc_details": {
+    "type": "script",
+    "path": "ruta/al/script"
+  },
+  "analysis_paralysis_risk": false,
+  "pandora_box_detected": false,
+  "pandora_box_details": null,
+  "tech_debt_delta": "neutral",
+  "tooling_roi": null,
+  "research_outcome": null,
+  "is_blocked": false,
+  "blocked_minutes": 0,
+  "blocker_details": null,
+  "business_impact": "critical_revenue_risk",
   "deliverables": [
     "ruta/al/archivo"
-  ]
+  ],
+  "tests_executed": true,
+  "test_run_type": "dry_run_replica",
+  "assistant": "antigravity",
+  "qualitative_tags": ["forensics", "reconciliacion"]
 }
 -->
-```
+````
+
+---
+
+## 5. Matriz de Inferencia Autógena para Agentes de IA
+
+Para evitar fricción y **nunca** pedirle a Johan que llene formularios manualmente, el asistente deduce los campos a partir de la sesión:
+
+| Huellas en la Sesión (Comandos / Archivos) | Fase Deducida (`phase`) | Balde (`bucket`) | Rol Deducido (`role`) | Impacto (`business_impact`) |
+| :--- | :--- | :--- | :--- | :--- |
+| Queries SQL forenses, CSVs, dumps, discrepancias | `spike_audit` | `deep_work` | `forensic_auditor` | `critical_revenue_risk` |
+| RFCs, diagramas Mermaid, contratos de API | `rfc_design` | `deep_work` | `backend_engineer` | `operational_efficiency` |
+| Scripts `.mjs`/`.py` de simulación, PoCs rápidos | `poc_prototype` | `deep_work` | `backend_engineer` | `bug_mitigation` |
+| Código frontend/backend, controladores, modelos | `construction_dev` | `deep_work` | `backend / fullstack`| `routine` |
+| Dockerfile, compose, Caddy, configs, puertos | `devops_infra` | `deep_work` | `devops_sre` | `operational_efficiency` |
+| Vitest, dry-runs SQL con ROLLBACK en réplica | `qa_validation` | `deep_work` | `qa_engineer` | `preventative` |
+| Creación de herramientas CLI, Makefile, skills IA | `tooling_dx` | `tooling_dx` | `tooling_architect` | `velocity_multiplier` |
+| I+D, estudio de librerías/protocolos de terceros | `research_learning`| `research_rd`| `rd_researcher` | `preventative` |
+| Refactorización activa, saneamiento de deuda técnica| `tech_debt_paydown`| `tech_debt_paydown`| `backend_engineer`| `operational_efficiency` |
+| Dudas de campañas Ripley, logs de usuarios | `support_l2_l3` | `toil_support` | `support_specialist` | `routine` |
+
+### Señales Estratégicas Clave:
+1. **Detección de PoC y Prevención de Parálisis (`poc_delivered`):**
+   - Si la sesión ejecutó o creó archivos ejecutables (`.mjs`, `.py`, `.sh`, scripts SQL con resultados) $\rightarrow$ `poc_delivered = true`.
+   - Si la sesión duró >120m en diseño conceptual sin código ejecutable $\rightarrow$ `analysis_paralysis_risk = true`.
+2. **Detección de "Caja de Pandora" (`pandora_box_detected`):**
+   - Se activa si se descubren fallos estructurales imprevistos (ej. *descuadre de 1.6M de filas en SEM-MKT*). El agente extrae el volumen de filas y marca `tech_debt_delta = "discovered"`.
+3. **Detección de Bloqueos / Stoppers (`is_blocked`):**
+   - Si se concluye en espera de respuesta de Meta, accesos o aprobación de Pierre, marcar `is_blocked: true`, identificar la entidad en `blocker_details`, y sugerir mover a `Pausado`.
+4. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane.py comment`?"*).

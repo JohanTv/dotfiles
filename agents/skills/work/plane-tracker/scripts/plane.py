@@ -63,6 +63,17 @@ def api_request(url, api_key, method="GET", data=None):
         sys.stderr.write(f"Error de conexión con Plane ({url}): {e}\n")
         sys.exit(1)
 
+def resolve_project_id(base_url, api_key, workspace, default_project_id, issue_ref):
+    """Detecta el proyecto según el prefijo del ticket (ej: OPS-12 -> Operaciones)."""
+    ref_upper = issue_ref.upper()
+    if ref_upper.startswith("OPS-"):
+        return "4423b9cd-86dc-4679-853a-90eab846229c"
+    elif ref_upper.startswith("OMNICANAL-"):
+        return "b402f601-cc4a-4b04-b479-4cf23121d1e6"
+    elif ref_upper.startswith("OMNIFY-"):
+        return "58371da4-cf62-4299-8fd4-99c1052b2eb3"
+    return default_project_id
+
 def resolve_issue(base_url, api_key, workspace, project_id, issue_ref):
     """Resuelve un número de secuencia (ej. '162' o 'OMNIFY-162') o UUID al issue completo."""
     if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
@@ -111,7 +122,8 @@ def get_labels_map(base_url, api_key, workspace, project_id):
 # Subcomandos
 # ------------------------------------------------------------------------------
 
-def cmd_comment(args, base_url, api_key, workspace, project_id):
+def cmd_comment(args, base_url, api_key, workspace, default_project_id):
+    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
     content = ""
     if args.file:
         with open(args.file, "r") as f:
@@ -128,9 +140,10 @@ def cmd_comment(args, base_url, api_key, workspace, project_id):
     issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     res = api_request(url, api_key, method="POST", data={"comment_html": content})
-    print(f"✔ Comentario publicado exitosamente en OMNIFY-{issue.get('sequence_id')} (ID: {res.get('id')})")
+    print(f"✔ Comentario publicado exitosamente en {args.issue} (ID: {res.get('id')})")
 
-def cmd_update(args, base_url, api_key, workspace, project_id):
+def cmd_update(args, base_url, api_key, workspace, default_project_id):
+    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
     patch_data = {}
 
@@ -175,11 +188,12 @@ def cmd_update(args, base_url, api_key, workspace, project_id):
     if "labels" in patch_data:
         changes.append(f"Etiquetas ➔ {args.labels}")
 
-    print(f"✔ Ticket OMNIFY-{issue.get('sequence_id')} actualizado con éxito: [{', '.join(changes)}]")
+    print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
-def cmd_get(args, base_url, api_key, workspace, project_id):
+def cmd_get(args, base_url, api_key, workspace, default_project_id):
+    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
-    print(f"\n📌 OMNIFY-{issue.get('sequence_id')}: {issue.get('name')}")
+    print(f"\n📌 {args.issue}: {issue.get('name')}")
     print(f"   Prioridad : {issue.get('priority')}")
     print(f"   Creado el : {issue.get('created_at')}")
     print(f"   UUID      : {issue.get('id')}\n")
