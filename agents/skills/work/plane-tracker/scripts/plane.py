@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-plane.py - CLI Integral para interactuar con Plane CE v1.2.3 desde agentes de IA y terminal.
+plane.py - CLI Integral y Resiliente para Plane CE v1.2.3.
 Soporta:
-  - Publicar comentarios dual-layer (humano + metadata)
-  - Actualizar estados (Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado)
-  - Gestionar prioridades (urgent, high, medium, low, none)
-  - Asignar etiquetas humanas (sms, backend, frontend, bd, infra, deuda-tecnica, etc.)
-  - Consultar y listar tickets asignados
+  - Descubrimiento dinámico de proyectos (OMNIFY, OPS, OMNILEADS, CDP, etc.) con caché local
+  - Paginación robusta de tickets, comentarios y etiquetas
+  - Timeout de red y manejo defensivo de errores
+  - Publicación de bitácoras dual-layer (humano + metadata)
+  - Transiciones de estado (Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado)
+  - Prioridades y etiquetas humanas dinámicas
+  - Salida formateada y soporte `--json` para agentes de IA
 """
 
 import sys
@@ -15,7 +17,12 @@ import json
 import urllib.request
 import urllib.error
 import re
+import time
 import argparse
+
+CACHE_DIR = os.path.expanduser("~/.cache/plane")
+CACHE_FILE = os.path.join(CACHE_DIR, "projects_cache.json")
+CACHE_TTL = 86400  # 24 horas
 
 def load_zshrc_local_if_needed():
     """Carga variables desde ~/.zshrc.local si no están en el entorno."""
@@ -45,12 +52,12 @@ def get_env_or_fail(var_name, description):
         sys.exit(1)
     return val
 
-def api_request(url, api_key, method="GET", data=None):
+def api_request(url, api_key, method="GET", data=None, timeout=10):
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"x-api-key": api_key, "Content-Type": "application/json"}
     req = urllib.request.Request(url, data=payload, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 204:
                 return {}
             content = resp.read().decode("utf-8")
@@ -60,39 +67,99 @@ def api_request(url, api_key, method="GET", data=None):
         sys.stderr.write(f"Error HTTP {e.code} en {url}: {err_msg}\n")
         sys.exit(1)
     except urllib.error.URLError as e:
-        sys.stderr.write(f"Error de conexión con Plane ({url}): {e}\n")
+        sys.stderr.write(f"Error de red/conexión con Plane ({url}): {e}\n")
         sys.exit(1)
 
-def resolve_project_id(base_url, api_key, workspace, default_project_id, issue_ref):
-    """Detecta el proyecto según el prefijo del ticket (ej: OPS-12 -> Operaciones)."""
-    ref_upper = issue_ref.upper()
-    if ref_upper.startswith("OPS-"):
-        return "4423b9cd-86dc-4679-853a-90eab846229c"
-    elif ref_upper.startswith("OMNICANAL-"):
-        return "b402f601-cc4a-4b04-b479-4cf23121d1e6"
-    elif ref_upper.startswith("OMNIFY-"):
-        return "58371da4-cf62-4299-8fd4-99c1052b2eb3"
-    return default_project_id
+def get_projects_map(base_url, api_key, workspace, force_refresh=False):
+    """Obtiene el mapa de identifier -> UUID de proyectos con caché local."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    now = time.time()
 
-def resolve_issue(base_url, api_key, workspace, project_id, issue_ref):
-    """Resuelve un número de secuencia (ej. '162' o 'OMNIFY-162') o UUID al issue completo."""
+    if not force_refresh and os.path.isfile(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r") as f:
+                cache_data = json.load(f)
+                if now - cache_data.get("_timestamp", 0) < CACHE_TTL:
+                    return cache_data.get("projects", {})
+        except Exception:
+            pass
+
+    # Consulta dinámica a la API de Plane
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/"
+    data = api_request(url, api_key)
+    projects_map = {}
+    for proj in data.get("results", []):
+        ident = proj.get("identifier", "").upper()
+        if ident:
+            projects_map[ident] = {
+                "id": proj["id"],
+                "name": proj["name"],
+                "identifier": ident
+            }
+
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump({"_timestamp": now, "projects": projects_map}, f, indent=2)
+    except Exception:
+        pass
+
+    return projects_map
+
+def resolve_project_and_seq(base_url, api_key, workspace, default_project_id, issue_ref):
+    """
+    Deduce el proyecto y número de secuencia a partir del issue_ref.
+    Soporta: 'OMNIFY-162', 'OPS-44', '162' o UUID.
+    """
+    # Si es UUID
     if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
-        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_ref}/"
+        return default_project_id, None, issue_ref
+
+    match = re.match(r"^([A-Za-z0-9_]+)-(\d+)$", issue_ref.strip())
+    if match:
+        prefix = match.group(1).upper()
+        seq_id = int(match.group(2))
+        projects_map = get_projects_map(base_url, api_key, workspace)
+        if prefix in projects_map:
+            return projects_map[prefix]["id"], seq_id, None
+
+        # Reintento con refresco de caché si no existe el prefijo
+        projects_map = get_projects_map(base_url, api_key, workspace, force_refresh=True)
+        if prefix in projects_map:
+            return projects_map[prefix]["id"], seq_id, None
+
+        sys.stderr.write(f"Error: Prefijo de proyecto '{prefix}' no encontrado en el workspace '{workspace}'.\n")
+        sys.stderr.write(f"Proyectos disponibles: {', '.join(projects_map.keys())}\n")
+        sys.exit(1)
+
+    # Si solo son números (ej: 162), se asume default_project_id (Omnify)
+    if re.match(r"^\d+$", issue_ref.strip()):
+        return default_project_id, int(issue_ref.strip()), None
+
+    sys.stderr.write(f"Error: Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.\n")
+    sys.exit(1)
+
+def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None):
+    """Resuelve un ticket con paginación robusta."""
+    if uuid_ref:
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{uuid_ref}/"
         return api_request(url, api_key)
 
-    seq_match = re.search(r"\d+", issue_ref)
-    if not seq_match:
-        sys.stderr.write(f"Error: Referencia de ticket inválida '{issue_ref}'.\n")
-        sys.exit(1)
-    seq_id = int(seq_match.group())
+    cursor = None
+    while True:
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
+        if cursor:
+            url += f"?cursor={urllib.parse.quote(cursor)}"
 
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
-    data = api_request(url, api_key)
-    for iss in data.get("results", []):
-        if iss.get("sequence_id") == seq_id:
-            return iss
+        data = api_request(url, api_key)
+        for iss in data.get("results", []):
+            if iss.get("sequence_id") == seq_id:
+                return iss
 
-    sys.stderr.write(f"Error: No se encontró el ticket OMNIFY-{seq_id} en el proyecto.\n")
+        if not data.get("next_page_results") or not data.get("next_cursor"):
+            break
+        cursor = data.get("next_cursor")
+
+    sys.stderr.write(f"Error: Ticket #{seq_id} no encontrado en el proyecto.\n")
     sys.exit(1)
 
 def get_states_map(base_url, api_key, workspace, project_id):
@@ -101,29 +168,40 @@ def get_states_map(base_url, api_key, workspace, project_id):
     data = api_request(url, api_key)
     mapping = {}
     for st in data.get("results", []):
-        name_clean = st["name"].lower()
-        slug_clean = st["slug"].lower()
+        name_clean = st["name"].lower().strip()
+        slug_clean = st["slug"].lower().strip()
         mapping[name_clean] = st["id"]
         mapping[slug_clean] = st["id"]
-        # Mapeos sin tilde
-        mapping[name_clean.replace("ó", "o").replace("é", "e").replace("á", "a")] = st["id"]
+        # Normalización sin acentos
+        norm = name_clean.replace("ó", "o").replace("é", "e").replace("á", "a").replace("í", "i").replace("ú", "u")
+        mapping[norm] = st["id"]
     return mapping
 
 def get_labels_map(base_url, api_key, workspace, project_id):
-    """Mapea nombres de etiquetas a su UUID."""
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/labels/"
-    data = api_request(url, api_key)
+    """Mapea nombres de etiquetas a su UUID con soporte de paginación."""
     mapping = {}
-    for lb in data.get("results", []):
-        mapping[lb["name"].lower()] = lb["id"]
+    cursor = None
+    while True:
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/labels/"
+        if cursor:
+            url += f"?cursor={urllib.parse.quote(cursor)}"
+
+        data = api_request(url, api_key)
+        for lb in data.get("results", []):
+            mapping[lb["name"].lower().strip()] = lb["id"]
+
+        if not data.get("next_page_results") or not data.get("next_cursor"):
+            break
+        cursor = data.get("next_cursor")
+
     return mapping
 
 # ------------------------------------------------------------------------------
-# Subcomandos
+# Comandos
 # ------------------------------------------------------------------------------
 
 def cmd_comment(args, base_url, api_key, workspace, default_project_id):
-    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
     content = ""
     if args.file:
         with open(args.file, "r") as f:
@@ -137,26 +215,30 @@ def cmd_comment(args, base_url, api_key, workspace, default_project_id):
         sys.stderr.write("Error: El comentario está vacío.\n")
         sys.exit(1)
 
-    issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     res = api_request(url, api_key, method="POST", data={"comment_html": content})
-    print(f"✔ Comentario publicado exitosamente en {args.issue} (ID: {res.get('id')})")
+
+    if getattr(args, "json", False):
+        print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": res.get("id")}))
+    else:
+        print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
 def cmd_update(args, base_url, api_key, workspace, default_project_id):
-    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     patch_data = {}
 
     if args.state:
         states_map = get_states_map(base_url, api_key, workspace, project_id)
-        target_state = args.state.lower().replace("ó", "o").replace("é", "e").replace("á", "a")
+        target_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
         if target_state not in states_map:
-            sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado.\n")
+            sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos en proyecto: {', '.join(states_map.keys())}\n")
             sys.exit(1)
         patch_data["state"] = states_map[target_state]
 
     if args.priority:
-        prio = args.priority.lower()
+        prio = args.priority.lower().strip()
         if prio not in ("urgent", "high", "medium", "low", "none"):
             sys.stderr.write(f"Error: Prioridad desconocida '{args.priority}'. Opciones: urgent, high, medium, low, none.\n")
             sys.exit(1)
@@ -180,75 +262,99 @@ def cmd_update(args, base_url, api_key, workspace, default_project_id):
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/"
     res = api_request(url, api_key, method="PATCH", data=patch_data)
-    changes = []
-    if "state" in patch_data:
-        changes.append(f"Estado ➔ {args.state}")
-    if "priority" in patch_data:
-        changes.append(f"Prioridad ➔ {args.priority}")
-    if "labels" in patch_data:
-        changes.append(f"Etiquetas ➔ {args.labels}")
-
-    print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
+    
+    if getattr(args, "json", False):
+        print(json.dumps({"status": "ok", "action": "update", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "patched": patch_data}))
+    else:
+        changes = []
+        if "state" in patch_data: changes.append(f"Estado ➔ {args.state}")
+        if "priority" in patch_data: changes.append(f"Prioridad ➔ {args.priority}")
+        if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
+        print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
 def cmd_get(args, base_url, api_key, workspace, default_project_id):
-    project_id = resolve_project_id(base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, args.issue)
-    print(f"\n📌 {args.issue}: {issue.get('name')}")
-    print(f"   Prioridad : {issue.get('priority')}")
-    print(f"   Creado el : {issue.get('created_at')}")
-    print(f"   UUID      : {issue.get('id')}\n")
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    
+    if getattr(args, "json", False):
+        print(json.dumps(issue, indent=2))
+    else:
+        print(f"\n📌 {args.issue}: {issue.get('name')}")
+        print(f"   Prioridad : {issue.get('priority')}")
+        print(f"   Creado el : {issue.get('created_at')}")
+        print(f"   UUID      : {issue.get('id')}\n")
 
-def cmd_list(args, base_url, api_key, workspace, project_id):
+def cmd_list(args, base_url, api_key, workspace, default_project_id):
+    # Si pasa un prefijo de proyecto (ej: OPS o OMNIFY)
+    project_id = default_project_id
+    if getattr(args, "project", None):
+        projects_map = get_projects_map(base_url, api_key, workspace)
+        p_upper = args.project.upper()
+        if p_upper in projects_map:
+            project_id = projects_map[p_upper]["id"]
+        else:
+            sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado. Opciones: {', '.join(projects_map.keys())}\n")
+            sys.exit(1)
+
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=50"
     data = api_request(url, api_key)
     results = data.get("results", [])
 
-    print(f"\n📋 Tickets recientes en Omnify ({len(results)} obtenidos):")
-    for iss in results[:15]:
-        prio = f"[{iss.get('priority', 'none').upper()}]"
-        print(f"  • OMNIFY-{iss.get('sequence_id'):<4} {prio:<9} {iss.get('name')[:65]}")
-    print("")
+    if getattr(args, "json", False):
+        print(json.dumps(results, indent=2))
+    else:
+        print(f"\n📋 Tickets recientes ({len(results)} obtenidos):")
+        for iss in results[:15]:
+            prio = f"[{iss.get('priority', 'none').upper()}]"
+            seq = iss.get('sequence_id', '?')
+            print(f"  • #{seq:<4} {prio:<9} {iss.get('name')[:65]}")
+        print("")
 
 def main():
-    parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA")
+    parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA (v2.2)")
+    parser.add_argument("--json", action="store_true", help="Salida en formato JSON para agentes")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # Subcomando: comment
+    # comment
     p_comment = subparsers.add_parser("comment", help="Publicar comentario en un ticket")
-    p_comment.add_argument("issue", help="Ticket (ej: OMNIFY-162, 162 o UUID)")
+    p_comment.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")
+    p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
-    # Subcomando: update
+    # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
-    p_update.add_argument("issue", help="Ticket (ej: OMNIFY-162, 162 o UUID)")
+    p_update.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")
+    p_update.add_argument("--json", action="store_true", help="Salida en JSON")
 
-    # Subcomando: get
+    # get
     p_get = subparsers.add_parser("get", help="Obtener detalles de un ticket")
-    p_get.add_argument("issue", help="Ticket (ej: OMNIFY-162, 162 o UUID)")
+    p_get.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
+    p_get.add_argument("--json", action="store_true", help="Salida en JSON")
 
-    # Subcomando: list
+    # list
     p_list = subparsers.add_parser("list", help="Listar tickets del proyecto")
-    p_list.add_argument("--mine", action="store_true", help="Filtrar por mis tickets")
+    p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
+    p_list.add_argument("--json", action="store_true", help="Salida en JSON")
 
     args = parser.parse_args()
 
     base_url = get_env_or_fail("PLANE_BASE_URL", "URL de Plane")
     api_key = get_env_or_fail("PLANE_API_KEY", "API Key de Plane")
     workspace = os.environ.get("PLANE_WORKSPACE_SLUG", "teamprogra")
-    project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
+    default_project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
 
     if args.command == "comment":
-        cmd_comment(args, base_url, api_key, workspace, project_id)
+        cmd_comment(args, base_url, api_key, workspace, default_project_id)
     elif args.command == "update":
-        cmd_update(args, base_url, api_key, workspace, project_id)
+        cmd_update(args, base_url, api_key, workspace, default_project_id)
     elif args.command == "get":
-        cmd_get(args, base_url, api_key, workspace, project_id)
+        cmd_get(args, base_url, api_key, workspace, default_project_id)
     elif args.command == "list":
-        cmd_list(args, base_url, api_key, workspace, project_id)
+        cmd_list(args, base_url, api_key, workspace, default_project_id)
 
 if __name__ == "__main__":
     main()
