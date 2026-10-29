@@ -55,7 +55,22 @@ plane-tracker comment OMNIFY-162 -f /tmp/worklog.md
 plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "validaciones" --worker-type "subagent"
 ```
 
-### B. Generar Reporte de Actividades (Formato Híbrido con Interval Merging)
+### B. Crear un Nuevo Ticket / Work Item
+```bash
+# Crear ticket en Omnify (por defecto) con sugerencia automática de rama Git:
+plane-tracker create "Optimizar queries de facturación" \
+  --priority "high" \
+  --labels "backend,performance" \
+  -d "Detectada lentitud en la carga de transacciones históricas."
+
+# Crear ticket en otro proyecto corporativo (ej: OPS):
+plane-tracker create "Mitigar saturación de workers en n8n" \
+  -p OPS \
+  --state "Pendiente" \
+  --priority "urgent"
+```
+
+### C. Generar Reporte de Actividades (Formato Híbrido con Interval Merging)
 ```bash
 # Reporte del día actual (ideal para jefatura a las 6:00 pm):
 plane-tracker report --today
@@ -68,7 +83,7 @@ plane-tracker report --today -p OMNIFY
 plane-tracker report --today --json
 ```
 
-### C. Actualizar Estado, Prioridad o Etiquetas
+### D. Actualizar Estado, Prioridad o Etiquetas
 ```bash
 plane-tracker update OMNIFY-162 \
   --state "Revisión" \
@@ -76,19 +91,19 @@ plane-tracker update OMNIFY-162 \
   --labels "sms,backend,bug"
 ```
 
-### D. Consultar Detalles de un Ticket
+### E. Consultar Detalles de un Ticket
 ```bash
 plane-tracker get OMNIFY-162
 plane-tracker get OPS-44
 ```
 
-### E. Listar Tickets Recientes
+### F. Listar Tickets Recientes
 ```bash
 plane-tracker list -p OMNIFY
 plane-tracker list -p OPS
 ```
 
-### F. Listar Proyectos Disponibles (Caché Dinámica en SQLite)
+### G. Listar Proyectos Disponibles (Caché Dinámica en SQLite)
 ```bash
 # Consultar proyectos disponibles en el workspace desde SQLite (< 2ms)
 plane-tracker projects
