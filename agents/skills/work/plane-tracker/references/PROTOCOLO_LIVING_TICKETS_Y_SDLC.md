@@ -31,7 +31,7 @@ Para evitar la creación de micro-tickets basura que destruyan las métricas del
 * **Tareas < 15 minutos (Toil / Soporte Rápido):**  
   * *Acción:* **NO crear ticket en Omnify**.
   * *Destino:* Absorber en el ticket paraguas semanal de `OPS`:
-    `Soporte y Mantenimiento Ad-Hoc - W{XX}`.
+    `Tareas Rápidas y Soporte - W{XX}`.
   * *Registro:* `plane-tracker comment OPS-XX --track "soporte" --capacity "toil_support" --duration 10 -m "..."`.
 * **Tareas > 15 minutos (Trabajo Estructurado):**  
   * *Acción:* Crear ticket formal en Plane **al minuto 15**.

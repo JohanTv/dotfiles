@@ -77,7 +77,7 @@ plane-tracker create "[SPIKE] Análisis de deadlock en tabla SEM-MKT" \
   --labels "backend,bd"
 
 # Creación en otro proyecto con estado inicial específico
-plane-tracker create "Soporte y Mantenimiento Ad-Hoc - W44" \
+plane-tracker create "Tareas Rápidas y Soporte - W44" \
   -p OPS \
   --state "Progreso" \
   --priority "medium" \
