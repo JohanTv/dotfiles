@@ -44,33 +44,33 @@ Plane cuenta con estados oficiales por proyecto. Las transiciones de estado debe
 
 ---
 
-## 3. Comandos CLI Disponibles (`plane` o `scripts/plane.py`)
+## 3. Comandos CLI Disponibles (`plane-tracker` o `scripts/plane.py`)
 
-El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`), persiste localmente en SQLite3 (`~/.cache/plane/worklogs.db` con WAL Mode) y carga variables seguras desde `~/.zshrc.local`. Puede invocarse como comando global `plane` o directamente con Python.
+El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`), persiste localmente en SQLite3 (`~/.cache/plane/worklogs.db` con WAL Mode) y carga variables seguras desde `~/.zshrc.local`. Puede invocarse como comando global `plane-tracker` o directamente con Python.
 
 ### A. Publicar Bitácora Dual-Layer (Comentario)
 ```bash
-plane comment OMNIFY-162 -f /tmp/worklog.md
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md
 # Con especificación opcional de track y tipo de agente:
-plane comment OMNIFY-162 -f /tmp/worklog.md --track "validaciones" --worker-type "subagent"
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "validaciones" --worker-type "subagent"
 ```
 
 ### B. Generar Reporte de Actividades (Formato Híbrido con Interval Merging)
 ```bash
 # Reporte del día actual (ideal para jefatura a las 6:00 pm):
-plane report --today
+plane-tracker report --today
 
 # Reporte semanal acumulado (ideal para balance de sprint los viernes):
-plane report --week
+plane-tracker report --week
 
 # Filtros opcionales por proyecto o formato JSON:
-plane report --today -p OMNIFY
-plane report --today --json
+plane-tracker report --today -p OMNIFY
+plane-tracker report --today --json
 ```
 
 ### C. Actualizar Estado, Prioridad o Etiquetas
 ```bash
-plane update OMNIFY-162 \
+plane-tracker update OMNIFY-162 \
   --state "Revisión" \
   --priority "high" \
   --labels "sms,backend,bug"
@@ -78,23 +78,23 @@ plane update OMNIFY-162 \
 
 ### D. Consultar Detalles de un Ticket
 ```bash
-plane get OMNIFY-162
-plane get OPS-44
+plane-tracker get OMNIFY-162
+plane-tracker get OPS-44
 ```
 
 ### E. Listar Tickets Recientes
 ```bash
-plane list -p OMNIFY
-plane list -p OPS
+plane-tracker list -p OMNIFY
+plane-tracker list -p OPS
 ```
 
 ### F. Listar Proyectos Disponibles (Caché Dinámica en SQLite)
 ```bash
 # Consultar proyectos disponibles en el workspace desde SQLite (< 2ms)
-plane projects
+plane-tracker projects
 
 # Forzar refresco desde la API de Plane si se crearon nuevos proyectos
-plane projects --refresh
+plane-tracker projects --refresh
 ```
 
 ---
