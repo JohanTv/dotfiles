@@ -1,30 +1,76 @@
 ---
 name: plane-tracker
-description: Registra bitácoras de sesión, tiempos y entregables en Plane (Omnify/Operaciones) bajo el patrón dual-layer (humano + metadata oculta). Úsalo al cerrar sesiones o al finalizar hitos de auditoría o desarrollo.
+description: Orquestador y registrador de tareas, estados, prioridades, etiquetas y bitácoras en Plane (Omnify/Operaciones) bajo el patrón dual-layer. Úsalo al iniciar tareas, al pasar a Pruebas/Revisión de PR, al cerrar sesiones o al finalizar hitos.
 ---
 
 # Plane Session Tracker & Worklog Operator
 
-Procedimiento operativo para registrar sesiones de trabajo, diagnósticos y avances de desarrollo en la plataforma Plane auto-hospedada de la empresa.
+Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.2.3 auto-hospedada de la empresa (Omnify / Operaciones).
 
 ---
 
-## 1. Verificación de Variables de Entorno
+## 1. Mapeo de Estados y Ciclo de Vida del Ticket
 
-Antes de invocar operaciones de Plane, el entorno debe tener configuradas las siguientes variables (definidas en `~/.zshrc.local`):
+El proyecto **Omnify** cuenta con 8 estados oficiales. Los asistentes deben realizar transiciones deterministas según el hito del desarrollador:
 
-* `PLANE_BASE_URL`: URL base de la instancia interna (ej. `http://190.105.240.58`).
-* `PLANE_API_KEY`: API token de cuenta de usuario.
-* `PLANE_WORKSPACE_SLUG`: Slug del espacio de trabajo (por defecto: `teamprogra`).
-* `PLANE_PROJECT_ID`: ID del proyecto (por defecto para Omnify: `58371da4-cf62-4299-8fd4-99c1052b2eb3`).
-
-Si alguna variable falta, solicita amablemente al usuario configurarla en `~/.zshrc.local` o emite el texto formateado en el chat para que el usuario pueda copiarlo y pegarlo manualmente.
+| Estado en Plane | ¿Cuándo se activa? (Triggers del Asistente) | Comando CLI |
+| :--- | :--- | :--- |
+| **`Pendiente`** | Tarea asignada o planificada pero aún no iniciada. | `plane.py update OMNIFY-XXX --state Pendiente` |
+| **`Progreso`** | Johan arranca a investigar, auditar o programar la tarea. | `plane.py update OMNIFY-XXX --state Progreso` |
+| **`Pruebas`** | Código/script listo; ejecutando dry-run transaccional, tests unitarios o validación con réplica. | `plane.py update OMNIFY-XXX --state Pruebas` |
+| **`Revisión`** | **PR subido a Git / Staging en espera de aprobación del líder técnico (Pierre).** | `plane.py update OMNIFY-XXX --state Revisión` |
+| **`Pausado`** | Bloqueo externo (esperando respuesta de Meta, credenciales, acceso a servidor). | `plane.py update OMNIFY-XXX --state Pausado` |
+| **`Completado`** | PR mergeado, migración ejecutada o entregable verificado en producción. | `plane.py update OMNIFY-XXX --state Completado` |
+| **`Backlog`** | Idea o deuda técnica sin fecha de ejecución inmediata. | `plane.py update OMNIFY-XXX --state Backlog` |
 
 ---
 
-## 2. El Formato Dual-Layer (Capa Humana + Capa Máquina)
+## 2. Taxonomía de Etiquetas (Labels) y Prioridades en Omnify
 
-Todo comentario de sesión debe cumplir con el siguiente estándar:
+### Etiquetas Disponibles:
+* **Componentes / Servicios:** `sms`, `backend`, `frontend`, `bd`, `infra`, `n8n`, `whatsapp`, `acortador`, `tts`, `correo`, `whatsapp-sender`.
+* **Área / Tipo de Esfuerzo:** `bug`, `deuda-tecnica`, `seguridad`, `docs`, `question`.
+
+### Prioridades Disponibles:
+* `urgent` (Caídas de producción, incidentes críticos, subfacturación activa).
+* `high` (Tareas del sprint o módulo actual comprometidas para entrega).
+* `medium` (Desarrollo estándar o mejoras planificadas).
+* `low` / `none` (Deuda técnica menor, cosméticos).
+
+---
+
+## 3. Comandos CLI Disponibles (`scripts/plane.py`)
+
+El script auto-carga variables desde `~/.zshrc.local` si no están en el entorno.
+
+### A. Actualizar Estado, Prioridad o Etiquetas
+```bash
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py update OMNIFY-162 \
+  --state "Revisión" \
+  --priority "high" \
+  --labels "sms,backend,bug"
+```
+
+### B. Publicar Bitácora Dual-Layer (Comentario)
+```bash
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py comment OMNIFY-162 -f /tmp/worklog.md
+```
+
+### C. Consultar Detalles de un Ticket
+```bash
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py get OMNIFY-162
+```
+
+### D. Listar Tickets Recientes del Proyecto
+```bash
+python3 ~/.agents/skills/plane-tracker/scripts/plane.py list
+```
+
+---
+
+## 4. Estándar de la Bitácora Dual-Layer (Comentario)
+
+Todo comentario generado por el asistente debe seguir este formato exacto:
 
 ```markdown
 ### ⏱️ Registro de Sesión | [FASE: Auditoría / Análisis / Dev / QA / Soporte]
@@ -35,17 +81,16 @@ Todo comentario de sesión debe cumplir con el siguiente estándar:
 | **Horario** | HH:MM - HH:MM (Xh Ym) |
 | **Tipo de Trabajo** | `Auditoría` / `Análisis` / `Construcción` / `QA` / `Soporte` |
 | **Responsable** | Johan Tanta |
-| **Estado Resultante** | ✅ Hito Concluido / En Progreso |
+| **Estado Resultante** | ✅ [Estado actual: Progreso / Pruebas / Revisión / Completado] |
 
-#### 🎯 Resumen Ejecutivo
-- Resumen conciso de 2-3 puntos clave entendibles por jefatura y gerencia.
-- Causa raíz identificada o problema de negocio resuelto.
+#### 🎯 Resumen Ejecutivo para Gerencia
+- Resumen conciso de 2-3 puntos clave con impacto de negocio.
 
 #### 📦 Entregables Verificables
-- Archivos creados, scripts SQL, ramas o PRs generados en la sesión.
+- Archivos generados, scripts SQL, commits o PR (#XX).
 
 #### ⏭️ Próxima Acción
-- Siguiente paso técnico inmediato o requerimiento pendiente.
+- Siguiente paso (ej. *"Esperando aprobación de PR por Pierre Vicente"*).
 
 <!-- PLANE_WORKLOG_METADATA
 {
@@ -58,24 +103,8 @@ Todo comentario de sesión debe cumplir con el siguiente estándar:
   "phase": "auditoria|analisis|construccion|qa|soporte",
   "developer": "johantv",
   "deliverables": [
-    "ruta/al/archivo1",
-    "ruta/al/archivo2"
+    "ruta/al/archivo"
   ]
 }
 -->
-```
-
----
-
-## 3. Publicación Automatizada del Comentario
-
-Para publicar el comentario en el ticket objetivo (`OMNIFY-XXX` o número de secuencia):
-
-```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane_post.py OMNIFY-XXX -m "CONTENIDO_DEL_COMENTARIO"
-```
-
-O guardando el comentario en un archivo temporal:
-```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane_post.py OMNIFY-XXX -f /tmp/comentario.md
 ```
