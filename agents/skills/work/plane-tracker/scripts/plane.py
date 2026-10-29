@@ -823,6 +823,21 @@ def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
             print(f"  • #{seq:<4} {prio:<9} {iss.get('name')[:65]}")
         print("")
 
+def cmd_projects(args, conn, base_url, api_key, workspace):
+    """Lista los proyectos disponibles en Plane y cacheados dinámicamente en SQLite."""
+    force_refresh = getattr(args, "refresh", False)
+    projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=force_refresh)
+
+    if getattr(args, "json", False):
+        print(json.dumps(list(projects_map.values()), indent=2))
+        return
+
+    print(f"\n📂 Proyectos en el workspace '{workspace}':")
+    for ident, data in sorted(projects_map.items()):
+        print(f"  • {ident:<14} ➔  {data['name']}")
+    print(f"\n💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').")
+    print(f"   Usa 'plane projects --refresh' para forzar sincronización con el servidor Plane.\n")
+
 # ------------------------------------------------------------------------------
 # Generador de Reportes de Actividad en Formato Híbrido (cmd_report)
 # ------------------------------------------------------------------------------
@@ -1034,6 +1049,11 @@ def main():
     p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
     p_list.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # projects
+    p_proj = subparsers.add_parser("projects", help="Listar proyectos disponibles en Plane cacheados en SQLite")
+    p_proj.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
+    p_proj.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # report
     p_report = subparsers.add_parser("report", help="Generar reporte de actividades en formato híbrido con Interval Merging")
     group_date = p_report.add_mutually_exclusive_group()
@@ -1065,6 +1085,8 @@ def main():
             cmd_get(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "list":
             cmd_list(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "projects":
+            cmd_projects(args, conn, base_url, api_key, workspace)
         elif args.command == "report":
             cmd_report(args, conn, base_url, api_key, workspace, default_project_id)
     finally:

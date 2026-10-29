@@ -14,13 +14,15 @@
 - **Toil y Reuniones (Tickets Paraguas):** Soporte ad-hoc a usuarios y reuniones se registran en tickets semanales consolidados en `Operaciones` u `Omnify`; nunca crees micro-tickets para tareas de menos de 15 minutos.
 
 ### Convención de Ramas Git (Work Context vs Personal):
-- **Ámbito Omnify / Operaciones (Work):** Cuando se trabaje en repositorios corporativos vinculados a Plane, toda rama debe seguir estrictamente el patrón:
+- **Ámbito Corporativo / Work (Plane):** Cuando se trabaje en repositorios corporativos de trabajo, toda rama debe seguir estrictamente el patrón:
   `{tipo}/{TICKET-ID}-{kebab-case-descripcion}`
   - Tipos válidos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra` (alineados a las 4 fases).
+  - **Proyecto por defecto:** Actualmente se considera principalmente **Omnify** (`OMNIFY-`).
+  - **Proyectos dinámicos:** La organización cuenta con proyectos dinámicos (`OMNIFY`, `OPS`, `OMNICANAL`, etc.) cacheados en SQLite. Usa `plane projects` para inspeccionarlos.
   - Ejemplos:
     - `feat/OMNIFY-175-campaign-form-validations`
-    - `fix/OPS-44-mitigate-n8n-stoppers`
+    - `fix/OMNIFY-180-fix-date-picker`
     - `spike/OMNIFY-162-sms-concurrency-audit`
-    - `refactor/OMNIFY-171-docker-node24`
-- **Manejo de Ambigüedad:** Si el usuario solicita crear una rama o iniciar una tarea sin mencionar el ticket de Plane, o si hay duda sobre a qué proyecto corresponde, el agente debe preguntar brevemente (ej. *"¿A qué ticket de Omnify u Operaciones asociamos esta rama?"*) antes de crearla.
+    - `fix/OPS-44-mitigate-n8n-stoppers`
+- **Manejo de Ambigüedad:** Si el usuario solicita crear una rama o iniciar una tarea sin mencionar el ticket de Plane, el agente debe preguntar brevemente (ej. *"¿A qué ticket de Omnify asociamos esta rama?"*) antes de crearla.
 - **Proyectos Personales / Sin Plane:** Si el contexto es un proyecto personal, de código abierto o no vinculado a Plane, no forzar ticket ID; usar el formato convencional estándar: `{tipo}/{kebab-case-descripcion}`.
