@@ -24,7 +24,7 @@ plane-tracker get <TICKET-ID>
 plane-tracker update <TICKET-ID> --state "Progreso" --priority "urgent"
 
 # 5. Publicación de bitácora dual-layer (humano + telemetría v2.2)
-plane-tracker comment <TICKET-ID> -f /tmp/worklog.md --track "main"
+plane-tracker comment <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
 
 # 6. Inspección de taxonomía de etiquetas del proyecto (< 2ms)
 plane-tracker labels [-p OMNIFY]
@@ -77,7 +77,7 @@ plane-tracker create "[SPIKE] Análisis de deadlock en tabla SEM-MKT" \
   --labels "backend,bd"
 
 # Creación en otro proyecto con estado inicial específico
-plane-tracker create "[OPS] Soporte L2/L3 y Mantenimiento Ad-Hoc - Semana W44" \
+plane-tracker create "Soporte y Mantenimiento Ad-Hoc - W44" \
   -p OPS \
   --state "Progreso" \
   --priority "medium" \
@@ -132,15 +132,17 @@ plane-tracker update OMNIFY-175 --state "Completado"
 ### E. `plane-tracker comment` (Bitácora Dual-Layer)
 Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite local para los reportes diarios.
 
+> ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale a Johan cuánto demoró antes de comentar.
+
 ```bash
 # Publicar archivo de bitácora
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --duration 95
 
 # Con track y tipo de trabajador especificado
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "form-validations" --worker-type "subagent"
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "form-validations" --worker-type "subagent" --duration 45
 
-# Comentario rápido con mensaje en línea
-plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" -m "Atención a comercial sobre campaña #842 (35m)."
+# Comentario rápido con mensaje en línea (ticket paraguas de OPS)
+plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 35 -m "Atención a comercial sobre campaña #842."
 ```
 
 ---

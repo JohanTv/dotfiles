@@ -250,6 +250,38 @@ def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
 
     return projects_map
 
+def get_project_identifier(conn, base_url, api_key, workspace, project_id):
+    """Devuelve el identifier humano (ej. 'OPS') a partir del UUID de un proyecto."""
+    if not project_id:
+        return None
+
+    row = conn.execute(
+        "SELECT identifier FROM projects WHERE project_id = ? AND workspace = ?",
+        (project_id, workspace)
+    ).fetchone()
+    if row and row["identifier"]:
+        return row["identifier"].upper()
+
+    # Fallback: cualquier caché local del UUID, aunque sea de otro workspace conocido
+    row = conn.execute(
+        "SELECT identifier FROM projects WHERE project_id = ?",
+        (project_id,)
+    ).fetchone()
+    if row and row["identifier"]:
+        return row["identifier"].upper()
+
+    # Último recurso: refrescar desde la API (mejor esfuerzo, nunca aborta el comando)
+    try:
+        projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=True)
+    except SystemExit:
+        return None
+    except Exception:
+        return None
+    for ident, proj in projects_map.items():
+        if proj["id"] == project_id:
+            return ident.upper()
+    return None
+
 def detect_ticket_from_git():
     """Intenta inferir el identificador de ticket desde la rama actual de git."""
     try:
@@ -527,10 +559,45 @@ def upsert_worklog(conn, entry):
 # Sincronización Remota con Plane API
 # ------------------------------------------------------------------------------
 
+def get_actor_uuid(base_url, api_key, workspace):
+    """
+    UUID del usuario activo en Plane, usado para filtrar el sync y no imputar
+    al reporte los comentarios de compañeros en tickets compartidos.
+
+    Fuentes: PLANE_ACTOR_UUID (UUID directo) o PLANE_USERNAME (display_name / email).
+    Si no está configurado, devuelve None y el sync queda sin filtro (con advertencia).
+    """
+    explicit = os.environ.get("PLANE_ACTOR_UUID")
+    if explicit:
+        return explicit.strip()
+
+    username = os.environ.get("PLANE_USERNAME", "").strip().lower()
+    if not username:
+        return None
+
+    members = api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/members/", api_key)
+    members = members if isinstance(members, list) else members.get("results", [])
+    for r in members:
+        candidates = {
+            str(r.get("display_name") or "").strip().lower(),
+            str(r.get("email") or "").strip().lower(),
+            str(r.get("first_name") or "").strip().lower(),
+        }
+        if username in candidates:
+            return r.get("id")
+
+    sys.stderr.write(f"⚠ PLANE_USERNAME='{username}' no coincide con ningún miembro del workspace.\n")
+    return None
+
 def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
     """Sincroniza comentarios de Plane para tickets actualizados y los persiste en SQLite con descargas paralelas."""
     sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
     projects_map = get_projects_map(conn, base_url, api_key, workspace)
+
+    # Filtro por autor: solo mis comentarios alimentan mi reporte (los tickets pueden ser compartidos)
+    actor_uuid = get_actor_uuid(base_url, api_key, workspace)
+    if not actor_uuid:
+        sys.stderr.write("⚠ Sin PLANE_USERNAME/PLANE_ACTOR_UUID: el sync mezclará horas de compañeros en tickets compartidos.\n")
     
     try:
         d_from = datetime.strptime(date_from_str, "%Y-%m-%d").date() - timedelta(days=1)
@@ -587,27 +654,46 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
             return ident, iss, []
 
     synced_count = 0
+    skipped_foreign = 0
+    skipped_no_duration = 0
     if candidate_tasks:
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(fetch_comments_for_issue, t) for t in candidate_tasks]
             for fut in as_completed(futures):
                 ident, iss, comments = fut.result()
                 for c in comments:
+                    # Filtro por autor: los tickets compartidos no deben contaminar mi reporte
+                    author = c.get("created_by") or c.get("actor")
+                    if actor_uuid and author and author != actor_uuid:
+                        skipped_foreign += 1
+                        continue
+
                     html = c.get("comment_html", "")
                     meta = extract_metadata_from_comment(html)
                     if meta:
+                        # Duración explícita (nunca inventar 60 min): metadata o rango start/end
+                        dur = meta.get("duration_minutes") or meta.get("duration_net_minutes")
+                        if not dur and meta.get("start_time") and meta.get("end_time"):
+                            dur = time_to_minutes(meta["end_time"]) - time_to_minutes(meta["start_time"])
+                            if dur < 0:
+                                dur += 24 * 60
+                        if not dur or dur < 1:
+                            skipped_no_duration += 1
+                            continue
+
                         ticket_label = f"{ident}-{iss.get('sequence_id')}"
                         entry = {
                             "ticket_id": ticket_label,
                             "track": meta.get("track", "main"),
                             "issue_name": iss.get("name", ""),
                             "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
-                            "start_time": meta.get("start_time", "09:00"),
-                            "end_time": meta.get("end_time", "10:00"),
-                            "duration_minutes": meta.get("duration_minutes", 60),
+                            "start_time": meta.get("start_time", (datetime.now() - timedelta(minutes=dur)).strftime("%H:%M")),
+                            "end_time": meta.get("end_time", datetime.now().strftime("%H:%M")),
+                            "duration_minutes": dur,
                             "worker_type": meta.get("worker_type", "human"),
                             "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
                             "phase": meta.get("phase", "dev"),
+                            "role": meta.get("role", "backend_engineer"),
                             "notes": meta.get("notes", iss.get("name", "")),
                             "stoppers": meta.get("stoppers", []),
                             "plane_comment_id": c.get("id"),
@@ -785,12 +871,44 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         sys.exit(1)
 
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+
+    # --- Duración explícita (NUNCA estimar por defecto) ---------------------------------
+    # Se valida ANTES de publicar: no puede quedar un comentario en Plane sin su worklog.
+    # Fuentes válidas: metadata dual-layer (duration_minutes / duration_net_minutes) o --duration N.
+    meta = extract_metadata_from_comment(content)
+    meta_duration = None
+    if meta:
+        meta_duration = meta.get("duration_minutes") or meta.get("duration_net_minutes")
+    duration = getattr(args, "duration", None) or meta_duration
+
+    if not duration:
+        sys.stderr.write("Error: Falta la duración de la sesión y no se puede estimar.\n")
+        sys.stderr.write("Usa --duration <minutos> (ej: --duration 5) o incluye el bloque PLANE_WORKLOG_METADATA\n")
+        sys.stderr.write("con 'duration_minutes' en el contenido.\n")
+        sys.stderr.write("Si el trabajo ocurrió fuera de la conversación, el agente debe preguntar cuánto demoró; no inferir ni inventar.\n")
+        sys.exit(1)
+
+    try:
+        duration = int(duration)
+    except (TypeError, ValueError):
+        sys.stderr.write("Error: la duración debe ser un entero de minutos (ej: --duration 5).\n")
+        sys.exit(1)
+
+    if duration < 1 or duration > 24 * 60:
+        sys.stderr.write(f"Error: duración fuera de rango ({duration} min). Debe estar entre 1 y 1440 minutos.\n")
+        sys.exit(1)
+
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     res = api_request(url, api_key, method="POST", data={"comment_html": content})
 
     # Caching atómico en SQLite3
-    meta = extract_metadata_from_comment(content)
-    ticket_label = f"{issue.get('project_detail', {}).get('identifier', 'OMNIFY')}-{issue.get('sequence_id')}" if "sequence_id" in issue else args.issue
+    now = datetime.now()
+    # Etiqueta real del ticket: identifier del proyecto resuelto (OPS-13, nunca OMNIFY-13 por defecto)
+    proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
+    if not proj_ident and issue_ref and "-" in issue_ref:
+        proj_ident = issue_ref.split("-")[0].upper()
+    seq_label = issue.get("sequence_id") or seq_id
+    ticket_label = f"{proj_ident}-{seq_label}" if proj_ident and seq_label else args.issue
     
     # Determinar track, worker_type y capacity_bucket (prioridad: flags de CLI -> metadata -> default)
     track = getattr(args, "track", None) or (meta.get("track") if meta else None) or "main"
@@ -801,10 +919,10 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         clean_text = re.sub(r"<[^>]+>", "", content).strip()
         meta = {
             "schema_version": "2.2",
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "start_time": datetime.now().strftime("%H:%M"),
-            "end_time": (datetime.now() + timedelta(minutes=30)).strftime("%H:%M"),
-            "duration_minutes": 30,
+            "date": now.strftime("%Y-%m-%d"),
+            "start_time": (now - timedelta(minutes=duration)).strftime("%H:%M"),
+            "end_time": now.strftime("%H:%M"),
+            "duration_minutes": duration,
             "track": track,
             "worker_type": worker_type,
             "capacity_bucket": capacity_bucket,
@@ -816,16 +934,23 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta["track"] = track
         meta["worker_type"] = worker_type
         meta["capacity_bucket"] = capacity_bucket
+        meta["duration_minutes"] = duration
+        # Horarios honestos: si la metadata no los trae, se derivan de la duración reportada
+        meta.setdefault("date", now.strftime("%Y-%m-%d"))
+        meta.setdefault("end_time", now.strftime("%H:%M"))
+        if not meta.get("start_time"):
+            end_t = datetime.strptime(meta["end_time"], "%H:%M")
+            meta["start_time"] = (end_t - timedelta(minutes=duration)).strftime("%H:%M")
 
     entry = {
         "id": res.get("id"),
         "ticket_id": ticket_label,
         "track": track,
         "issue_name": issue.get("name", ""),
-        "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
-        "start_time": meta.get("start_time", "09:00"),
-        "end_time": meta.get("end_time", "10:00"),
-        "duration_minutes": meta.get("duration_minutes", 60),
+        "date": meta.get("date", now.strftime("%Y-%m-%d")),
+        "start_time": meta.get("start_time", (now - timedelta(minutes=duration)).strftime("%H:%M")),
+        "end_time": meta.get("end_time", now.strftime("%H:%M")),
+        "duration_minutes": duration,
         "worker_type": worker_type,
         "capacity_bucket": capacity_bucket,
         "phase": meta.get("phase", "dev"),
@@ -1438,6 +1563,44 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
         print("\n" + "=" * 80)
 
 # ------------------------------------------------------------------------------
+# Comando: whoami — Verificación de setup inicial
+# ------------------------------------------------------------------------------
+
+def cmd_whoami(conn, base_url, api_key, workspace):
+    """Muestra la configuración activa y verifica que el usuario esté resuelto en Plane."""
+    print(f"🌐 PLANE_BASE_URL  : {base_url}")
+    print(f"🏢 PLANE_WORKSPACE : {workspace}")
+
+    plane_username = os.environ.get("PLANE_USERNAME", "")
+    actor_uuid_env = os.environ.get("PLANE_ACTOR_UUID", "")
+
+    if actor_uuid_env:
+        print(f"🔑 PLANE_ACTOR_UUID: {actor_uuid_env} (configurado directamente)")
+        resolved = actor_uuid_env
+    elif plane_username:
+        print(f"👤 PLANE_USERNAME  : {plane_username} (resolviendo UUID...)")
+        resolved = get_actor_uuid(base_url, api_key, workspace)
+        if resolved:
+            print(f"✅ UUID resuelto   : {resolved}")
+            print(f"\n💡 Tip: para acelerar futuros syncs, agrega a ~/.zshrc.local:")
+            print(f"   export PLANE_ACTOR_UUID=\"{resolved}\"")
+        else:
+            print(f"❌ No se pudo resolver el UUID para PLANE_USERNAME='{plane_username}'")
+            print("   Verifica que el nombre o email coincida exactamente con tu perfil en Plane.")
+            sys.exit(1)
+    else:
+        print("⚠️  Ni PLANE_USERNAME ni PLANE_ACTOR_UUID están configurados.")
+        print("   El sync funcionará pero mezclará horas de todos los autores en tickets compartidos.")
+        print("\n📋 Setup requerido en ~/.zshrc.local:")
+        print("   export PLANE_USERNAME=\"tu@email.com\"  # o tu display_name en Plane")
+        print("   # Opcional (más robusto):")
+        print("   export PLANE_ACTOR_UUID=\"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\"")
+        resolved = None
+
+    if resolved:
+        print(f"\n✅ Configuración válida. Puedes usar plane-tracker normalmente.")
+
+# ------------------------------------------------------------------------------
 # Entrypoint CLI
 # ------------------------------------------------------------------------------
 
@@ -1456,6 +1619,8 @@ def main():
                            choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],
                            help="Balde de capacidad de la sesión")
     p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
+    p_comment.add_argument("--duration", type=int, metavar="MIN",
+                           help="Duración neta de la sesión en minutos (requerido si el contenido no lleva metadata telemétrica). Ej: --duration 5")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # create
@@ -1504,6 +1669,9 @@ def main():
     p_proj.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
     p_proj.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # whoami
+    subparsers.add_parser("whoami", help="Verificar configuración activa: muestra workspace, usuario y UUID resuelto")
+
     # report
     p_report = subparsers.add_parser("report", help="Generar reporte de actividades en formato híbrido con Interval Merging")
     group_date = p_report.add_mutually_exclusive_group()
@@ -1545,6 +1713,8 @@ def main():
             cmd_projects(args, conn, base_url, api_key, workspace)
         elif args.command == "report":
             cmd_report(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "whoami":
+            cmd_whoami(conn, base_url, api_key, workspace)
     finally:
         conn.close()
 

@@ -141,12 +141,12 @@ Permite que un ticket sea iniciado por Pierre, transferido a Johan y viceversa, 
 ### 3.5 Tickets Paraguas Semanales (Umbrella Tickets)
 Para no crear 20 micro-tickets a la semana que destruyan las métricas de sprint, se mantienen **dos tickets paraguas semanales recurrentes** (cadencia `W{ISO_WEEK}`):
 
-1. **En `OPS` (Soporte L2/L3 y Toil):**  
-   `[OPS] Soporte L2/L3 y Mantenimiento Ad-Hoc - Semana W{XX}`  
+1. **En `OPS` (Soporte y Toil):**  
+   `Soporte y Mantenimiento Ad-Hoc - W{XX}`  
    *Balde:* `toil_support` | *Labels:* `externo`, `infra`.  
    *Uso:* Atender consultas de usuarios de Ripley, revisar un log en Caddy, reiniciar un worker.
-2. **En `OMNIFY` (Ceremonias y Coordinación):**  
-   `[SYNC] Ceremonias de Equipo, Sincronización y Dailies - Semana W{XX}`  
+2. **En `OPS` (Coordinación de Equipo):**  
+   `Sincronización de Equipo y Acuerdos - W{XX}`  
    *Balde:* `coordination` | *Labels:* `docs`.  
    *Uso:* Daily meeting matutino, reuniones 1:1 con Pierre, balance de sprint.
 
@@ -217,7 +217,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`create`** | `plane-tracker create "[FIX] Titulo" -p OMNIFY -d "..."` | Crea issue en Plane y autogenera rama Git según la fase. |
 | **`get`** | `plane-tracker get OMNIFY-197` | Muestra metadata, descripción y **contexto de comentarios / handoff**. |
 | **`update`** | `plane-tracker update OMNIFY-162 --state "Progreso"` | Actualiza estado, prioridad o etiquetas en Plane. |
-| **`comment`**| `plane-tracker comment OMNIFY-162 -f worklog.md --track "main"` | Publica bitácora dual-layer con telemetría v2.2. |
+| **`comment`**| `plane-tracker comment OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica bitácora dual-layer con telemetría v2.2. |
 | **`labels`** | `plane-tracker labels [-p OMNIFY] [--refresh]` | Lista etiquetas indexadas desde caché local (**< 2ms**). |
 | **`projects`**| `plane-tracker projects [--refresh]` | Lista proyectos dinámicos del workspace (`teamprogra`). |
 | **`report`** | `plane-tracker report --today [--week] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |

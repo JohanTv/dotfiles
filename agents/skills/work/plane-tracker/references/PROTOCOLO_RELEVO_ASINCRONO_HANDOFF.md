@@ -96,7 +96,7 @@ El asistente debe destilar la información ignorando logs crudos extensos y resp
 Si Johan no concluye la tarea durante su turno y debe suspenderla o devolvérsela a Pierre, debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión:
 
 ```bash
-plane-tracker comment OMNIFY-197 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)
+plane-tracker comment OMNIFY-197 --duration 10 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)
 - **Avance realizado:** Se configuró el usuario bot en Plane y se validó la petición HTTP con curl.
 - **Rama Git / Commit:** infra/OMNIFY-197-claude-mcp-connector (commit a81f3e en origin).
 - **Estado actual:** El servidor responde 200 OK localmente con el bot token.

@@ -38,7 +38,7 @@ Equipos de ingeniería maduros (Google SRE, Stripe, Spotify) gestionan la jornad
 | Balde | Tipo de Trabajo | % Realista de Jornada | ¿Dónde vive en Plane? |
 | :--- | :--- | :---: | :--- |
 | **Balde 1: Ingeniería & Producto (Deep Work)** | Auditoría, Análisis de Implementación, Backend, Frontend, DevOps y QA formal. | **50% - 60%** (~4 - 5 hrs) | **Proyecto `Omnify`** |
-| **Balde 2: Operaciones & Soporte L2/L3 (Toil)** | Dudas de usuarios, parches rápidos, consultas ad-hoc a BD, verificación de envíos. | **20% - 25%** (~1.5 - 2 hrs) | **Proyecto `Operaciones` / Ticket Paraguas** |
+| **Balde 2: Operaciones & Soporte (Toil)** | Dudas de usuarios, parches rápidos, consultas ad-hoc a BD, verificación de envíos. | **20% - 25%** (~1.5 - 2 hrs) | **Proyecto `Operaciones` / Ticket Paraguas** |
 | **Balde 3: Coordinación & Overhead** | Dailies, sincronización con líderes, refinamiento, pausas cognitivas. | **15% - 20%** (~1 - 1.5 hrs) | **Ticket Paraguas Semanal** |
 
 > [!NOTE]
@@ -99,15 +99,15 @@ Para no crear 15 tickets de 10 minutos cada día por llamadas o preguntas en Sla
 
 #### A. En el Proyecto `Operaciones` (`OPS`):
 Crea un ticket semanal recurrente para soporte y mantenimiento:
-* **Título:** `[Soporte L2/L3] Atención de Consultas de Usuarios y Mantenimiento Ad-Hoc - Semana W44`
+* **Título:** `Atención de Consultas de Usuarios y Mantenimiento Ad-Hoc - W44`
 * **Cómo se usa:** Cada vez que atiendes a un usuario o haces una consulta rápida de BD, agregas un comentario rápido o acumulas el tiempo en el log de la sesión:
   > *"Atención a usuario Comercial: verificación de estado de campaña Ripley (30m). Revisión de logs en Caddy por timeout reportado (20m)."*
 
-#### B. En el Proyecto `Omnify` (`OMNIFY`):
-Crea un ticket semanal para coordinación del equipo:
-* **Título:** `[Coordinación] Reuniones de Equipo, Dailies y Sincronización Técnica - W44`
+#### B. En el Proyecto `Operaciones` (`OPS`), balde `coordination`:
+Crea un segundo ticket semanal, también en `OPS` (el proyecto `OMNIFY` queda limpio de tickets de proceso):
+* **Título:** `Sincronización de Equipo y Acuerdos - W44`
 * **Cómo se usa:** Se imputan las horas reales de reuniones con el equipo o jefatura:
-  > *"Daily meeting (15m), Reunión de priorización con Pierre (45m), Demo de avance (30m)."*
+  > *"Reunión de equipo (15m), Sync de priorización con Pierre (45m), Demo de avance (30m)."*
 
 ---
 

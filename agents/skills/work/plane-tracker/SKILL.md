@@ -9,6 +9,47 @@ Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.
 
 ---
 
+## 0. Setup Inicial (Primera vez que se usa esta skill)
+
+> [!IMPORTANT]
+> Antes de ejecutar cualquier comando de `plane-tracker`, el agente **debe verificar** que las variables de entorno requeridas están configuradas en `~/.zshrc.local`. Si alguna falta, **solicitar al usuario los valores** de forma interactiva antes de continuar.
+
+### Variables requeridas
+
+```bash
+# URL base de tu instancia Plane CE (sin trailing slash)
+export PLANE_BASE_URL="https://plane.tudominio.com"
+
+# Workspace slug de Plane (visible en la URL: /tu-workspace/...)
+export PLANE_WORKSPACE="tu-workspace"
+
+# API Key personal (Plane → Perfil → API Tokens)
+export PLANE_API_KEY="tu-api-key"
+
+# Tu username o email en Plane — usado para filtrar tu reporte
+# y no mezclar horas de compañeros en tickets compartidos
+export PLANE_USERNAME="tu@email.com"   # o tu display_name en Plane
+
+# Opcional — UUID directo de tu usuario (más robusto que PLANE_USERNAME)
+# Obtenlo con: plane-tracker whoami
+# export PLANE_ACTOR_UUID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+```
+
+### Protocolo de onboarding del agente
+
+Cuando el usuario invoca esta skill **por primera vez** (o `plane-tracker` falla con error de configuración), el agente debe:
+
+1. **Verificar** con `plane-tracker whoami 2>&1` si la configuración está activa.
+2. **Si falta alguna variable**, preguntar al usuario:
+   - *"¿Cuál es la URL de tu instancia Plane (ej. `https://plane.miempresa.com`)?"*
+   - *"¿Cuál es tu API Key de Plane? (Plane → Perfil → API Tokens)"*
+   - *"¿Cuál es tu username o email en Plane?"*
+3. **Escribir** los valores en `~/.zshrc.local` usando `echo 'export VAR=...' >> ~/.zshrc.local`.
+4. **Recargar** con `source ~/.zshrc.local` y verificar con `plane-tracker whoami`.
+5. **Nunca** exponer el API Key en logs, artefactos ni respuestas de chat.
+
+---
+
 ## 1. Mapeo Determinista de Estados y Ciclo de Vida del Ticket
 
 Plane cuenta con estados oficiales por proyecto. Las transiciones de estado deben ser deterministas según el hito técnico alcanzado:
@@ -16,7 +57,7 @@ Plane cuenta con estados oficiales por proyecto. Las transiciones de estado debe
 | Estado en Plane | Trigger Técnico del Asistente | Comando CLI |
 | :--- | :--- | :--- |
 | **`Pendiente`** | Tarea asignada en el sprint pero aún no comenzada. | `plane.py update OMNIFY-XXX --state Pendiente` |
-| **`Progreso`** | Johan inicia actividades de Auditoría, Spike, RFC, Tooling o Desarrollo activo. | `plane.py update OMNIFY-XXX --state Progreso` |
+| **`Progreso`** | El usuario inicia actividades de Auditoría, Spike, RFC, Tooling o Desarrollo activo. | `plane.py update OMNIFY-XXX --state Progreso` |
 | **`Pruebas`** | Código/script listo; ejecutando dry-run transaccional, test suite o réplica. | `plane.py update OMNIFY-XXX --state Pruebas` |
 | **`Revisión`** | **PR subido a Git o Staging esperando aprobación del líder técnico (Pierre).** | `plane.py update OMNIFY-XXX --state Revisión` |
 | **`Pausado`** | **Stopper externo activo** (esperando respuesta de Meta, credenciales, accesos). | `plane.py update OMNIFY-XXX --state Pausado` |
@@ -28,9 +69,12 @@ Plane cuenta con estados oficiales por proyecto. Las transiciones de estado debe
 
 ## 2. Taxonomía de Proyectos, Etiquetas y Prioridades
 
-### A. Proyectos Oficiales:
-* **`OMNIFY`:** Código fuente, plataformas web, backend, APIs, integraciones y auditorías de producto.
-* **`OPERACIONES` (`OPS`):** Soporte L2/L3 a usuarios, mantenimiento ad-hoc, cuentas Meta, servidores y tickets paraguas semanales.
+### A. Proyectos del Workspace `teamprogra`:
+* **`OMNIFY` (Omnify):** Código fuente, plataformas web, backend, APIs, integraciones y auditorías de producto.
+* **`OMNICANAL` (Plataforma - Omnicanal):** Desarrollo de la plataforma de omnicanalidad.
+* **`OMNILEADS` (Omnileads):** Proyecto de captación y leads.
+* **`CDP` (CDP):** Proyecto de la plataforma de datos.
+* **`OPS` (Operaciones):** Soporte a usuarios, mantenimiento ad-hoc, cuentas Meta, servidores y **los dos tickets paraguas semanales** (toil y coordinación). No usar el prefijo `[OPS]` en títulos: el identifier del proyecto ya aporta el contexto.
 
 ### B. Etiquetas Humanas (Labels) en Omnify:
 * **Componentes / Servicios:** `sms`, `backend`, `frontend`, `bd`, `infra`, `n8n`, `whatsapp`, `acortador`, `tts`, `correo`, `whatsapp-sender`.
@@ -50,9 +94,15 @@ El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `O
 
 ### A. Publicar Bitácora Dual-Layer (Comentario)
 ```bash
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --duration 95
 # Con especificación opcional de track y tipo de agente:
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "validaciones" --worker-type "subagent"
+plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --duration 95 --track "validaciones" --worker-type "subagent"
+plane-tracker comment OPS-13 -m "Firma actualizada" --capacity toil_support --duration 5
+```
+
+> ⚠️ **`--duration <minutos>` es obligatorio** cuando el contenido no lleva el bloque `PLANE_WORKLOG_METADATA` (en ese bloque puede ir en `duration_minutes` o `duration_net_minutes`). Sin él, el CLI aborta **antes** de publicar el comentario, porque la duración ya no se inventa (antes asumía 30 min por defecto y contaminaba el reporte).
+>
+> **Regla de duración honesta:** si el trabajo se hizo **fuera de la conversación** (ej. el usuario cambió su firma de correo por su cuenta y solo pide registrar el hecho en el workitem), el agente **pregunta** cuánto demoró antes de comentar. Nunca estimes un tiempo que no observaste; si el usuario no lo sabe, deja el registro pendiente.
 ```
 
 ### B. Crear un Nuevo Ticket / Work Item
@@ -164,7 +214,7 @@ Todo comentario generado por el asistente al cerrar una sesión debe seguir estr
 - Commit o PR asociado (#XX)
 
 #### ⏭️ Próxima Acción & Dependencias
-- Responsable: `Johan Tanta` / `Pierre Vicente` / `Meta`
+- Responsable: `{Nombre del usuario}` / `Pierre Vicente` / `Meta`
 - Paso siguiente para desbloquear o avanzar.
 
 <!-- PLANE_WORKLOG_METADATA
@@ -215,7 +265,7 @@ Todo comentario generado por el asistente al cerrar una sesión debe seguir estr
 
 ## 5. Matriz de Inferencia Autógena para Agentes de IA
 
-Para evitar fricción y **nunca** pedirle a Johan que llene formularios manualmente, el asistente deduce los campos a partir de la sesión:
+Para evitar fricción y **nunca** pedirle al usuario que llene formularios manualmente, el asistente deduce los campos a partir de la sesión:
 
 | Huellas en la Sesión (Comandos / Archivos) | Fase Deducida (`phase`) | Balde (`bucket`) | Rol Deducido (`role`) | Impacto (`business_impact`) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -238,13 +288,15 @@ Para evitar fricción y **nunca** pedirle a Johan que llene formularios manualme
    - Se activa si se descubren fallos estructurales imprevistos (ej. *descuadre de 1.6M de filas en SEM-MKT*). El agente extrae el volumen de filas y marca `tech_debt_delta = "discovered"`.
 3. **Detección de Bloqueos / Stoppers (`is_blocked`):**
    - Si se concluye en espera de respuesta de Meta, accesos o aprobación de Pierre, marcar `is_blocked: true`, identificar la entidad en `blocker_details`, y sugerir mover a `Pausado`.
-4. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane-tracker comment`?"*).
+4. **Duración Honesta (`duration_minutes` / `--duration`):**
+   - El tiempo **no se estima**. Si el agente vio y midió la sesión, usa ese valor; si el trabajo ocurrió **fuera de la conversación** (ej. el usuario configuró su firma de correo por su cuenta y solo pide registrarlo en `OPS-13`), el agente **pregunta primero** cuánto demoró y usa ese número en `--duration`. Si el usuario no lo sabe, no se publica el comentario todavía.
+5. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane-tracker comment --duration N`?"*).
 
 ---
 
 ## 6. Estándar de Creación de Work Items / Tickets
 
-Cuando un agente o Johan cree un nuevo work item con `plane-tracker create`, debe seguir estrictamente este estándar:
+Cuando el agente o el usuario cree un nuevo work item con `plane-tracker create`, debe seguir estrictamente este estándar:
 
 ### A. Título
 Formato: `[{FASE}] {Acción en infinitivo o resumen conciso en español}`
