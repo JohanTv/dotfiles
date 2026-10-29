@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-plane.py - CLI Integral y Resiliente para Plane CE v1.2.3.
+plane.py - CLI Integral y Resiliente para Plane CE v1.2.3 con Persistencia SQLite3 (v2.3).
 Soporta:
-  - Descubrimiento dinámico de proyectos (OMNIFY, OPS, OMNILEADS, CDP, etc.) con caché local
-  - Paginación robusta de tickets, comentarios y etiquetas
-  - Timeout de red, reintentos con backoff defensivo ante HTTP 429
-  - Publicación de bitácoras dual-layer (humano + metadata oculta)
-  - Transiciones de estado (Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado)
-  - Prioridades y etiquetas humanas dinámicas
-  - Generación de reportes de actividad (--today, --week, --date) en formato híbrido
+  - Base de datos local SQLite3 con WAL Mode (Zero-Lock, concurrencia segura para subagentes)
+  - Descubrimiento dinámico de proyectos (OMNIFY, OPS, OMNILEADS, CDP) en base de datos
+  - Bitácoras dual-layer (humano + metadata oculta v2.2 con soporte de tracks y worker_type)
+  - Fusión matemática de intervalos (Klee's Measure) para reportes sin horas duplicadas
+  - Transiciones de estado seguras y asignación de prioridades y etiquetas
+  - Tolerancia a fallos de red y backoff defensivo ante HTTP 429
   - Salida formateada y soporte `--json` para agentes de IA y dashboards
 """
 
 import sys
 import os
 import json
+import sqlite3
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -24,11 +24,83 @@ import argparse
 from datetime import datetime, timedelta, date
 
 CACHE_DIR = os.path.expanduser("~/.cache/plane")
-CACHE_FILE = os.path.join(CACHE_DIR, "projects_cache.json")
-WORKLOGS_CACHE = os.path.join(CACHE_DIR, "worklogs_cache.json")
-CACHE_TTL = 86400  # 24 horas
+DB_FILE = os.path.join(CACHE_DIR, "worklogs.db")
+PROJECTS_TTL = 86400  # 24 horas
+SYNC_COOLDOWN = 300   # 5 minutos
 
 DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+# ------------------------------------------------------------------------------
+# Conexión y Gestión de Base de Datos SQLite3 (WAL Mode)
+# ------------------------------------------------------------------------------
+
+def get_db():
+    """Retorna una conexión a SQLite3 con WAL mode y timeout defensivo."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 10000;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+def init_db(conn):
+    """Inicializa el esquema relacional e índices si no existen."""
+    with conn:
+        # 1. Tabla de Proyectos
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                identifier TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                workspace TEXT NOT NULL DEFAULT 'teamprogra',
+                updated_at REAL NOT NULL
+            );
+        """)
+
+        # 2. Tabla de Metadatos de Sincronización
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sync_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            );
+        """)
+
+        # 3. Tabla Principal de Registros de Trabajo (Worklogs v2.2)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS worklogs (
+                ticket_id TEXT NOT NULL,
+                track TEXT NOT NULL DEFAULT 'main',
+                date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+                plane_comment_id TEXT,
+                project_id TEXT NOT NULL,
+                issue_name TEXT NOT NULL DEFAULT '',
+                worker_type TEXT NOT NULL DEFAULT 'human',
+                capacity_bucket TEXT NOT NULL DEFAULT 'deep_work',
+                phase TEXT NOT NULL DEFAULT 'construction_dev',
+                role TEXT NOT NULL DEFAULT 'backend_engineer',
+                notes TEXT NOT NULL DEFAULT '',
+                stoppers_json TEXT NOT NULL DEFAULT '[]',
+                raw_payload TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (ticket_id, track, date, start_time)
+            );
+        """)
+
+        # Índices
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_date_start ON worklogs(date, start_time);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_ticket_track ON worklogs(ticket_id, track);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_project_date ON worklogs(project_id, date);")
+
+# ------------------------------------------------------------------------------
+# Entorno y Red
+# ------------------------------------------------------------------------------
 
 def load_zshrc_local_if_needed():
     """Carga variables desde ~/.zshrc.local si no están en el entorno."""
@@ -90,41 +162,41 @@ def api_request(url, api_key, method="GET", data=None, timeout=10, max_retries=3
             sys.stderr.write(f"Error de red/conexión con Plane ({url}): {e}\n")
             sys.exit(1)
 
-def get_projects_map(base_url, api_key, workspace, force_refresh=False):
-    """Obtiene el mapa de identifier -> UUID de proyectos con caché local."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    now = time.time()
+# ------------------------------------------------------------------------------
+# Gestión de Proyectos con Caché en SQLite3
+# ------------------------------------------------------------------------------
 
-    if not force_refresh and os.path.isfile(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-                if now - cache_data.get("_timestamp", 0) < CACHE_TTL:
-                    return cache_data.get("projects", {})
-        except Exception:
-            pass
+def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
+    """Obtiene el mapa de identifier -> UUID de proyectos desde SQLite o Plane API."""
+    now = time.time()
+    if not force_refresh:
+        rows = conn.execute("SELECT identifier, project_id, name, updated_at FROM projects WHERE workspace = ?", (workspace,)).fetchall()
+        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+            return {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"]} for r in rows}
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/"
     data = api_request(url, api_key)
     projects_map = {}
-    for proj in data.get("results", []):
-        ident = proj.get("identifier", "").upper()
-        if ident:
-            projects_map[ident] = {
-                "id": proj["id"],
-                "name": proj["name"],
-                "identifier": ident
-            }
-
-    try:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump({"_timestamp": now, "projects": projects_map}, f, indent=2)
-    except Exception:
-        pass
+    with conn:
+        for proj in data.get("results", []):
+            ident = proj.get("identifier", "").upper()
+            if ident:
+                p_id = proj["id"]
+                p_name = proj["name"]
+                projects_map[ident] = {"id": p_id, "name": p_name, "identifier": ident}
+                conn.execute("""
+                    INSERT INTO projects (identifier, project_id, name, workspace, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(identifier) DO UPDATE SET
+                        project_id = excluded.project_id,
+                        name = excluded.name,
+                        workspace = excluded.workspace,
+                        updated_at = excluded.updated_at;
+                """, (ident, p_id, p_name, workspace, now))
 
     return projects_map
 
-def resolve_project_and_seq(base_url, api_key, workspace, default_project_id, issue_ref):
+def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref):
     """
     Deduce el proyecto y número de secuencia a partir del issue_ref.
     Soporta: 'OMNIFY-162', 'OPS-44', '162' o UUID.
@@ -136,11 +208,11 @@ def resolve_project_and_seq(base_url, api_key, workspace, default_project_id, is
     if match:
         prefix = match.group(1).upper()
         seq_id = int(match.group(2))
-        projects_map = get_projects_map(base_url, api_key, workspace)
+        projects_map = get_projects_map(conn, base_url, api_key, workspace)
         if prefix in projects_map:
             return projects_map[prefix]["id"], seq_id, None
 
-        projects_map = get_projects_map(base_url, api_key, workspace, force_refresh=True)
+        projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=True)
         if prefix in projects_map:
             return projects_map[prefix]["id"], seq_id, None
 
@@ -212,51 +284,15 @@ def get_labels_map(base_url, api_key, workspace, project_id):
     return mapping
 
 # ------------------------------------------------------------------------------
-# Gestión de Caché Local de Registros de Trabajo (Worklogs)
+# Telemetría y Metadata (v2.2)
 # ------------------------------------------------------------------------------
 
-def load_worklogs_cache():
-    """Carga la caché local de registros de trabajo y timestamp de último sync."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    if os.path.isfile(WORKLOGS_CACHE):
-        try:
-            with open(WORKLOGS_CACHE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data.get("worklogs", []), data.get("_last_synced", 0)
-        except Exception:
-            pass
-    return [], 0
-
-def save_worklogs_cache(worklogs, mark_sync=False):
-    """Guarda registros de trabajo en la caché local sin duplicados."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    _, last_synced = load_worklogs_cache()
-    if mark_sync:
-        last_synced = time.time()
-
-    seen = set()
-    unique = []
-    for wl in sorted(worklogs, key=lambda x: (x.get("date", ""), x.get("start_time", ""))):
-        key = wl.get("id") or f"{wl.get('ticket_id')}_{wl.get('date')}_{wl.get('start_time')}"
-        if key not in seen:
-            seen.add(key)
-            unique.append(wl)
-    try:
-        with open(WORKLOGS_CACHE, "w", encoding="utf-8") as f:
-            json.dump({"_version": "2.1", "_last_synced": last_synced, "worklogs": unique}, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
-    return unique
-
 def extract_metadata_from_comment(comment_html):
-    """
-    Extrae metadata telemétrica oculta (<!-- PLANE_WORKLOG_METADATA ... -->)
-    o deduce los datos a partir de la tabla markdown del comentario.
-    """
+    """Extrae metadata telemétrica oculta (<!-- PLANE_WORKLOG_METADATA ... -->) o deduce de tabla."""
     if not comment_html:
         return None
 
-    # 1. Bloque JSON telemétrico estructurado
+    # 1. Bloque JSON telemétrico oficial v2.1 / v2.2
     meta_match = re.search(r"<!--\s*PLANE_WORKLOG_METADATA\s*([\s\S]*?)\s*-->", comment_html)
     if meta_match:
         try:
@@ -271,6 +307,7 @@ def extract_metadata_from_comment(comment_html):
     session_match = re.search(r"\*\*Sesión\*\*\s*\|\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", comment_html)
     notes_match = re.search(r"\*\*(?:Resumen|Notas|Detalle)\*\*\s*\|\s*([^|\n<]+)", comment_html)
     bucket_match = re.search(r"\*\*Capacidad\*\*\s*\|\s*`?([a-z_]+)`?", comment_html)
+    track_match = re.search(r"\*\*Track\*\*\s*\|\s*`?([a-zA-Z0-9_-]+)`?", comment_html)
 
     if session_match:
         s_time = session_match.group(1)
@@ -287,48 +324,98 @@ def extract_metadata_from_comment(comment_html):
         d_str = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
         notes_str = notes_match.group(1).strip() if notes_match else ""
         bucket_str = bucket_match.group(1).strip() if bucket_match else "deep_work"
+        track_str = track_match.group(1).strip() if track_match else "main"
 
         return {
+            "schema_version": "2.2",
             "date": d_str,
             "start_time": s_time,
             "end_time": e_time,
             "duration_minutes": dur,
+            "track": track_str,
+            "worker_type": "human",
             "capacity_bucket": bucket_str,
             "notes": notes_str,
             "stoppers": [],
-            "schema_version": "2.1"
+            "phase": "dev"
         }
 
     return None
 
-def sync_remote_worklogs(base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
-    """
-    Sincroniza remotamente comentarios desde Plane para tickets actualizados
-    entre date_from_str y date_to_str.
-    """
-    sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
-    projects_map = get_projects_map(base_url, api_key, workspace)
-    cached, _ = load_worklogs_cache()
-    cached_ids = {e.get("id") for e in cached if e.get("id")}
-    new_entries = []
+def upsert_worklog(conn, entry):
+    """Inserta o actualiza un registro de trabajo en SQLite3 de forma idempotente."""
+    now = time.time()
+    t_id = entry.get("ticket_id", "GENERAL")
+    track = entry.get("track", "main")
+    d_str = entry.get("date", datetime.now().strftime("%Y-%m-%d"))
+    s_time = entry.get("start_time", "09:00")
+    e_time = entry.get("end_time", "10:00")
+    dur = entry.get("duration_minutes", 60)
+    p_id = t_id.split("-")[0] if "-" in t_id else "GENERAL"
+    i_name = entry.get("issue_name", "")
+    w_type = entry.get("worker_type", "human")
+    bucket = entry.get("capacity_bucket", "deep_work")
+    phase = entry.get("phase", "dev")
+    role = entry.get("role", "backend_engineer")
+    notes = entry.get("notes", "")
+    stoppers = json.dumps(entry.get("stoppers", []), ensure_ascii=False)
+    comment_id = entry.get("plane_comment_id") or entry.get("id")
+    raw_payload = json.dumps(entry.get("raw_payload", entry), ensure_ascii=False)
+    created_at = entry.get("created_at", datetime.now().isoformat())
 
+    with conn:
+        conn.execute("""
+            INSERT INTO worklogs (
+                ticket_id, track, date, start_time, end_time, duration_minutes,
+                plane_comment_id, project_id, issue_name, worker_type,
+                capacity_bucket, phase, role, notes, stoppers_json, raw_payload,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(ticket_id, track, date, start_time) DO UPDATE SET
+                end_time = excluded.end_time,
+                duration_minutes = excluded.duration_minutes,
+                plane_comment_id = COALESCE(excluded.plane_comment_id, worklogs.plane_comment_id),
+                issue_name = CASE WHEN excluded.issue_name != '' THEN excluded.issue_name ELSE worklogs.issue_name END,
+                worker_type = excluded.worker_type,
+                capacity_bucket = excluded.capacity_bucket,
+                phase = excluded.phase,
+                role = excluded.role,
+                notes = excluded.notes,
+                stoppers_json = excluded.stoppers_json,
+                raw_payload = excluded.raw_payload,
+                updated_at = excluded.updated_at;
+        """, (
+            t_id, track, d_str, s_time, e_time, dur,
+            comment_id, p_id, i_name, w_type,
+            bucket, phase, role, notes, stoppers, raw_payload,
+            created_at, now
+        ))
+
+# ------------------------------------------------------------------------------
+# Sincronización Remota con Plane API
+# ------------------------------------------------------------------------------
+
+def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
+    """Sincroniza comentarios de Plane para tickets actualizados y los persiste en SQLite."""
+    sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
+    projects_map = get_projects_map(conn, base_url, api_key, workspace)
+    
     try:
         d_from = datetime.strptime(date_from_str, "%Y-%m-%d").date() - timedelta(days=1)
     except Exception:
         d_from = datetime.now().date() - timedelta(days=7)
 
-    # Filtrar o priorizar proyectos relevantes
     target_idents = []
     if filter_project:
         f_up = filter_project.upper()
         if f_up in projects_map:
             target_idents = [f_up]
     else:
-        # Priorizar Omnify y Operaciones (proyectos activos de desarrollo y soporte)
         for pref in ["OMNIFY", "OPS", "OMNICANAL"]:
             if pref in projects_map:
                 target_idents.append(pref)
 
+    synced_count = 0
     for ident in target_idents:
         proj = projects_map[ident]
         proj_id = proj["id"]
@@ -355,7 +442,7 @@ def sync_remote_worklogs(base_url, api_key, workspace, date_from_str, date_to_st
 
             c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/{iss['id']}/comments/"
             try:
-                time.sleep(0.1)  # Evitar 429
+                time.sleep(0.1)  # Respetar rate limit
                 c_data = api_request(c_url, api_key, raise_on_error=True)
             except urllib.error.HTTPError as e:
                 if e.code in (401, 403, 404):
@@ -365,48 +452,183 @@ def sync_remote_worklogs(base_url, api_key, workspace, date_from_str, date_to_st
                 continue
 
             for c in c_data.get("results", []):
-                c_id = c.get("id")
-                if c_id in cached_ids:
-                    continue
-
                 html = c.get("comment_html", "")
                 meta = extract_metadata_from_comment(html)
                 if meta:
                     ticket_label = f"{ident}-{iss.get('sequence_id')}"
                     entry = {
-                        "id": c_id,
                         "ticket_id": ticket_label,
+                        "track": meta.get("track", "main"),
                         "issue_name": iss.get("name", ""),
                         "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
                         "start_time": meta.get("start_time", "09:00"),
                         "end_time": meta.get("end_time", "10:00"),
                         "duration_minutes": meta.get("duration_minutes", 60),
+                        "worker_type": meta.get("worker_type", "human"),
                         "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
                         "phase": meta.get("phase", "dev"),
                         "notes": meta.get("notes", iss.get("name", "")),
                         "stoppers": meta.get("stoppers", []),
-                        "related_ticket_id": meta.get("related_ticket_id"),
-                        "created_at": c.get("created_at")
+                        "plane_comment_id": c.get("id"),
+                        "created_at": c.get("created_at"),
+                        "raw_payload": meta
                     }
-                    new_entries.append(entry)
-                    cached_ids.add(c_id)
+                    upsert_worklog(conn, entry)
+                    synced_count += 1
 
-    if new_entries:
-        cached.extend(new_entries)
-        save_worklogs_cache(cached, mark_sync=True)
-        sys.stderr.write(f"✔ Se importaron {len(new_entries)} registros nuevos desde Plane.\n")
+    # Actualizar watermark de sync
+    now = time.time()
+    with conn:
+        conn.execute("""
+            INSERT INTO sync_metadata (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
+        """, (f"sync:{workspace}", datetime.now().isoformat(), now))
+
+    if synced_count > 0:
+        sys.stderr.write(f"✔ Se sincronizaron {synced_count} registros telemétricos en SQLite3.\n")
     else:
-        save_worklogs_cache(cached, mark_sync=True)
-        sys.stderr.write("ℹ Sincronización completa: no se hallaron nuevos registros telemétricos.\n")
-
-    return cached
+        sys.stderr.write("ℹ Sincronización completa: sin nuevos registros telemétricos.\n")
 
 # ------------------------------------------------------------------------------
-# Comandos
+# Algoritmo de Fusión de Intervalos de Klee (Interval Merging)
 # ------------------------------------------------------------------------------
 
-def cmd_comment(args, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
+def time_to_minutes(t_str):
+    try:
+        h, m = map(int, t_str.split(":"))
+        return h * 60 + m
+    except Exception:
+        return 0
+
+def minutes_to_time(m):
+    h = (m // 60) % 24
+    mins = m % 60
+    return f"{h:02d}:{mins:02d}"
+
+def calculate_klee_union_minutes(intervals):
+    """Calcula la longitud de la unión de intervalos sin duplicar solapamientos (Medida de Lebesgue en 1D)."""
+    if not intervals:
+        return 0
+    sorted_int = sorted(intervals, key=lambda x: x[0])
+    union_mins = 0
+    cur_start, cur_end = sorted_int[0]
+
+    for s, e in sorted_int[1:]:
+        if s <= cur_end:
+            cur_end = max(cur_end, e)
+        else:
+            union_mins += (cur_end - cur_start)
+            cur_start, cur_end = s, e
+    union_mins += (cur_end - cur_start)
+    return union_mins
+
+def merge_daily_worklogs(rows):
+    """
+    Agrupa y fusiona registros para el formato ejecutivo:
+    titulo / inicio / fin / notas
+    
+    1. Registros del mismo ticket con solapamiento temporal se unifican en un único bloque continuo.
+    2. Registros de distintos tickets preservan su horario real.
+    3. El total día se calcula mediante la unión de Lebesgue (Klee's Measure) para tiempo reloj real.
+    """
+    if not rows:
+        return [], 0, 0
+
+    tickets_map = {}
+    for r in rows:
+        tid = r["ticket_id"]
+        tickets_map.setdefault(tid, []).append(r)
+
+    consolidated = []
+    all_raw_intervals = []
+    total_compute_minutes = 0
+
+    for tid, t_entries in tickets_map.items():
+        sorted_t = sorted(t_entries, key=lambda x: time_to_minutes(x["start_time"]))
+        merged_blocks = []
+
+        for e in sorted_t:
+            s_m = time_to_minutes(e["start_time"])
+            e_m = time_to_minutes(e["end_time"])
+            dur = e["duration_minutes"]
+            total_compute_minutes += dur
+            all_raw_intervals.append((s_m, e_m))
+
+            track_name = e["track"]
+            worker = e["worker_type"]
+            actor_tag = " [Subagente]" if "subagent" in worker.lower() else ""
+            track_tag = f"Track: {track_name}" if track_name != "main" else "General"
+            note_content = f"[{track_tag}{actor_tag} ({e['start_time']}-{e['end_time']})]: {e['notes']}"
+
+            try:
+                stoppers_list = json.loads(e["stoppers_json"])
+            except Exception:
+                stoppers_list = []
+
+            if not merged_blocks:
+                merged_blocks.append({
+                    "ticket_id": tid,
+                    "issue_name": e["issue_name"],
+                    "start_min": s_m,
+                    "end_min": e_m,
+                    "active_mins": dur,
+                    "notes_list": [note_content],
+                    "stoppers": stoppers_list,
+                    "workers": {worker}
+                })
+            else:
+                last = merged_blocks[-1]
+                # Solapamiento o contigüidad (<= 5 min)
+                if s_m <= last["end_min"] + 5:
+                    last["end_min"] = max(last["end_min"], e_m)
+                    last["active_mins"] += dur
+                    last["notes_list"].append(note_content)
+                    last["stoppers"].extend(stoppers_list)
+                    last["workers"].add(worker)
+                else:
+                    merged_blocks.append({
+                        "ticket_id": tid,
+                        "issue_name": e["issue_name"],
+                        "start_min": s_m,
+                        "end_min": e_m,
+                        "active_mins": dur,
+                        "notes_list": [note_content],
+                        "stoppers": stoppers_list,
+                        "workers": {worker}
+                    })
+
+        for b in merged_blocks:
+            wall_m = b["end_min"] - b["start_min"]
+            leverage = round(b["active_mins"] / wall_m, 2) if wall_m > 0 else 1.0
+            combined_notes = " | ".join(b["notes_list"])
+            if len(b["notes_list"]) > 1 or leverage > 1.0:
+                combined_notes += f" (Consolidado: {b['active_mins']}m esfuerzo en {wall_m}m reloj | AI Leverage: {leverage}x)"
+
+            consolidated.append({
+                "ticket_id": b["ticket_id"],
+                "issue_name": b["issue_name"],
+                "start_time": minutes_to_time(b["start_min"]),
+                "end_time": minutes_to_time(b["end_min"]),
+                "start_min": b["start_min"],
+                "wall_minutes": wall_m,
+                "active_minutes": b["active_mins"],
+                "notes": combined_notes,
+                "stoppers": list(set(b["stoppers"])),
+                "workers": list(b["workers"])
+            })
+
+    consolidated.sort(key=lambda x: x["start_min"])
+    day_wall_clock_minutes = calculate_klee_union_minutes(all_raw_intervals)
+
+    return consolidated, day_wall_clock_minutes, total_compute_minutes
+
+# ------------------------------------------------------------------------------
+# Comandos CLI
+# ------------------------------------------------------------------------------
+
+def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     content = ""
     if args.file:
         with open(args.file, "r", encoding="utf-8") as f:
@@ -424,48 +646,61 @@ def cmd_comment(args, base_url, api_key, workspace, default_project_id):
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     res = api_request(url, api_key, method="POST", data={"comment_html": content})
 
-    # Caching local automático del worklog para reportes instantáneos
+    # Caching atómico en SQLite3
     meta = extract_metadata_from_comment(content)
     ticket_label = f"{issue.get('project_detail', {}).get('identifier', 'OMNIFY')}-{issue.get('sequence_id')}" if "sequence_id" in issue else args.issue
+    
+    # Determinar track y worker_type (prioridad: flags de CLI -> metadata -> default)
+    track = getattr(args, "track", None) or (meta.get("track") if meta else None) or "main"
+    worker_type = getattr(args, "worker_type", None) or (meta.get("worker_type") if meta else None) or "human"
+
     if not meta:
         clean_text = re.sub(r"<[^>]+>", "", content).strip()
         meta = {
+            "schema_version": "2.2",
             "date": datetime.now().strftime("%Y-%m-%d"),
             "start_time": datetime.now().strftime("%H:%M"),
             "end_time": (datetime.now() + timedelta(minutes=30)).strftime("%H:%M"),
             "duration_minutes": 30,
+            "track": track,
+            "worker_type": worker_type,
             "capacity_bucket": "deep_work",
             "notes": clean_text[:120] if clean_text else issue.get("name", ""),
             "stoppers": [],
-            "schema_version": "2.1"
+            "phase": "dev"
         }
+    else:
+        meta["track"] = track
+        meta["worker_type"] = worker_type
 
-    worklogs, _ = load_worklogs_cache()
     entry = {
-        "id": res.get("id") or f"local_{int(time.time())}",
+        "id": res.get("id"),
         "ticket_id": ticket_label,
+        "track": track,
         "issue_name": issue.get("name", ""),
         "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
         "start_time": meta.get("start_time", "09:00"),
         "end_time": meta.get("end_time", "10:00"),
         "duration_minutes": meta.get("duration_minutes", 60),
+        "worker_type": worker_type,
         "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
         "phase": meta.get("phase", "dev"),
+        "role": meta.get("role", "backend_engineer"),
         "notes": meta.get("notes", issue.get("name", "")),
         "stoppers": meta.get("stoppers", []),
-        "related_ticket_id": meta.get("related_ticket_id"),
-        "created_at": datetime.now().isoformat()
+        "plane_comment_id": res.get("id"),
+        "created_at": datetime.now().isoformat(),
+        "raw_payload": meta
     }
-    worklogs.append(entry)
-    save_worklogs_cache(worklogs)
+    upsert_worklog(conn, entry)
 
     if getattr(args, "json", False):
         print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": res.get("id")}))
     else:
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
-def cmd_update(args, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
+def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     patch_data = {}
 
@@ -512,8 +747,8 @@ def cmd_update(args, base_url, api_key, workspace, default_project_id):
         if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
         print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
-def cmd_get(args, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(base_url, api_key, workspace, default_project_id, args.issue)
+def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
+    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     
     if getattr(args, "json", False):
@@ -524,10 +759,10 @@ def cmd_get(args, base_url, api_key, workspace, default_project_id):
         print(f"   Creado el : {issue.get('created_at')}")
         print(f"   UUID      : {issue.get('id')}\n")
 
-def cmd_list(args, base_url, api_key, workspace, default_project_id):
+def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
     project_id = default_project_id
     if getattr(args, "project", None):
-        projects_map = get_projects_map(base_url, api_key, workspace)
+        projects_map = get_projects_map(conn, base_url, api_key, workspace)
         p_upper = args.project.upper()
         if p_upper in projects_map:
             project_id = projects_map[p_upper]["id"]
@@ -550,7 +785,7 @@ def cmd_list(args, base_url, api_key, workspace, default_project_id):
         print("")
 
 # ------------------------------------------------------------------------------
-# Generador de Reportes de Actividad (cmd_report)
+# Generador de Reportes de Actividad en Formato Híbrido (cmd_report)
 # ------------------------------------------------------------------------------
 
 def format_minutes(m):
@@ -558,65 +793,57 @@ def format_minutes(m):
     mins = m % 60
     return f"{h}h {mins:02d}m"
 
-def render_day_block(date_obj, entries):
-    """Genera el bloque textual de un día en formato híbrido."""
+def render_day_block(date_obj, rows):
+    """Renderiza el bloque de un día usando Interval Merging de Klee."""
     dia_nombre = DIAS_SEMANA[date_obj.weekday()]
     d_str = date_obj.strftime("%d/%m/%Y")
     lines = []
 
-    if not entries:
+    if not rows:
         return f"ℹ Sin registros de actividad para {dia_nombre} {d_str}.\n"
 
-    # Orden cronológico por start_time
-    sorted_entries = sorted(entries, key=lambda x: x.get("start_time", ""))
+    merged_entries, wall_clock_mins, total_compute_mins = merge_daily_worklogs(rows)
 
-    total_active = 0
     by_project = {}
-    stoppers = []
+    all_stoppers = []
 
-    for idx, e in enumerate(sorted_entries, 1):
-        t_id = e.get("ticket_id", "DESARROLLO")
-        name = e.get("issue_name", "").strip()
-        notas = e.get("notes", "").strip()
-        s_time = e.get("start_time", "--:--")
-        e_time = e.get("end_time", "--:--")
-        dur = e.get("duration_minutes", 0)
-
-        total_active += dur
-        prefix = t_id.split("-")[0] if "-" in t_id else "Otros"
-        by_project[prefix] = by_project.get(prefix, 0) + dur
-
-        for st in e.get("stoppers", []):
-            if st and st not in stoppers:
-                stoppers.append(st)
-
-        lines.append(f"titulo: [{t_id}] {name}")
-        lines.append(f"inicio: {s_time}")
-        lines.append(f"fin: {e_time}")
-        lines.append(f"notas: {notas}")
+    for e in merged_entries:
+        lines.append(f"titulo: [{e['ticket_id']}] {e['issue_name']}")
+        lines.append(f"inicio: {e['start_time']}")
+        lines.append(f"fin: {e['end_time']}")
+        lines.append(f"notas: {e['notes']}")
         lines.append("")
 
-    # Totales y Standbys
+        pref = e["ticket_id"].split("-")[0] if "-" in e["ticket_id"] else "Otros"
+        by_project[pref] = by_project.get(pref, 0) + e["wall_minutes"]
+        for st in e["stoppers"]:
+            if st and st not in all_stoppers:
+                all_stoppers.append(st)
+
     proj_parts = [f"{k}: {format_minutes(v)}" for k, v in by_project.items()]
     proj_str = " | ".join(proj_parts) if proj_parts else "N/A"
 
     lines.append("-" * 80)
-    lines.append(f"📊 Total día: {format_minutes(total_active)} activas ({proj_str})")
-    if stoppers:
-        lines.append(f"⏸️ Standby externo: {', '.join(stoppers)}")
+    lines.append(f"📊 Total día: {format_minutes(wall_clock_mins)} reloj activa ({proj_str})")
+    
+    if total_compute_mins > wall_clock_mins:
+        leverage = round(total_compute_mins / wall_clock_mins, 2) if wall_clock_mins > 0 else 1.0
+        lines.append(f"🚀 AI Leverage Multiplier: {leverage}x ({format_minutes(total_compute_mins)} de esfuerzo entregado en {format_minutes(wall_clock_mins)} reloj)")
+
+    if all_stoppers:
+        lines.append(f"⏸️ Standby externo: {', '.join(all_stoppers)}")
     else:
         lines.append("⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)")
 
     return "\n".join(lines)
 
-def cmd_report(args, base_url, api_key, workspace, default_project_id):
+def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     today = datetime.now().date()
     is_week = getattr(args, "week", False)
     custom_date = getattr(args, "date", None)
     force_sync = getattr(args, "sync", False)
 
     if is_week:
-        # Lunes a Domingo de la semana en curso
         start_date = today - timedelta(days=today.weekday())
         end_date = start_date + timedelta(days=6)
     elif custom_date:
@@ -628,37 +855,47 @@ def cmd_report(args, base_url, api_key, workspace, default_project_id):
             sys.stderr.write(f"Error: Formato de fecha inválido '{custom_date}'. Usa YYYY-MM-DD.\n")
             sys.exit(1)
     else:
-        # Por defecto: hoy
         start_date = today
         end_date = today
 
-    cached, last_synced = load_worklogs_cache()
-    now = time.time()
-    has_entries = any(start_date <= datetime.strptime(e.get("date", "2000-01-01"), "%Y-%m-%d").date() <= end_date for e in cached)
-    needs_sync = force_sync or (not has_entries and (now - last_synced > 300))
-    if needs_sync:
-        cached = sync_remote_worklogs(base_url, api_key, workspace, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"), filter_project=getattr(args, "project", None))
+    s_str = start_date.strftime("%Y-%m-%d")
+    e_str = end_date.strftime("%Y-%m-%d")
 
-    # Filtrar registros en el rango
-    filtered = []
-    for e in cached:
-        d_val = e.get("date")
-        if not d_val:
-            continue
-        try:
-            dt = datetime.strptime(d_val, "%Y-%m-%d").date()
-            if start_date <= dt <= end_date:
-                # Filtro opcional por proyecto
-                if getattr(args, "project", None):
-                    p_upper = args.project.upper()
-                    if not e.get("ticket_id", "").upper().startswith(p_upper):
-                        continue
-                filtered.append(e)
-        except Exception:
-            pass
+    # Verificar si necesitamos sincronizar remotamente
+    sync_meta = conn.execute("SELECT updated_at FROM sync_metadata WHERE key = ?", (f"sync:{workspace}",)).fetchone()
+    last_synced = sync_meta["updated_at"] if sync_meta else 0
+    now = time.time()
+
+    # Contar registros existentes en el rango
+    count_row = conn.execute("SELECT COUNT(*) as cnt FROM worklogs WHERE date >= ? AND date <= ?", (s_str, e_str)).fetchone()
+    has_entries = count_row["cnt"] > 0
+
+    needs_sync = force_sync or (not has_entries and (now - last_synced > SYNC_COOLDOWN))
+    if needs_sync:
+        sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=getattr(args, "project", None))
+
+    # Construir query SQL indexada con filtros opcionales
+    query = "SELECT * FROM worklogs WHERE date >= ? AND date <= ?"
+    params = [s_str, e_str]
+
+    if getattr(args, "project", None):
+        query += " AND project_id = ?"
+        params.append(args.project.upper())
+
+    if getattr(args, "track", None):
+        query += " AND track = ?"
+        params.append(args.track)
+
+    if getattr(args, "worker_type", None):
+        query += " AND worker_type = ?"
+        params.append(args.worker_type)
+
+    query += " ORDER BY date ASC, start_time ASC"
+    rows = conn.execute(query, params).fetchall()
 
     if getattr(args, "json", False):
-        print(json.dumps(filtered, indent=2, ensure_ascii=False))
+        result = [dict(r) for r in rows]
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return
 
     # Renderizado en texto
@@ -668,36 +905,47 @@ def cmd_report(args, base_url, api_key, workspace, default_project_id):
         print(f"📅 REPORTE SEMANAL - SEMANA {num_semana} ({start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')})")
         print("=" * 80 + "\n")
 
-        total_week_active = 0
+        all_week_intervals = []
+        total_week_compute = 0
         week_by_project = {}
         all_week_stoppers = []
 
         cur = start_date
-        # Solo mostrar hasta hoy si la semana aún está transcurriendo
         limit_day = min(end_date, today)
         while cur <= limit_day:
-            day_entries = [e for e in filtered if e.get("date") == cur.strftime("%Y-%m-%d")]
+            cur_s = cur.strftime("%Y-%m-%d")
+            day_rows = [r for r in rows if r["date"] == cur_s]
             dia_nombre = DIAS_SEMANA[cur.weekday()]
             print(f"[{dia_nombre} {cur.strftime('%d/%m/%Y')}]")
-            print(render_day_block(cur, day_entries))
+            print(render_day_block(cur, day_rows))
             print("")
 
-            for e in day_entries:
-                dur = e.get("duration_minutes", 0)
-                total_week_active += dur
-                pref = e.get("ticket_id", "").split("-")[0] if "-" in e.get("ticket_id", "") else "Otros"
+            for r in day_rows:
+                s_m = time_to_minutes(r["start_time"])
+                e_m = time_to_minutes(r["end_time"])
+                dur = r["duration_minutes"]
+                all_week_intervals.append((s_m, e_m))
+                total_week_compute += dur
+                pref = r["ticket_id"].split("-")[0] if "-" in r["ticket_id"] else "Otros"
                 week_by_project[pref] = week_by_project.get(pref, 0) + dur
-                for st in e.get("stoppers", []):
-                    if st and st not in all_week_stoppers:
-                        all_week_stoppers.append(st)
+                try:
+                    for st in json.loads(r["stoppers_json"]):
+                        if st and st not in all_week_stoppers:
+                            all_week_stoppers.append(st)
+                except Exception:
+                    pass
 
             cur += timedelta(days=1)
 
+        week_wall_clock = calculate_klee_union_minutes(all_week_intervals)
         proj_parts = [f"{k}: {format_minutes(v)}" for k, v in week_by_project.items()]
         proj_str = " | ".join(proj_parts) if proj_parts else "N/A"
 
         print("=" * 80)
-        print(f"🏆 TOTAL SEMANA: {format_minutes(total_week_active)} activas ({proj_str})")
+        print(f"🏆 TOTAL SEMANA: {format_minutes(week_wall_clock)} reloj activa ({proj_str})")
+        if total_week_compute > week_wall_clock:
+            leverage = round(total_week_compute / week_wall_clock, 2) if week_wall_clock > 0 else 1.0
+            print(f"🚀 AI Leverage Multiplier: {leverage}x ({format_minutes(total_week_compute)} de esfuerzo total entregado)")
         if all_week_stoppers:
             print(f"⏸️ STANDBY TOTAL: {', '.join(all_week_stoppers)}")
         print("=" * 80 + "\n")
@@ -708,8 +956,7 @@ def cmd_report(args, base_url, api_key, workspace, default_project_id):
         print("=" * 80)
         print(f"📋 REPORTE DE ACTIVIDAD - {dia_nombre.upper()} {target.strftime('%d/%m/%Y')}")
         print("=" * 80 + "\n")
-        day_entries = [e for e in filtered if e.get("date") == target.strftime("%Y-%m-%d")]
-        print(render_day_block(target, day_entries))
+        print(render_day_block(target, rows))
         print("\n" + "=" * 80)
 
 # ------------------------------------------------------------------------------
@@ -717,7 +964,7 @@ def cmd_report(args, base_url, api_key, workspace, default_project_id):
 # ------------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3)")
+    parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3 SQLite3)")
     parser.add_argument("--json", action="store_true", help="Salida en formato JSON para agentes")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -726,6 +973,8 @@ def main():
     p_comment.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")
+    p_comment.add_argument("--track", help="Frente de trabajo (ej: main, subagent, review, datepicker)")
+    p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # update
@@ -747,12 +996,14 @@ def main():
     p_list.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # report
-    p_report = subparsers.add_parser("report", help="Generar reporte de actividades en formato híbrido")
+    p_report = subparsers.add_parser("report", help="Generar reporte de actividades en formato híbrido con Interval Merging")
     group_date = p_report.add_mutually_exclusive_group()
     group_date.add_argument("--today", action="store_true", help="Reporte del día actual (por defecto)")
     group_date.add_argument("--week", action="store_true", help="Reporte de la semana actual")
     group_date.add_argument("--date", help="Reporte de fecha específica (YYYY-MM-DD)")
     p_report.add_argument("-p", "--project", help="Filtrar por proyecto (ej: OMNIFY, OPS)")
+    p_report.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
+    p_report.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
     p_report.add_argument("--sync", action="store_true", help="Forzar sincronización remota con Plane")
     p_report.add_argument("--json", action="store_true", help="Salida en formato JSON")
 
@@ -763,16 +1014,22 @@ def main():
     workspace = os.environ.get("PLANE_WORKSPACE_SLUG", "teamprogra")
     default_project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
 
-    if args.command == "comment":
-        cmd_comment(args, base_url, api_key, workspace, default_project_id)
-    elif args.command == "update":
-        cmd_update(args, base_url, api_key, workspace, default_project_id)
-    elif args.command == "get":
-        cmd_get(args, base_url, api_key, workspace, default_project_id)
-    elif args.command == "list":
-        cmd_list(args, base_url, api_key, workspace, default_project_id)
-    elif args.command == "report":
-        cmd_report(args, base_url, api_key, workspace, default_project_id)
+    conn = get_db()
+    init_db(conn)
+
+    try:
+        if args.command == "comment":
+            cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "update":
+            cmd_update(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "get":
+            cmd_get(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "list":
+            cmd_list(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "report":
+            cmd_report(args, conn, base_url, api_key, workspace, default_project_id)
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     main()

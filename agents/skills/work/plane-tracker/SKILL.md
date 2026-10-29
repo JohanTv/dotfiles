@@ -44,37 +44,53 @@ Plane cuenta con estados oficiales por proyecto. Las transiciones de estado debe
 
 ---
 
-## 3. Comandos CLI Disponibles (`scripts/plane.py`)
+## 3. Comandos CLI Disponibles (`plane` o `scripts/plane.py`)
 
-El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`) y carga variables seguras desde `~/.zshrc.local`.
+El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`), persiste localmente en SQLite3 (`~/.cache/plane/worklogs.db` con WAL Mode) y carga variables seguras desde `~/.zshrc.local`. Puede invocarse como comando global `plane` o directamente con Python.
 
 ### A. Publicar Bitácora Dual-Layer (Comentario)
 ```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py comment OMNIFY-162 -f /tmp/worklog.md
+plane comment OMNIFY-162 -f /tmp/worklog.md
+# Con especificación opcional de track y tipo de agente:
+plane comment OMNIFY-162 -f /tmp/worklog.md --track "validaciones" --worker-type "subagent"
 ```
 
-### B. Actualizar Estado, Prioridad o Etiquetas
+### B. Generar Reporte de Actividades (Formato Híbrido con Interval Merging)
 ```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py update OMNIFY-162 \
+# Reporte del día actual (ideal para jefatura a las 6:00 pm):
+plane report --today
+
+# Reporte semanal acumulado (ideal para balance de sprint los viernes):
+plane report --week
+
+# Filtros opcionales por proyecto o formato JSON:
+plane report --today -p OMNIFY
+plane report --today --json
+```
+
+### C. Actualizar Estado, Prioridad o Etiquetas
+```bash
+plane update OMNIFY-162 \
   --state "Revisión" \
   --priority "high" \
   --labels "sms,backend,bug"
 ```
 
-### C. Consultar Detalles de un Ticket
+### D. Consultar Detalles de un Ticket
 ```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py get OMNIFY-162
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py get OPS-44
+plane get OMNIFY-162
+plane get OPS-44
 ```
 
-### D. Listar Tickets Recientes
+### E. Listar Tickets Recientes
 ```bash
-python3 ~/.agents/skills/plane-tracker/scripts/plane.py list
+plane list -p OMNIFY
+plane list -p OPS
 ```
 
 ---
 
-## 4. Estándar de Bitácora Dual-Layer (Humano + Telemetría v2.1)
+## 4. Estándar de Bitácora Dual-Layer (Humano + Telemetría v2.2)
 
 Todo comentario generado por el asistente al cerrar una sesión debe seguir estrictamente este estándar:
 
@@ -84,6 +100,7 @@ Todo comentario generado por el asistente al cerrar una sesión debe seguir estr
 | Parámetro | Detalle |
 | :--- | :--- |
 | **Fecha & Horario** | YYYY-MM-DD \| HH:MM - HH:MM (Xh Ym) |
+| **Frente / Track** | 🎯 `main` / `validaciones` / `datepicker` / `subagent` |
 | **Capacidad & Balde** | 🧠 `Deep Work` / 🚀 `Tooling & DX` / 🔬 `Research & I+D` / 🧹 `Tech Debt Paydown` / 🔧 `Toil & Soporte` / 🤝 `Coordinación` |
 | **Rol Ejercido** | `Auditor Forense` / `Backend` / `DevOps` / `QA` / `Tooling Architect` / `R&D Researcher` / `Soporte` |
 | **Tiempo de Foco** | **Xh Ym netos** (Z min bloqueo / interrupción) |
@@ -104,7 +121,9 @@ Todo comentario generado por el asistente al cerrar una sesión debe seguir estr
 
 <!-- PLANE_WORKLOG_METADATA
 {
-  "schema_version": "2.1",
+  "schema_version": "2.2",
+  "track": "main",
+  "worker_type": "human",
   "session_id": "auto-inferido-o-uuid",
   "ticket_id": "OMNIFY-XXX",
   "project": "OMNIFY",
