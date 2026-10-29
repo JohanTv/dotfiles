@@ -47,3 +47,6 @@
   - En `OPS`: `[OPS] Soporte L2/L3 y Mantenimiento Ad-Hoc - Semana W{XX}` (capacidad: `toil_support`).
   - En `OMNIFY`: `[SYNC] Ceremonias de Equipo, Sincronización y Dailies - Semana W{XX}` (capacidad: `coordination`).
   - Cada intervención se registra con `plane-tracker comment <TICKET> --track "<tema>" --capacity "<balde>"`.
+- **Protocolo de Relevo Asíncrono (Task Handoff):**
+  - **Al tomar un ticket ajeno (ej. de Pierre):** El agente ejecuta `plane-tracker get <TICKET>` para destilar automáticamente el contexto útil de los comentarios previos (qué se probó, qué funcionó, stoppers y próximo paso inmediato). Las horas efectivas se imputan a nombre propio con `plane-tracker comment` sin alterar el cómputo del autor anterior.
+  - **Al dejar una tarea a medias:** Publicar un comentario estructurado de relevo (*Handoff Snapshot*) con: avance realizado, rama/commit actual, estado del arte y pendientes inmediatos para quien lo retome.

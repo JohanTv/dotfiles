@@ -102,9 +102,10 @@ plane-tracker update OMNIFY-162 \
   --labels "sms,backend,bug"
 ```
 
-### F. Consultar Detalles de un Ticket
+### F. Consultar Detalles y Contexto de Relevo (Handoff)
 ```bash
-plane-tracker get OMNIFY-162
+# Consultar ticket, descripción y comentarios de contexto dejados por Pierre o el equipo:
+plane-tracker get OMNIFY-197
 plane-tracker get OPS-44
 ```
 
@@ -280,4 +281,15 @@ Enfoque de solución técnica, diseño de arquitectura, endpoints o lógica de n
 - [ ] Validación transaccional o verificación end-to-end completada.
 - [ ] Rama Git creada bajo el patrón `{tipo}/{TICKET-ID}-{kebab-case}`.
 - [ ] Bitácora dual registrada al finalizar con `plane-tracker comment`.
+```
+
+### D. Plantilla de Relevo Asíncrono (Handoff Snapshot)
+Si dejas una tarea a medias o la devuelves/reasignas a Pierre o al equipo, publica un comentario estructurado de relevo:
+
+```markdown
+### 🔄 Relevo de Tarea (Handoff Snapshot)
+- **Avance realizado:** Qué se construyó, probó o diagnosticó en esta sesión.
+- **Rama Git / Commit:** `feat/OMNIFY-XXX-descripcion` (commit `abcdef1` en remote).
+- **Estado actual:** Qué componentes o endpoints están estables y qué se verificó.
+- **Stoppers / Próximo paso:** Qué le toca exactamente a quien lo retome para no perder el hilo.
 ```

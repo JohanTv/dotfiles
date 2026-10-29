@@ -1006,14 +1006,49 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-    
+
+    # Obtener comentarios del ticket para análisis de contexto y handoff
+    comments = []
+    try:
+        url_c = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+        comments_data = api_request(url_c, api_key)
+        comments = comments_data.get("results", [])
+    except Exception:
+        pass
+
     if getattr(args, "json", False):
-        print(json.dumps(issue, indent=2))
-    else:
-        print(f"\n📌 {args.issue}: {issue.get('name')}")
-        print(f"   Prioridad : {issue.get('priority')}")
-        print(f"   Creado el : {issue.get('created_at')}")
-        print(f"   UUID      : {issue.get('id')}\n")
+        issue_copy = dict(issue)
+        issue_copy["comments"] = comments
+        print(json.dumps(issue_copy, indent=2))
+        return
+
+    print(f"\n📌 {args.issue}: {issue.get('name')}")
+    print(f"   • Prioridad : {issue.get('priority', 'none').upper()}")
+    print(f"   • Creado el : {issue.get('created_at')[:10]}")
+    print(f"   • UUID      : {issue.get('id')}")
+
+    desc = issue.get("description_html") or ""
+    clean_desc = re.sub(r"<[^>]+>", " ", desc).strip()
+    if clean_desc:
+        clean_desc = " ".join(clean_desc.split())
+        if len(clean_desc) > 300:
+            clean_desc = clean_desc[:297] + "..."
+        print(f"\n📄 Descripción:")
+        print(f"   {clean_desc}")
+
+    if comments:
+        print(f"\n💬 Contexto de Relevo / Comentarios ({len(comments)}):")
+        for i, c in enumerate(comments, 1):
+            c_html = c.get("comment_html") or ""
+            # Remover bloques de metadata oculta
+            text_only = re.sub(r"<!--[\s\S]*?-->", "", c_html)
+            text_only = re.sub(r"<[^>]+>", " ", text_only).strip()
+            text_only = " ".join(text_only.split())
+            if len(text_only) > 300:
+                text_only = text_only[:297] + "..."
+            created = c.get("created_at", "")[:16].replace("T", " ")
+            print(f"   [{i}] ({created}): {text_only}")
+    print("")
 
 def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
     project_id = default_project_id
