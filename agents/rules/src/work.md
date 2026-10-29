@@ -18,7 +18,7 @@
   `{tipo}/{TICKET-ID}-{kebab-case-descripcion}`
   - Tipos válidos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra` (alineados a las 4 fases).
   - **Proyecto por defecto:** Actualmente se considera principalmente **Omnify** (`OMNIFY-`).
-  - **Proyectos dinámicos:** La organización cuenta con proyectos dinámicos (`OMNIFY`, `OPS`, `OMNICANAL`, etc.) cacheados en SQLite. Usa `plane projects` para inspeccionarlos.
+  - **Proyectos dinámicos:** La organización cuenta con proyectos dinámicos (`OMNIFY`, `OPS`, `OMNICANAL`, etc.) cacheados en SQLite. Usa `plane-tracker projects` para inspeccionarlos.
   - Ejemplos:
     - `feat/OMNIFY-175-campaign-form-validations`
     - `fix/OMNIFY-180-fix-date-picker`

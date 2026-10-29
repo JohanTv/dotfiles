@@ -225,7 +225,7 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
             issue_ref = git_ticket
         else:
             sys.stderr.write("Error: No se especificó ticket y no se detectó identificador en la rama actual de Git.\n")
-            sys.stderr.write("Usa: 'plane comment OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.\n")
+            sys.stderr.write("Usa: 'plane-tracker comment OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.\n")
             sys.exit(1)
 
     if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
@@ -836,7 +836,7 @@ def cmd_projects(args, conn, base_url, api_key, workspace):
     for ident, data in sorted(projects_map.items()):
         print(f"  • {ident:<14} ➔  {data['name']}")
     print(f"\n💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').")
-    print(f"   Usa 'plane projects --refresh' para forzar sincronización con el servidor Plane.\n")
+    print(f"   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.\n")
 
 # ------------------------------------------------------------------------------
 # Generador de Reportes de Actividad en Formato Híbrido (cmd_report)

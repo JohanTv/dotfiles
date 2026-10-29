@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plane - CLI wrapper para Plane CE v1.2.3
+# plane-tracker - CLI wrapper para Plane CE v1.2.3 (Worklogs & Telemetría)
 
 SCRIPT_COMMON="$HOME/.agents/skills/plane-tracker/scripts/plane.py"
 SCRIPT_REPO="$HOME/Code/dotfiles/agents/skills/work/plane-tracker/scripts/plane.py"
