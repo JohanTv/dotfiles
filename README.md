@@ -19,17 +19,19 @@
 
 ```text
 dotfiles/
+├── Makefile                    # 🎯 Orquestador maestro (make, make work, make personal, make doctor)
 ├── install.sh                  # Instalador idempotente y detector de SO
-├── .gitignore                  # Protección contra secretos y temporales
+├── .gitignore                  # Protección contra secretos, dist/ y temporales
 │
 ├── agents/                     # 🤖 Orquestación unificada de Agentes de IA
 │   ├── AGENTS.md               # Catálogo maestro y gobernanza de agentes
 │   ├── rules/                  # Reglas de comportamiento inyectadas por turno
-│   │   └── global-rules.md     # Directrices compactas CLI, Git y seguridad
+│   │   ├── src/                # Fuentes modulares (core.md, work.md, personal.md)
+│   │   └── dist/               # Artefacto activo compilado (active-rules.md, readonly)
 │   ├── skills/                 # Procedimientos y runbooks bajo demanda
-│   │   ├── find-session/       # Buscador instantáneo Gemini, Claude y OpenCode
-│   │   ├── dotfiles-sync/      # Diagnóstico y auditoría de sincronización del host
-│   │   └── wmctrl-focus/       # Enfoque y lanzamiento de ventanas GNOME/X11
+│   │   ├── common/             # Skills universales (find-session, dotfiles-sync)
+│   │   ├── desktop-linux/      # Skills exclusivas GNOME/X11 (wmctrl-focus)
+│   │   └── work/               # Skills de trabajo empresarial (plane-tracker)
 │   └── mcp/                    # Servidores Model Context Protocol (MCP)
 │       ├── gemini_mcp.json     # Integración global para Gemini CLI (agy)
 │       └── opencode.json       # Configuración global y MCP para OpenCode
@@ -40,7 +42,7 @@ dotfiles/
 │
 ├── shell/                      # 🐚 Entorno de línea de comandos
 │   ├── .zshrc                  # Configuración optimizada de Zsh (carga tema xxf)
-│   ├── .zshrc.local.example    # Plantilla para secretos y variables privadas
+│   ├── .zshrc.local.example    # Plantilla para secretos y variables de Plane
 │   └── themes/                 # Temas personalizados de Oh My Zsh
 │       └── xxf.zsh-theme       # Tema propio modificado (branch status, host, etc.)
 │
