@@ -792,9 +792,10 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     meta = extract_metadata_from_comment(content)
     ticket_label = f"{issue.get('project_detail', {}).get('identifier', 'OMNIFY')}-{issue.get('sequence_id')}" if "sequence_id" in issue else args.issue
     
-    # Determinar track y worker_type (prioridad: flags de CLI -> metadata -> default)
+    # Determinar track, worker_type y capacity_bucket (prioridad: flags de CLI -> metadata -> default)
     track = getattr(args, "track", None) or (meta.get("track") if meta else None) or "main"
     worker_type = getattr(args, "worker_type", None) or (meta.get("worker_type") if meta else None) or "human"
+    capacity_bucket = getattr(args, "capacity_bucket", None) or (meta.get("capacity_bucket") if meta else None) or "deep_work"
 
     if not meta:
         clean_text = re.sub(r"<[^>]+>", "", content).strip()
@@ -806,7 +807,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
             "duration_minutes": 30,
             "track": track,
             "worker_type": worker_type,
-            "capacity_bucket": "deep_work",
+            "capacity_bucket": capacity_bucket,
             "notes": clean_text[:120] if clean_text else issue.get("name", ""),
             "stoppers": [],
             "phase": "dev"
@@ -814,6 +815,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     else:
         meta["track"] = track
         meta["worker_type"] = worker_type
+        meta["capacity_bucket"] = capacity_bucket
 
     entry = {
         "id": res.get("id"),
@@ -825,7 +827,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "end_time": meta.get("end_time", "10:00"),
         "duration_minutes": meta.get("duration_minutes", 60),
         "worker_type": worker_type,
-        "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
+        "capacity_bucket": capacity_bucket,
         "phase": meta.get("phase", "dev"),
         "role": meta.get("role", "backend_engineer"),
         "notes": meta.get("notes", issue.get("name", "")),
@@ -1187,29 +1189,42 @@ def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
                 break
 
     force_refresh = getattr(args, "refresh", False)
-    sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
+    try:
+        sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
+    except Exception as e:
+        sys.stderr.write(f"⚠ Modo offline / advertencia de red: no se pudo sincronizar Plane ({e}). Consultando caché local SQLite.\n")
 
     raw_query = args.query.strip()
-    stop_words = {"de", "del", "la", "las", "el", "los", "en", "un", "una", "unos", "unas", "por", "para", "con", "y", "o", "a", "al", "que", "se", "es"}
-    tokens = [re.sub(r"[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "", t) for t in raw_query.split()]
-    tokens = [t for t in tokens if t and t.lower() not in stop_words]
-
     matches = []
-    if tokens:
-        fts_query = " OR ".join(f'"{t}"*' for t in tokens)
-        try:
-            sql = """
-                SELECT c.ticket_id, c.title, c.state_name, c.state_group, c.priority
-                FROM issues_fts f
-                JOIN issues_cache c ON f.ticket_id = c.ticket_id
-                WHERE issues_fts MATCH ? AND c.project_id = ?
-                ORDER BY rank
-                LIMIT 5;
-            """
-            rows = conn.execute(sql, (fts_query, project_id)).fetchall()
-            matches = [dict(r) for r in rows]
-        except Exception:
-            pass
+
+    # Fast-path si la consulta es un número o identificador directo (ej: "197" o "OMNIFY-197")
+    seq_match = re.match(r"^(?:[A-Za-z]+-)?(\d+)$", raw_query)
+    if seq_match:
+        target_seq = int(seq_match.group(1))
+        row = conn.execute("SELECT ticket_id, title, state_name, state_group, priority FROM issues_cache WHERE sequence_id = ? AND project_id = ?", (target_seq, project_id)).fetchone()
+        if row:
+            matches = [dict(row)]
+
+    if not matches:
+        stop_words = {"de", "del", "la", "las", "el", "los", "en", "un", "una", "unos", "unas", "por", "para", "con", "y", "o", "a", "al", "que", "se", "es"}
+        tokens = [re.sub(r"[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "", t) for t in raw_query.split()]
+        tokens = [t for t in tokens if t and t.lower() not in stop_words]
+
+        if tokens:
+            fts_query = " OR ".join(f'"{t}"*' for t in tokens)
+            try:
+                sql = """
+                    SELECT c.ticket_id, c.title, c.state_name, c.state_group, c.priority
+                    FROM issues_fts f
+                    JOIN issues_cache c ON f.ticket_id = c.ticket_id
+                    WHERE issues_fts MATCH ? AND c.project_id = ?
+                    ORDER BY rank
+                    LIMIT 5;
+                """
+                rows = conn.execute(sql, (fts_query, project_id)).fetchall()
+                matches = [dict(r) for r in rows]
+            except Exception:
+                pass
 
     if not matches and tokens:
         like_clauses = " OR ".join("title LIKE ?" for _ in tokens[:3])
@@ -1437,6 +1452,9 @@ def main():
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")
     p_comment.add_argument("--track", help="Frente de trabajo (ej: main, subagent, review, datepicker)")
+    p_comment.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
+                           choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],
+                           help="Balde de capacidad de la sesión")
     p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
