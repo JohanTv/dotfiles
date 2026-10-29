@@ -58,25 +58,10 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Enlazar Reglas de Agentes IA (Gemini, Claude, OpenCode)
+# 2. Configurar y Compilar Reglas y Skills de Agentes IA (via Makefile)
 # ------------------------------------------------------------------------------
-log_info "Configurando reglas universales de Agentes IA..."
-link_file "$DOTFILES_DIR/agents/rules/global-rules.md" "$HOME/.gemini/GEMINI.md"
-link_file "$DOTFILES_DIR/agents/rules/global-rules.md" "$HOME/.claude/CLAUDE.md"
-link_file "$DOTFILES_DIR/agents/rules/global-rules.md" "$HOME/.config/opencode/AGENTS.md"
-
-# Skills de agentes
-log_info "Enlazando catálogo de skills de agentes..."
-for skill_dir in "$DOTFILES_DIR"/agents/skills/*; do
-    if [[ -d "$skill_dir" ]]; then
-        skill_name=$(basename "$skill_dir")
-        if [[ "$skill_name" == "wmctrl-focus" && "$IS_WSL" == true ]]; then
-            log_info "Omitiendo skill wmctrl-focus (requiere X11/GNOME)."
-            continue
-        fi
-        link_file "$skill_dir" "$HOME/.agents/skills/$skill_name"
-    fi
-done
+log_info "Configurando y compilando reglas y skills de Agentes IA..."
+make -C "$DOTFILES_DIR" all
 
 # ------------------------------------------------------------------------------
 # 3. Configurar Servidores MCP Globales (Chrome DevTools)

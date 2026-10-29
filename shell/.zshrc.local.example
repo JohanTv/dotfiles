@@ -2,6 +2,15 @@
 # Este archivo está ignorado en git (*.local).
 # Copia este archivo a ~/.zshrc.local para variables privadas.
 
+# Perfil activo de dotfiles para Agentes IA (work / personal)
+# export DOTFILES_PROFILE="work"
+
+# Plane Self-Hosted (Gestión de Tareas TI)
+# export PLANE_BASE_URL="http://190.105.240.58"
+# export PLANE_API_KEY="plane_api_xxx"
+# export PLANE_WORKSPACE_SLUG="teamprogra"
+# export PLANE_PROJECT_ID="58371da4-cf62-4299-8fd4-99c1052b2eb3" # Omnify
+
 # Ejemplo de tokens o API keys privadas:
 # export GITHUB_TOKEN="ghp_xxx"
 # export OPENAI_API_KEY="sk-xxx"
