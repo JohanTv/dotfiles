@@ -12,6 +12,7 @@
 .DS_Store
 .cache/
 node_modules/
+__pycache__/
 
 # Artefactos compilados y estado de perfil de agentes
 /agents/rules/dist/

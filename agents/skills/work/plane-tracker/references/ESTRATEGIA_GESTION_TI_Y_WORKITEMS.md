@@ -99,13 +99,13 @@ Para no crear 15 tickets de 10 minutos cada día por llamadas o preguntas en Sla
 
 #### A. En el Proyecto `Operaciones` (`OPS`):
 Crea un ticket semanal recurrente para soporte y mantenimiento:
-* **Título:** `Atención de Consultas de Usuarios y Mantenimiento Ad-Hoc - W44`
+* **Título:** `Tareas Rápidas y Soporte - W44`
 * **Cómo se usa:** Cada vez que atiendes a un usuario o haces una consulta rápida de BD, agregas un comentario rápido o acumulas el tiempo en el log de la sesión:
   > *"Atención a usuario Comercial: verificación de estado de campaña Ripley (30m). Revisión de logs en Caddy por timeout reportado (20m)."*
 
 #### B. En el Proyecto `Operaciones` (`OPS`), balde `coordination`:
 Crea un segundo ticket semanal, también en `OPS` (el proyecto `OMNIFY` queda limpio de tickets de proceso):
-* **Título:** `Sincronización de Equipo y Acuerdos - W44`
+* **Título:** `Reuniones de Equipo y Acuerdos - W44`
 * **Cómo se usa:** Se imputan las horas reales de reuniones con el equipo o jefatura:
   > *"Reunión de equipo (15m), Sync de priorización con Pierre (45m), Demo de avance (30m)."*
 

@@ -142,11 +142,11 @@ Permite que un ticket sea iniciado por Pierre, transferido a Johan y viceversa, 
 Para no crear 20 micro-tickets a la semana que destruyan las métricas de sprint, se mantienen **dos tickets paraguas semanales recurrentes** (cadencia `W{ISO_WEEK}`):
 
 1. **En `OPS` (Soporte y Toil):**  
-   `Soporte y Mantenimiento Ad-Hoc - W{XX}`  
+   `Tareas Rápidas y Soporte - W{XX}`  
    *Balde:* `toil_support` | *Labels:* `externo`, `infra`.  
    *Uso:* Atender consultas de usuarios de Ripley, revisar un log en Caddy, reiniciar un worker.
 2. **En `OPS` (Coordinación de Equipo):**  
-   `Sincronización de Equipo y Acuerdos - W{XX}`  
+   `Reuniones de Equipo y Acuerdos - W{XX}`  
    *Balde:* `coordination` | *Labels:* `docs`.  
    *Uso:* Daily meeting matutino, reuniones 1:1 con Pierre, balance de sprint.
 
