@@ -15,6 +15,7 @@ import sys
 import os
 import json
 import sqlite3
+import subprocess
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -22,6 +23,7 @@ import re
 import time
 import argparse
 from datetime import datetime, timedelta, date
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 CACHE_DIR = os.path.expanduser("~/.cache/plane")
 DB_FILE = os.path.join(CACHE_DIR, "worklogs.db")
@@ -196,13 +198,38 @@ def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
 
     return projects_map
 
-def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref):
+def detect_ticket_from_git():
+    """Intenta inferir el identificador de ticket desde la rama actual de git."""
+    try:
+        cmd = ["git", "branch", "--show-current"]
+        branch = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
+        if not branch:
+            cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+            branch = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
+        match = re.search(r"([A-Za-z0-9_]+-\d+)", branch)
+        if match:
+            return match.group(1).upper()
+    except Exception:
+        pass
+    return None
+
+def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref=None):
     """
-    Deduce el proyecto y número de secuencia a partir del issue_ref.
-    Soporta: 'OMNIFY-162', 'OPS-44', '162' o UUID.
+    Deduce el proyecto y número de secuencia a partir del issue_ref o rama de Git.
+    Soporta: 'OMNIFY-162', 'OPS-44', '162', UUID o None/@ (autodetección de Git).
     """
+    if not issue_ref or issue_ref in ("@", ".", "current", "--current", "this"):
+        git_ticket = detect_ticket_from_git()
+        if git_ticket:
+            sys.stderr.write(f"ℹ Ticket auto-detectado desde la rama actual de Git: {git_ticket}\n")
+            issue_ref = git_ticket
+        else:
+            sys.stderr.write("Error: No se especificó ticket y no se detectó identificador en la rama actual de Git.\n")
+            sys.stderr.write("Usa: 'plane comment OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.\n")
+            sys.exit(1)
+
     if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
-        return default_project_id, None, issue_ref
+        return default_project_id, None, issue_ref, issue_ref
 
     match = re.match(r"^([A-Za-z0-9_]+)-(\d+)$", issue_ref.strip())
     if match:
@@ -210,18 +237,18 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
         seq_id = int(match.group(2))
         projects_map = get_projects_map(conn, base_url, api_key, workspace)
         if prefix in projects_map:
-            return projects_map[prefix]["id"], seq_id, None
+            return projects_map[prefix]["id"], seq_id, None, f"{prefix}-{seq_id}"
 
         projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=True)
         if prefix in projects_map:
-            return projects_map[prefix]["id"], seq_id, None
+            return projects_map[prefix]["id"], seq_id, None, f"{prefix}-{seq_id}"
 
         sys.stderr.write(f"Error: Prefijo de proyecto '{prefix}' no encontrado en el workspace '{workspace}'.\n")
         sys.stderr.write(f"Proyectos disponibles: {', '.join(projects_map.keys())}\n")
         sys.exit(1)
 
     if re.match(r"^\d+$", issue_ref.strip()):
-        return default_project_id, int(issue_ref.strip()), None
+        return default_project_id, int(issue_ref.strip()), None, f"OMNIFY-{issue_ref.strip()}"
 
     sys.stderr.write(f"Error: Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.\n")
     sys.exit(1)
@@ -396,7 +423,7 @@ def upsert_worklog(conn, entry):
 # ------------------------------------------------------------------------------
 
 def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
-    """Sincroniza comentarios de Plane para tickets actualizados y los persiste en SQLite."""
+    """Sincroniza comentarios de Plane para tickets actualizados y los persiste en SQLite con descargas paralelas."""
     sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
     projects_map = get_projects_map(conn, base_url, api_key, workspace)
     
@@ -415,7 +442,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
             if pref in projects_map:
                 target_idents.append(pref)
 
-    synced_count = 0
+    candidate_tasks = []
     for ident in target_idents:
         proj = projects_map[ident]
         proj_id = proj["id"]
@@ -439,42 +466,51 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                     continue
             except Exception:
                 pass
+            candidate_tasks.append((ident, proj_id, iss))
 
-            c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/{iss['id']}/comments/"
-            try:
-                time.sleep(0.1)  # Respetar rate limit
-                c_data = api_request(c_url, api_key, raise_on_error=True)
-            except urllib.error.HTTPError as e:
-                if e.code in (401, 403, 404):
-                    continue
-                pass
-            except Exception:
-                continue
+    def fetch_comments_for_issue(task):
+        ident, proj_id, iss = task
+        c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/{iss['id']}/comments/"
+        try:
+            c_data = api_request(c_url, api_key, raise_on_error=True)
+            return ident, iss, c_data.get("results", [])
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 404):
+                return ident, iss, []
+            return ident, iss, []
+        except Exception:
+            return ident, iss, []
 
-            for c in c_data.get("results", []):
-                html = c.get("comment_html", "")
-                meta = extract_metadata_from_comment(html)
-                if meta:
-                    ticket_label = f"{ident}-{iss.get('sequence_id')}"
-                    entry = {
-                        "ticket_id": ticket_label,
-                        "track": meta.get("track", "main"),
-                        "issue_name": iss.get("name", ""),
-                        "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
-                        "start_time": meta.get("start_time", "09:00"),
-                        "end_time": meta.get("end_time", "10:00"),
-                        "duration_minutes": meta.get("duration_minutes", 60),
-                        "worker_type": meta.get("worker_type", "human"),
-                        "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
-                        "phase": meta.get("phase", "dev"),
-                        "notes": meta.get("notes", iss.get("name", "")),
-                        "stoppers": meta.get("stoppers", []),
-                        "plane_comment_id": c.get("id"),
-                        "created_at": c.get("created_at"),
-                        "raw_payload": meta
-                    }
-                    upsert_worklog(conn, entry)
-                    synced_count += 1
+    synced_count = 0
+    if candidate_tasks:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(fetch_comments_for_issue, t) for t in candidate_tasks]
+            for fut in as_completed(futures):
+                ident, iss, comments = fut.result()
+                for c in comments:
+                    html = c.get("comment_html", "")
+                    meta = extract_metadata_from_comment(html)
+                    if meta:
+                        ticket_label = f"{ident}-{iss.get('sequence_id')}"
+                        entry = {
+                            "ticket_id": ticket_label,
+                            "track": meta.get("track", "main"),
+                            "issue_name": iss.get("name", ""),
+                            "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
+                            "start_time": meta.get("start_time", "09:00"),
+                            "end_time": meta.get("end_time", "10:00"),
+                            "duration_minutes": meta.get("duration_minutes", 60),
+                            "worker_type": meta.get("worker_type", "human"),
+                            "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
+                            "phase": meta.get("phase", "dev"),
+                            "notes": meta.get("notes", iss.get("name", "")),
+                            "stoppers": meta.get("stoppers", []),
+                            "plane_comment_id": c.get("id"),
+                            "created_at": c.get("created_at"),
+                            "raw_payload": meta
+                        }
+                        upsert_worklog(conn, entry)
+                        synced_count += 1
 
     # Actualizar watermark de sync
     now = time.time()
@@ -628,7 +664,8 @@ def merge_daily_worklogs(rows):
 # ------------------------------------------------------------------------------
 
 def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    args.issue = issue_ref
     content = ""
     if args.file:
         with open(args.file, "r", encoding="utf-8") as f:
@@ -700,7 +737,8 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
 def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    args.issue = issue_ref
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     patch_data = {}
 
@@ -748,7 +786,8 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    args.issue = issue_ref
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     
     if getattr(args, "json", False):
@@ -970,7 +1009,7 @@ def main():
 
     # comment
     p_comment = subparsers.add_parser("comment", help="Publicar comentario en un ticket")
-    p_comment.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
+    p_comment.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")
     p_comment.add_argument("--track", help="Frente de trabajo (ej: main, subagent, review, datepicker)")
@@ -979,7 +1018,7 @@ def main():
 
     # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
-    p_update.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
+    p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")
@@ -987,7 +1026,7 @@ def main():
 
     # get
     p_get = subparsers.add_parser("get", help="Obtener detalles de un ticket")
-    p_get.add_argument("issue", help="Ticket (ej: OMNIFY-162, OPS-44 o 162)")
+    p_get.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_get.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # list
