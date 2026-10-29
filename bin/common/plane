@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# plane - CLI wrapper para Plane CE v1.2.3
+
+SCRIPT_COMMON="$HOME/.agents/skills/plane-tracker/scripts/plane.py"
+SCRIPT_REPO="$HOME/Code/dotfiles/agents/skills/work/plane-tracker/scripts/plane.py"
+
+if [[ -f "$SCRIPT_COMMON" ]]; then
+    exec python3 "$SCRIPT_COMMON" "$@"
+elif [[ -f "$SCRIPT_REPO" ]]; then
+    exec python3 "$SCRIPT_REPO" "$@"
+else
+    echo "Error: plane.py no encontrado. Asegúrate de tener el perfil 'work' activo." >&2
+    exit 1
+fi
