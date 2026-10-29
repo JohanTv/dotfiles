@@ -132,6 +132,15 @@ def build_managed_targets(wsl_active):
             if os.path.isfile(full_p):
                 targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/desktop-linux/{entry}", True))
 
+    # Dynamic discovery for work binaries (if active profile is 'work' or 'all')
+    if active_profile in ("work", "all"):
+        work_bin = os.path.join(DOTFILES_DIR, "bin/work")
+        if os.path.isdir(work_bin):
+            for entry in sorted(os.listdir(work_bin)):
+                full_p = os.path.join(work_bin, entry)
+                if os.path.isfile(full_p):
+                    targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/work/{entry}", False))
+
     return targets
 
 

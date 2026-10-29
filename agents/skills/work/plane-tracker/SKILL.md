@@ -293,3 +293,17 @@ Si dejas una tarea a medias o la devuelves/reasignas a Pierre o al equipo, publi
 - **Estado actual:** Qué componentes o endpoints están estables y qué se verificó.
 - **Stoppers / Próximo paso:** Qué le toca exactamente a quien lo retome para no perder el hilo.
 ```
+
+---
+
+## 7. Documentación y Especificaciones de Arquitectura
+
+Para profundizar en la arquitectura matemática, protocolos y contratos detallados, consulta los documentos de referencia en [references/](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/):
+
+1. [**Arquitectura del Sistema de Tracking y Telemetría**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md)
+2. [**Protocolo de Living Tickets y Fases del SDLC**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
+3. [**Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
+4. [**Guía Operativa del CLI `plane-tracker`**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
+5. [**Matriz de Taxonomía y Protocolo de Tickets Paraguas**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
+6. [**Estrategia Integral de Gestión TI y Work Items**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
+7. [**Índice Maestro de la Documentación**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/README.md)
