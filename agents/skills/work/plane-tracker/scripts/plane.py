@@ -126,6 +126,32 @@ def init_db(conn):
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_states_project ON states(project_id);")
 
+        # 6. Tabla de Issues Cache para búsqueda FTS5 en Momento Cero (< 2ms)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS issues_cache (
+                id TEXT PRIMARY KEY,
+                sequence_id INTEGER NOT NULL,
+                ticket_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                state_name TEXT NOT NULL,
+                state_group TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                labels_csv TEXT NOT NULL DEFAULT '',
+                updated_at REAL NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues_cache(project_id, state_group);")
+
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
+                ticket_id UNINDEXED,
+                title,
+                labels_csv,
+                tokenize = 'unicode61 remove_diacritics 2'
+            );
+        """)
+
 # ------------------------------------------------------------------------------
 # Entorno y Red
 # ------------------------------------------------------------------------------
@@ -933,11 +959,29 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     ticket_ref = f"{project_ident}-{seq_id}" if seq_id else res.get("id")
     web_url = f"{base_url.rstrip('/')}/{workspace}/projects/{project_id}/issues/{res.get('id')}"
 
-    # Generar sugerencia de rama
-    clean_desc = re.sub(r"[^a-zA-Z0-9]+", "-", args.title.lower()).strip("-")
+    # Generar sugerencia de rama inteligente según prefijo [FASE]
+    branch_type = "feat"
+    clean_title = args.title.strip()
+    phase_match = re.match(r"^\[([A-Za-z]+)\]\s*(.*)$", clean_title)
+    if phase_match:
+        f_prefix = phase_match.group(1).lower()
+        clean_title = phase_match.group(2)
+        type_map = {
+            "spike": "spike",
+            "rfc": "spike",
+            "fix": "fix",
+            "feat": "feat",
+            "infra": "infra",
+            "qa": "test",
+            "test": "test",
+            "refactor": "refactor"
+        }
+        branch_type = type_map.get(f_prefix, "feat")
+
+    clean_desc = re.sub(r"[^a-zA-Z0-9]+", "-", clean_title.lower()).strip("-")
     if len(clean_desc) > 35:
         clean_desc = clean_desc[:35].rstrip("-")
-    branch_sugg = f"feat/{ticket_ref}-{clean_desc}"
+    branch_sugg = f"{branch_type}/{ticket_ref}-{clean_desc}"
 
     if getattr(args, "json", False):
         print(json.dumps({
@@ -1045,6 +1089,128 @@ def cmd_projects(args, conn, base_url, api_key, workspace):
         print(f"  • {ident:<14} ➔  {data['name']}")
     print(f"\n💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').")
     print(f"   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.\n")
+
+def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
+    """Sincroniza issues del proyecto en SQLite para búsquedas instantáneas (< 2ms) con FTS5."""
+    now = time.time()
+    if not force_refresh:
+        row = conn.execute("SELECT MAX(updated_at) as last_sync FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()
+        if row and row["last_sync"] and (now - row["last_sync"]) < 1800:
+            return
+
+    states_map_by_id = {}
+    try:
+        url_states = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/"
+        s_data = api_request(url_states, api_key)
+        for s in s_data.get("results", []):
+            states_map_by_id[s["id"]] = (s["name"], s.get("group", ""))
+    except Exception:
+        pass
+
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=100"
+    data = api_request(url, api_key)
+    results = data.get("results", [])
+
+    with conn:
+        conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
+        for iss in results:
+            seq = iss.get("sequence_id")
+            if not seq:
+                continue
+            t_id = f"{project_ident}-{seq}"
+            s_info = states_map_by_id.get(iss.get("state"), ("Pendiente", "unstarted"))
+            conn.execute("""
+                INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (iss["id"], seq, t_id, project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"), "", now))
+
+        # Sincronizar tabla FTS5
+        conn.execute("DELETE FROM issues_fts;")
+        conn.execute("""
+            INSERT INTO issues_fts (ticket_id, title, labels_csv)
+            SELECT ticket_id, title, labels_csv FROM issues_cache;
+        """)
+
+def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
+    """Búsqueda ultra-rápida FTS5 (< 2ms) en el Momento Cero para detectar tickets existentes."""
+    project_id = default_project_id
+    project_ident = "OMNIFY"
+    projects_map = get_projects_map(conn, base_url, api_key, workspace)
+
+    if getattr(args, "project", None):
+        p_upper = args.project.upper()
+        if p_upper in projects_map:
+            project_id = projects_map[p_upper]["id"]
+            project_ident = p_upper
+        else:
+            sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado.\n")
+            sys.exit(1)
+    else:
+        for k, v in projects_map.items():
+            if v["id"] == project_id:
+                project_ident = k
+                break
+
+    force_refresh = getattr(args, "refresh", False)
+    sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
+
+    raw_query = args.query.strip()
+    stop_words = {"de", "del", "la", "las", "el", "los", "en", "un", "una", "unos", "unas", "por", "para", "con", "y", "o", "a", "al", "que", "se", "es"}
+    tokens = [re.sub(r"[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "", t) for t in raw_query.split()]
+    tokens = [t for t in tokens if t and t.lower() not in stop_words]
+
+    matches = []
+    if tokens:
+        fts_query = " OR ".join(f'"{t}"*' for t in tokens)
+        try:
+            sql = """
+                SELECT c.ticket_id, c.title, c.state_name, c.state_group, c.priority
+                FROM issues_fts f
+                JOIN issues_cache c ON f.ticket_id = c.ticket_id
+                WHERE issues_fts MATCH ? AND c.project_id = ?
+                ORDER BY rank
+                LIMIT 5;
+            """
+            rows = conn.execute(sql, (fts_query, project_id)).fetchall()
+            matches = [dict(r) for r in rows]
+        except Exception:
+            pass
+
+    if not matches and tokens:
+        like_clauses = " OR ".join("title LIKE ?" for _ in tokens[:3])
+        params = [f"%{t}%" for t in tokens[:3]] + [project_id]
+        sql = f"""
+            SELECT ticket_id, title, state_name, state_group, priority
+            FROM issues_cache
+            WHERE ({like_clauses}) AND project_id = ?
+            LIMIT 5;
+        """
+        try:
+            rows = conn.execute(sql, params).fetchall()
+            matches = [dict(r) for r in rows]
+        except Exception:
+            pass
+
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "query": raw_query,
+            "project": project_ident,
+            "count": len(matches),
+            "results": matches
+        }, indent=2))
+        return
+
+    if matches:
+        print(f"\n🔍 Coincidencias encontradas en {project_ident} ({len(matches)}):")
+        for m in matches:
+            prio = f"[{m['priority'].upper()}]"
+            state = f"({m['state_name']})"
+            print(f"  • {m['ticket_id']:<12} {state:<14} {prio:<9} {m['title']}")
+        print(f"\n💡 Para trabajar en uno existente: git checkout -b feat/{matches[0]['ticket_id']}-descripcion")
+        print(f"   O crea uno nuevo si es diferente: plane-tracker create \"[FEAT] ...\"\n")
+    else:
+        print(f"\nℹ No se encontraron tickets similares a '{raw_query}' en {project_ident}.")
+        print(f"💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create \"[FEAT] {raw_query}\"\n")
 
 # ------------------------------------------------------------------------------
 # Generador de Reportes de Actividad en Formato Híbrido (cmd_report)
@@ -1267,6 +1433,13 @@ def main():
     p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
     p_list.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # search
+    p_search = subparsers.add_parser("search", help="Búsqueda ultra-rápida FTS5 (< 2ms) de tickets en Momento Cero")
+    p_search.add_argument("query", help="Texto de búsqueda (ej: 'validaciones formulario', 'webhook sms')")
+    p_search.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
+    p_search.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane")
+    p_search.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # labels
     p_labels = subparsers.add_parser("labels", help="Listar etiquetas disponibles en un proyecto cacheadas en SQLite")
     p_labels.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
@@ -1311,6 +1484,8 @@ def main():
             cmd_get(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "list":
             cmd_list(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "search":
+            cmd_search(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "labels":
             cmd_labels(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "projects":
