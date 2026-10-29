@@ -14,6 +14,7 @@ keybinds clear-defaults=true {
         bind "Alt Shift Right" "Alt Shift l" "Alt L" { MovePane "Right"; }
         bind "Alt Shift Down" "Alt Shift j" "Alt J" { MovePane "Down"; }
         bind "Alt Shift Up" "Alt Shift k" "Alt K" { MovePane "Up"; }
+        bind "Alt z" { ToggleFocusFullscreen; }
     }
     tmux {
         bind "[" { SwitchToMode "scroll"; }
@@ -93,3 +94,8 @@ on_force_close "detach"
 attach_to_session true
 session_serialization true
 serialize_pane_viewport true
+
+// Portapapeles con Windows en WSL
+copy_command "clip.exe"
+copy_clipboard "primary"
+copy_on_select true
