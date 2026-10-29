@@ -1155,8 +1155,18 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
                     sys.stderr.write(f"Advertencia: Etiqueta '{l}' no existe en el proyecto. Ignorada.\n")
         patch_data["labels"] = label_ids
 
+    for arg, field in (("start_date", "start_date"), ("due_date", "target_date")):
+        val = getattr(args, arg, None)
+        if val:
+            try:
+                datetime.strptime(val, "%Y-%m-%d")
+            except ValueError:
+                sys.stderr.write(f"Error: Fecha inválida '{val}'. Formato: YYYY-MM-DD.\n")
+                sys.exit(1)
+            patch_data[field] = val
+
     if not patch_data:
-        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--state, --priority o --labels).\n")
+        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--state, --priority, --labels, --start-date o --due-date).\n")
         return
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/"
@@ -1169,6 +1179,8 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         if "state" in patch_data: changes.append(f"Estado ➔ {args.state}")
         if "priority" in patch_data: changes.append(f"Prioridad ➔ {args.priority}")
         if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
+        if "start_date" in patch_data: changes.append(f"Inicio ➔ {patch_data['start_date']}")
+        if "target_date" in patch_data: changes.append(f"Vence ➔ {patch_data['target_date']}")
         print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
 def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
@@ -1211,6 +1223,11 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
 
     if getattr(args, "priority", None):
         payload["priority"] = args.priority.lower()
+
+    if getattr(args, "start_date", None):
+        payload["start_date"] = args.start_date
+    if getattr(args, "due_date", None):
+        payload["target_date"] = args.due_date
 
     if getattr(args, "state", None):
         states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
@@ -1786,6 +1803,8 @@ def main():
     p_create.add_argument("--priority", choices=["urgent", "high", "medium", "low", "none"], default="none", help="Prioridad del ticket")
     p_create.add_argument("--state", help="Estado inicial (por defecto Backlog)")
     p_create.add_argument("--labels", help="Etiquetas separadas por comas (ej: backend,bug,spike)")
+    p_create.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
+    p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
     p_create.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # update
@@ -1794,6 +1813,8 @@ def main():
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")
+    p_update.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
+    p_update.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
     p_update.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # get
