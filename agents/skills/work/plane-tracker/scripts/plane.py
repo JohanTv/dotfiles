@@ -1122,6 +1122,67 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     else:
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
+def _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue):
+    """ID del comentario a tocar: el indicado, o el último comentario propio del ticket."""
+    if args.comment_id:
+        return args.comment_id
+    actor = get_actor_uuid(base_url, api_key, workspace)
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+    res = api_request(url, api_key)
+    comments = res if isinstance(res, list) else res.get("results", [])
+    own = [c for c in comments if not actor or c.get("actor") == actor]
+    if not own:
+        sys.stderr.write("Error: No hay comentarios propios en el ticket. Indica el ID con --comment-id.\n")
+        sys.exit(1)
+    return max(own, key=lambda c: c.get("created_at", "")).get("id")
+
+
+def cmd_comment_delete(args, conn, base_url, api_key, workspace, default_project_id):
+    """Elimina un comentario en Plane y su worklog en la BD local."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    cid = _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue)
+    api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/", api_key, method="DELETE")
+    with conn:
+        n = conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,)).rowcount
+    print(f"✔ Comentario {cid} eliminado de {issue_ref} ({n} worklog local(es) borrado(s))")
+
+
+def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_id):
+    """Edita el texto de un comentario y/o registra su worklog local, sin publicar otro comentario."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    cid = _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue)
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/"
+
+    content = args.message
+    if content is not None:
+        html = content if content.strip().startswith("<") and ">" in content else markdown_to_html(content)
+        api_request(url, api_key, method="PATCH", data={"comment_html": html})
+        print(f"✔ Comentario {cid} actualizado en {issue_ref}")
+
+    if args.duration:
+        c = api_request(url, api_key)
+        # El comentario ya existe: su hora de publicación (local) es el fin; inicio = fin - duración
+        end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
+        start = end - timedelta(minutes=args.duration)
+        track = args.track or "main"
+        bucket = args.capacity_bucket or "deep_work"
+        worker = args.worker_type or "human"
+        proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
+        notes = re.sub(r"<[^>]+>", "", c.get("comment_html") or "").strip()[:120] or issue.get("name", "")
+        meta = {"schema_version": "2.2", "date": start.strftime("%Y-%m-%d"), "start_time": start.strftime("%H:%M"),
+                "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": track,
+                "worker_type": worker, "capacity_bucket": bucket, "notes": notes, "stoppers": [], "phase": "dev"}
+        with conn:  # reemplaza el worklog previo de este comentario (idempotente)
+            conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,))
+        upsert_worklog(conn, {**meta, "ticket_id": f"{proj_ident}-{issue.get('sequence_id') or seq_id}",
+                              "issue_name": issue.get("name", ""), "plane_comment_id": cid, "raw_payload": meta})
+        print(f"✔ Worklog local vinculado a {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {track}, {bucket})")
+    elif content is None:
+        sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
+
+
 def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
@@ -1807,6 +1868,20 @@ def main():
     p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
     p_create.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # comment-delete / comment-edit
+    p_cdel = subparsers.add_parser("comment-delete", help="Eliminar un comentario (por defecto el último propio) y su worklog local")
+    p_cdel.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
+    p_cdel.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
+    p_cedit = subparsers.add_parser("comment-edit", help="Editar un comentario y/o vincularle su worklog local sin publicar otro")
+    p_cedit.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
+    p_cedit.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
+    p_cedit.add_argument("-m", "--message", help="Nuevo texto del comentario")
+    p_cedit.add_argument("--track", help="Frente de trabajo")
+    p_cedit.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
+                         choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"])
+    p_cedit.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"])
+    p_cedit.add_argument("--duration", type=int, metavar="MIN", help="Duración en minutos: registra el worklog usando la hora de publicación como fin")
+
     # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
     p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
@@ -1873,6 +1948,10 @@ def main():
     try:
         if args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "comment-delete":
+            cmd_comment_delete(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "comment-edit":
+            cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "create":
             cmd_create(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "update":

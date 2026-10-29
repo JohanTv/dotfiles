@@ -100,6 +100,17 @@ plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --duration 95 --track "valid
 plane-tracker comment OPS-13 -m "Firma actualizada" --capacity toil_support --duration 5
 ```
 
+Corregir un comentario ya publicado (**nunca publicar otro comentario solo para registrar tiempo**; el comentario existente ya es el registro). Sin `--comment-id` actúan sobre tu último comentario en el ticket:
+
+```bash
+# Registrar/corregir el tiempo en la BD local (inicio = hora de publicación − duración)
+plane-tracker comment-edit OPS-13 --track "firma-correo" --capacity toil_support --duration 5
+# Editar el texto en Plane
+plane-tracker comment-edit OPS-13 -m "Texto corregido" [--comment-id <uuid>]
+# Eliminar un comentario (y su worklog local)
+plane-tracker comment-delete OPS-13 [--comment-id <uuid>]
+```
+
 > ⚠️ **`--duration <minutos>` es obligatorio** cuando el contenido no lleva el bloque `PLANE_WORKLOG_METADATA` (en ese bloque puede ir en `duration_minutes` o `duration_net_minutes`). Sin él, el CLI aborta **antes** de publicar el comentario, porque la duración ya no se inventa (antes asumía 30 min por defecto y contaminaba el reporte).
 >
 > **Regla de duración honesta:** si el trabajo se hizo **fuera de la conversación** (ej. el usuario cambió su firma de correo por su cuenta y solo pide registrar el hecho en el workitem), el agente **pregunta** cuánto demoró antes de comentar. Nunca estimes un tiempo que no observaste; si el usuario no lo sabe, deja el registro pendiente.
