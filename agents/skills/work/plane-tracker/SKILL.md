@@ -88,6 +88,15 @@ plane list -p OMNIFY
 plane list -p OPS
 ```
 
+### F. Listar Proyectos Disponibles (Caché Dinámica en SQLite)
+```bash
+# Consultar proyectos disponibles en el workspace desde SQLite (< 2ms)
+plane projects
+
+# Forzar refresco desde la API de Plane si se crearon nuevos proyectos
+plane projects --refresh
+```
+
 ---
 
 ## 4. Estándar de Bitácora Dual-Layer (Humano + Telemetría v2.2)
