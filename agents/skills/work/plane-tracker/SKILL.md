@@ -5,7 +5,7 @@ description: Orquestador y registrador de tareas, estados, prioridades, etiqueta
 
 # Plane Session Tracker & Worklog Operator (v2.1)
 
-Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.2.3 auto-hospedada de la empresa (Omnify / Operaciones) y alimentar el motor de telemetría y dashboard personal de `Code/plane`.
+Procedimiento operativo integral para interactuar con la plataforma Plane CE v1.2.3 auto-hospedada de la empresa (Omnify / Operaciones) y alimentar el motor de telemetría y dashboard personal de `Code/plane-tracker`.
 
 ---
 
