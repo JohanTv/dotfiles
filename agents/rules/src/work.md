@@ -27,19 +27,23 @@
 - **Manejo de Ambigüedad:** Si el usuario solicita crear una rama o iniciar una tarea sin mencionar el ticket de Plane, el agente debe preguntar brevemente (ej. *"¿A qué ticket de Omnify asociamos esta rama?"*) antes de crearla.
 - **Proyectos Personales / Sin Plane:** Si el contexto es un proyecto personal, de código abierto o no vinculado a Plane, no forzar ticket ID; usar el formato convencional estándar: `{tipo}/{kebab-case-descripcion}`.
 
-### Estándar de Creación de Work Items (Plane CE):
+### Detección y Momento Cero (Zero-Moment Discovery):
+- **Búsqueda Instantánea:** Al iniciar una sesión o recibir una intención de trabajo (ej. *"arreglemos las validaciones del formulario"*), el agente debe ejecutar `plane-tracker search "<intención>"` para comprobar en < 2ms si ya existe un ticket abierto en Plane o si se debe proponer uno nuevo.
+- **Acción Rápida:** Si hay un ticket coincidente, preguntar brevemente para confirmar y cambiar a la rama respectiva (`git checkout -b feat/OMNIFY-XXX-...`). Si no existe, proponer el work item con título, prioridad y etiquetas.
+
+### Estándar de Creación y Ciclo de Vida de Work Items:
 - **Título:** Estructurado como `[{FASE}] {Acción o resumen conciso en español}`
   - Fases válidas: `[SPIKE]`, `[RFC]`, `[FEAT]`, `[FIX]`, `[INFRA]`, `[QA]`, `[REFACTOR]`.
-  - Ejemplos: `[FEAT] Validaciones de formulario de campaña`, `[FIX] Mitigar error 504 en webhook sms`.
+  - El módulo se menciona naturalmente en el texto (ej. `[FEAT] Validaciones de formulario en campañas SMS`). No usar corchetes dobles para evitar truncamiento en tarjetas Kanban.
 - **Taxonomía de Etiquetas (Mínimo 2 etiquetas):**
   - Capa técnica: `backend`, `frontend`, `bd`, `infra`.
   - Tipo o naturaleza: `bug`, `deuda-tecnica`, `seguridad`, `docs`.
   - Módulo específico (si aplica): `sms`, `whatsapp`, `correo`, `tts`, `acortador`, `n8n`.
   - Consulta etiquetas vivas en SQLite con `plane-tracker labels`.
-- **Estructura Canónica del Cuerpo (Markdown):**
-  Todo ticket creado por agentes o ingenieros debe incluir:
-  1. `## Contexto`: Situación actual, módulo o componente afectado.
-  2. `## Problema / Oportunidad`: Dolor, bug, cuello de botella o necesidad técnica.
-  3. `## Solución Propuesta`: Enfoque técnico, schema, endpoints o refactor.
-  4. `## Requisitos y Restricciones`: Dependencias, variables, compatibilidad Plane 1.2.3.
-  5. `## Criterios de Aceptación (DoD)`: Checklist verificable con pruebas y bitácora.
+- **Living Ticket Pattern (Regla de los 15 Minutos):**
+  - **Tareas < 15 min (Toil/Soporte):** No crear ticket en Omnify; absorber en el ticket paraguas semanal de `OPS`.
+  - **Tareas > 15 min:** Crear ticket formal en Plane. Si se inicia en incertidumbre (`[SPIKE]` o `[FIX]`), la descripción inicial documenta *Contexto*, *Síntoma observado*, *Comportamiento esperado* e *Hipótesis*. Al aislar la causa raíz, se actualiza con la *Solución Propuesta* y *Criterios de Aceptación (DoD)*.
+- **Tickets Paraguas Semanales (Cadencia W{ISO_WEEK}):**
+  - En `OPS`: `[OPS] Soporte L2/L3 y Mantenimiento Ad-Hoc - Semana W{XX}` (capacidad: `toil_support`).
+  - En `OMNIFY`: `[SYNC] Ceremonias de Equipo, Sincronización y Dailies - Semana W{XX}` (capacidad: `coordination`).
+  - Cada intervención se registra con `plane-tracker comment <TICKET> --track "<tema>" --capacity "<balde>"`.
