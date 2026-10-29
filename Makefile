@@ -14,9 +14,9 @@ PROFILE_RULES := $(DOTFILES_DIR)/agents/rules/src/$(PROFILE).md
 
 IS_WSL := $(shell grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null && echo true || echo false)
 
-.PHONY: all work personal compile-rules link-rules sync-skills doctor check install help
+.PHONY: all work personal compile-rules link-rules sync-skills sync-binaries doctor check install help
 
-all: compile-rules link-rules sync-skills
+all: compile-rules link-rules sync-skills sync-binaries
 	@echo "✔ Dotfiles sincronizados con perfil activo: [$(PROFILE)] (WSL: $(IS_WSL))"
 
 work:
@@ -103,6 +103,61 @@ sync-skills:
 		fi \
 	done
 	@echo "✔ Sincronización y conciliación de skills completada."
+
+sync-binaries:
+	@mkdir -p $$HOME/.local/bin
+	@# 1. Enlazar binarios comunes
+	@for b in $(DOTFILES_DIR)/bin/common/*; do \
+		if [ -f "$$b" ]; then \
+			chmod +x "$$b"; \
+			ln -sf "$$b" "$$HOME/.local/bin/$$(basename "$$b")"; \
+		fi \
+	done
+	@# 2. Enlazar desktop-linux (solo si no es WSL)
+	@if [ "$(IS_WSL)" = "false" ] && [ -d "$(DOTFILES_DIR)/bin/desktop-linux" ]; then \
+		for b in $(DOTFILES_DIR)/bin/desktop-linux/*; do \
+			if [ -f "$$b" ]; then \
+				chmod +x "$$b"; \
+				ln -sf "$$b" "$$HOME/.local/bin/$$(basename "$$b")"; \
+			fi \
+		done \
+	fi
+	@# 3. Enlazar binarios de trabajo si perfil es work
+	@if [ "$(PROFILE)" = "work" ] && [ -d "$(DOTFILES_DIR)/bin/work" ]; then \
+		for b in $(DOTFILES_DIR)/bin/work/*; do \
+			if [ -f "$$b" ]; then \
+				chmod +x "$$b"; \
+				ln -sf "$$b" "$$HOME/.local/bin/$$(basename "$$b")"; \
+			fi \
+		done \
+	fi
+	@# 4. Poda segura de binarios obsoletos o inactivos
+	@for link in $$HOME/.local/bin/*; do \
+		if [ -L "$$link" ]; then \
+			target=$$(readlink -f "$$link" 2>/dev/null || true); \
+			base=$$(basename "$$link"); \
+			case "$$target" in \
+				$(DOTFILES_DIR)/bin/*) \
+					# Si es de trabajo pero no estamos en work, remover \
+					if [ "$$target" = "$(DOTFILES_DIR)/bin/work/$$base" ] && [ "$(PROFILE)" != "work" ]; then \
+						rm "$$link"; \
+						echo "○ Poda de binario de trabajo inactivo: $$base"; \
+					fi; \
+					# Si es desktop pero estamos en WSL, remover \
+					if [ "$$target" = "$(DOTFILES_DIR)/bin/desktop-linux/$$base" ] && [ "$(IS_WSL)" = "true" ]; then \
+						rm "$$link"; \
+						echo "○ Poda de binario desktop en WSL: $$base"; \
+					fi; \
+					# Si el destino no existe (broken link), remover \
+					if [ ! -e "$$target" ]; then \
+						rm "$$link"; \
+						echo "○ Poda de binario roto: $$base"; \
+					fi; \
+					;; \
+			esac \
+		fi \
+	done
+	@echo "✔ Sincronización y conciliación de binarios completada."
 
 doctor:
 	@python3 $(DOTFILES_DIR)/bin/common/dotfiles-doctor

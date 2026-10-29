@@ -144,6 +144,18 @@ else
     log_info "Omitiendo scripts de escritorio X11/GNOME (modo WSL activo)."
 fi
 
+# Scripts específicos de perfil de trabajo (Plane / Omnify)
+ACTIVE_PROFILE="$(cat "$DOTFILES_DIR/.active-profile" 2>/dev/null || echo "${DOTFILES_PROFILE:-work}")"
+if [[ "$ACTIVE_PROFILE" == "work" && -d "$DOTFILES_DIR/bin/work" ]]; then
+    log_info "Instalando scripts de trabajo (perfil work activo)..."
+    for script in "$DOTFILES_DIR"/bin/work/*; do
+        if [[ -f "$script" ]]; then
+            chmod +x "$script"
+            link_file "$script" "$HOME/.local/bin/$(basename "$script")"
+        fi
+    done
+fi
+
 echo ""
 log_ok "¡Instalación completada con éxito!"
 log_info "Reinicia tu terminal o ejecuta: source ~/.zshrc"
