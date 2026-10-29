@@ -71,15 +71,18 @@ Evitar la dispersión de tiempo en el reporte diario para el jefe sin ensuciar e
 
 ### 3.2 Los Dos Tickets Semanales
 
+Ambos viven en el proyecto **`OPS` (Operaciones)**, no en OMNIFY. El identifier del proyecto ya aporta el contexto, por eso los títulos **no llevan prefijos** `[OPS]` ni `[SYNC]` y evitan jerga que el equipo no maneja (`L2/L3`, `SYNC`, `Ceremonias`).
+
 ```
-┌────────────────────────────────────────────────────────┐
-│            TICKETS PARAGUAS DE LA SEMANA W{XX}         │
-├────────────────────────────┬───────────────────────────┤
-│ En Proyecto: OPS           │ En Proyecto: OMNIFY       │
-│ [OPS] Soporte L2/L3 y Man- │ [SYNC] Ceremonias de      │
-│ tenimiento Ad-Hoc - W{XX}  │ Equipo y Dailies - W{XX}  │
-│ Capacidad: toil_support    │ Capacidad: coordination   │
-└────────────────────────────┴───────────────────────────┘
+┌──────────────────────────────────┬──────────────────────────────────┐
+│ TICKETS PARAGUAS DE LA SEMANA W{XX}                                 │
+│ Proyecto: OPS (Operaciones)                                         │
+├──────────────────────────────────┼──────────────────────────────────┤
+│ Toil / Soporte                   │ Coordinación de Equipo           │
+│ Soporte y Mantenimiento Ad-Hoc   │ Sincronización de Equipo         │
+│ - W{XX}                          │ y Acuerdos - W{XX}               │
+│ Capacidad: toil_support          │ Capacidad: coordination          │
+└──────────────────────────────────┴──────────────────────────────────┘
 ```
 
 ### 3.3 Cadencia de Operación
@@ -87,15 +90,16 @@ Evitar la dispersión de tiempo en el reporte diario para el jefe sin ensuciar e
    - El desarrollador o el asistente verifica si existe el ticket de la semana (`W{ISO_WEEK}`).
    - Si no existe, se crea con estado `Progreso`.
 2. **Durante la semana (Append-Only):**
-   - Cada interrupción o reunión se comenta usando flags de track:
+   - Cada interrupción, reunión o imprevisto se comenta en **su** paraguas de `OPS`, con track y duración declarada:
      ```bash
-     plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" -m "..."
-     plane-tracker comment OMNIFY-185 --track "daily-pierre" --capacity "coordination" -m "..."
+     plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 12 -m "..."
+     plane-tracker comment OPS-45 --track "daily-pierre" --capacity "coordination" --duration 25 -m "..."
      ```
+   - `--duration` (minutos netos) es obligatorio. Si el hecho ocurrió **fuera de la conversación** del agente, el agente **pregunta** cuánto demoró antes de comentar; nunca estima.
 3. **Viernes 06:30 pm (Cierre):**
    - Se ejecuta el balance con `plane-tracker report --week`.
-   - El ticket paraguas se transiciona a `Completado`:
+   - Los dos paraguas se transicionan a `Completado`:
      ```bash
      plane-tracker update OPS-44 --state "Completado"
-     plane-tracker update OMNIFY-185 --state "Completado"
+     plane-tracker update OPS-45 --state "Completado"
      ```
