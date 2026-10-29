@@ -6,17 +6,17 @@ Bienvenido a la especificación técnica y operativa del ecosistema de tracking 
 
 ## 🗺️ Mapa de Documentos
 
-1. [🏛️ **Arquitectura del Sistema de Tracking y Telemetría**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md)
+1. [🏛️ **Arquitectura del Sistema de Tracking y Telemetría**](./ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md)
    * Visión general, dual-layer pattern, SQLite3 WAL mode, Klee's Interval Merging y optimización de tokens.
-2. [🔄 **Protocolo de Living Tickets y Fases del SDLC**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
+2. [🔄 **Protocolo de Living Tickets y Fases del SDLC**](./PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
    * El ciclo de 4 fases (`[SPIKE]`, `[RFC]`, `[FEAT/FIX]`, `[QA]`), la regla de los 15 minutos y las 3 plantillas evolutivas para gestionar la incertidumbre.
-3. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
+3. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](./PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
    * Cómo tomar tickets iniciados por Pierre o el equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
-4. [🛠️ **Guía Operativa del CLI `plane-tracker`**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
+4. [🛠️ **Guía Operativa del CLI `plane-tracker`**](./GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
    * Manual exhaustivo de comandos (`search`, `create`, `get`, `update`, `comment`, `labels`, `projects`, `report`) con flags, ejemplos y salidas JSON.
-5. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
+5. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
    * Catálogo de 16 etiquetas en Omnify, 11 en OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
-6. [📋 **Estrategia Integral de Gestión TI y Work Items**](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-tracker/references/ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
+6. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
    * Visión de alto rendimiento, arquetipos de ingeniería y diseño del dashboard personal.
 
 ---
