@@ -112,6 +112,18 @@ plane-tracker projects
 plane-tracker projects --refresh
 ```
 
+### H. Listar Etiquetas del Proyecto (Caché Dinámica en SQLite)
+```bash
+# Consultar taxonomía de etiquetas de Omnify (< 2ms)
+plane-tracker labels
+
+# Consultar etiquetas de otro proyecto (ej: OPS)
+plane-tracker labels -p OPS
+
+# Forzar refresco desde la API de Plane si se agregaron etiquetas nuevas
+plane-tracker labels --refresh
+```
+
 ---
 
 ## 4. Estándar de Bitácora Dual-Layer (Humano + Telemetría v2.2)
@@ -214,4 +226,47 @@ Para evitar fricción y **nunca** pedirle a Johan que llene formularios manualme
    - Se activa si se descubren fallos estructurales imprevistos (ej. *descuadre de 1.6M de filas en SEM-MKT*). El agente extrae el volumen de filas y marca `tech_debt_delta = "discovered"`.
 3. **Detección de Bloqueos / Stoppers (`is_blocked`):**
    - Si se concluye en espera de respuesta de Meta, accesos o aprobación de Pierre, marcar `is_blocked: true`, identificar la entidad en `blocker_details`, y sugerir mover a `Pausado`.
-4. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane.py comment`?"*).
+4. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane-tracker comment`?"*).
+
+---
+
+## 6. Estándar de Creación de Work Items / Tickets
+
+Cuando un agente o Johan cree un nuevo work item con `plane-tracker create`, debe seguir estrictamente este estándar:
+
+### A. Título
+Formato: `[{FASE}] {Acción en infinitivo o resumen conciso en español}`
+* Prefijos válidos: `[SPIKE]`, `[RFC]`, `[FEAT]`, `[FIX]`, `[INFRA]`, `[QA]`, `[REFACTOR]`.
+* Ejemplos:
+  * `[SPIKE] Diagnóstico de concurrencia y rate limit en envíos masivos SMS`
+  * `[FEAT] Validaciones de esquema y formulario en creación de campañas`
+  * `[FIX] Mitigar error 504 en webhook de recepción de estados de campaña`
+
+### B. Etiquetas (Mínimo 2 etiquetas)
+* **Capa Técnica (al menos una):** `backend`, `frontend`, `bd`, `infra`.
+* **Naturaleza / Tipo (al menos una):** `bug`, `deuda-tecnica`, `seguridad`, `docs`.
+* **Módulo o Canal (si aplica):** `sms`, `whatsapp`, `correo`, `tts`, `acortador`, `n8n`.
+* Consulta las etiquetas activas con `plane-tracker labels`.
+
+### C. Plantilla Canónica de la Descripción (Markdown)
+```markdown
+## Contexto
+Breve descripción de la situación actual, componentes o servicios satélite involucrados.
+
+## Problema / Oportunidad
+El dolor o la necesidad técnica concreta. ¿Qué falla, qué lentitud existe o qué funcionalidad se requiere?
+
+## Solución Propuesta
+Enfoque de solución técnica, diseño de arquitectura, endpoints o lógica de negocio a implementar.
+
+## Requisitos y Restricciones Técnicas
+- Compatibilidad con Plane CE v1.2.3, versiones de Node/Python o contenedores Docker.
+- Variables de entorno o credenciales requeridas.
+- Impacto o dependencias con otros módulos o tablas.
+
+## Criterios de Aceptación (Definition of Done)
+- [ ] Pruebas unitarias o de integración pasando.
+- [ ] Validación transaccional o verificación end-to-end completada.
+- [ ] Rama Git creada bajo el patrón `{tipo}/{TICKET-ID}-{kebab-case}`.
+- [ ] Bitácora dual registrada al finalizar con `plane-tracker comment`.
+```

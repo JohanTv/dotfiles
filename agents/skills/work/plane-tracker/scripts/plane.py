@@ -100,6 +100,32 @@ def init_db(conn):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_ticket_track ON worklogs(ticket_id, track);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_project_date ON worklogs(project_id, date);")
 
+        # 4. Tabla de Etiquetas (Labels) con TTL
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS labels (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                color TEXT NOT NULL DEFAULT '',
+                updated_at REAL NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_labels_project ON labels(project_id);")
+
+        # 5. Tabla de Estados (States) con TTL
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS states (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                slug TEXT NOT NULL,
+                group_name TEXT NOT NULL,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_states_project ON states(project_id);")
+
 # ------------------------------------------------------------------------------
 # Entorno y Red
 # ------------------------------------------------------------------------------
@@ -277,11 +303,44 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
     sys.stderr.write(f"Error: Ticket #{seq_id} no encontrado en el proyecto.\n")
     sys.exit(1)
 
-def get_states_map(base_url, api_key, workspace, project_id):
-    """Mapea nombres y slugs de estados a su UUID."""
+def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
+    """Mapea nombres y slugs de estados a su UUID usando caché SQLite3 con TTL."""
+    now = time.time()
+    if conn and not force_refresh:
+        rows = conn.execute("SELECT id, name, slug, group_name, is_default, updated_at FROM states WHERE project_id = ?", (project_id,)).fetchall()
+        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+            mapping = {}
+            for r in rows:
+                name_clean = r["name"].lower().strip()
+                slug_clean = r["slug"].lower().strip()
+                mapping[name_clean] = r["id"]
+                mapping[slug_clean] = r["id"]
+                norm = name_clean.replace("ó", "o").replace("é", "e").replace("á", "a").replace("í", "i").replace("ú", "u")
+                mapping[norm] = r["id"]
+            return mapping
+
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/"
     data = api_request(url, api_key)
     mapping = {}
+    if conn:
+        with conn:
+            for st in data.get("results", []):
+                s_id = st["id"]
+                s_name = st["name"]
+                s_slug = st["slug"]
+                s_group = st.get("group", "")
+                s_def = 1 if st.get("default") else 0
+                conn.execute("""
+                    INSERT INTO states (id, project_id, name, slug, group_name, is_default, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        slug = excluded.slug,
+                        group_name = excluded.group_name,
+                        is_default = excluded.is_default,
+                        updated_at = excluded.updated_at;
+                """, (s_id, project_id, s_name, s_slug, s_group, s_def, now))
+
     for st in data.get("results", []):
         name_clean = st["name"].lower().strip()
         slug_clean = st["slug"].lower().strip()
@@ -291,10 +350,17 @@ def get_states_map(base_url, api_key, workspace, project_id):
         mapping[norm] = st["id"]
     return mapping
 
-def get_labels_map(base_url, api_key, workspace, project_id):
-    """Mapea nombres de etiquetas a su UUID con soporte de paginación."""
+def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
+    """Mapea nombres de etiquetas a su UUID con paginación y caché SQLite3 con TTL."""
+    now = time.time()
+    if conn and not force_refresh:
+        rows = conn.execute("SELECT id, name, color, updated_at FROM labels WHERE project_id = ?", (project_id,)).fetchall()
+        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+            return {r["name"].lower().strip(): r["id"] for r in rows}
+
     mapping = {}
     cursor = None
+    all_labels = []
     while True:
         url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/labels/"
         if cursor:
@@ -303,10 +369,23 @@ def get_labels_map(base_url, api_key, workspace, project_id):
         data = api_request(url, api_key)
         for lb in data.get("results", []):
             mapping[lb["name"].lower().strip()] = lb["id"]
+            all_labels.append(lb)
 
         if not data.get("next_page_results") or not data.get("next_cursor"):
             break
         cursor = data.get("next_cursor")
+
+    if conn and all_labels:
+        with conn:
+            for lb in all_labels:
+                conn.execute("""
+                    INSERT INTO labels (id, project_id, name, color, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        color = excluded.color,
+                        updated_at = excluded.updated_at;
+                """, (lb["id"], project_id, lb["name"], lb.get("color", ""), now))
 
     return mapping
 
@@ -743,7 +822,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     patch_data = {}
 
     if args.state:
-        states_map = get_states_map(base_url, api_key, workspace, project_id)
+        states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
         target_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
         if target_state not in states_map:
             sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos en proyecto: {', '.join(states_map.keys())}\n")
@@ -758,7 +837,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         patch_data["priority"] = prio
 
     if args.labels:
-        labels_map = get_labels_map(base_url, api_key, workspace, project_id)
+        labels_map = get_labels_map(conn, base_url, api_key, workspace, project_id)
         label_ids = []
         for raw_l in args.labels.split(","):
             l = raw_l.strip().lower()
@@ -826,7 +905,7 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         payload["priority"] = args.priority.lower()
 
     if getattr(args, "state", None):
-        states_map = get_states_map(base_url, api_key, workspace, project_id)
+        states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
         norm_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
         if norm_state in states_map:
             payload["state"] = states_map[norm_state]
@@ -835,7 +914,7 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
             sys.exit(1)
 
     if getattr(args, "labels", None):
-        labels_map = get_labels_map(base_url, api_key, workspace, project_id)
+        labels_map = get_labels_map(conn, base_url, api_key, workspace, project_id)
         label_ids = []
         for l in args.labels.split(","):
             l_clean = l.strip().lower()
@@ -916,6 +995,41 @@ def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
             seq = iss.get("sequence_id", "?")
             print(f"  • #{seq:<4} {prio:<9} {iss.get('name')[:65]}")
         print("")
+
+def cmd_labels(args, conn, base_url, api_key, workspace, default_project_id):
+    """Lista las etiquetas disponibles en un proyecto desde SQLite o Plane."""
+    project_id = default_project_id
+    project_ident = "OMNIFY"
+    projects_map = get_projects_map(conn, base_url, api_key, workspace)
+
+    if getattr(args, "project", None):
+        p_upper = args.project.upper()
+        if p_upper in projects_map:
+            project_id = projects_map[p_upper]["id"]
+            project_ident = p_upper
+        else:
+            sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado. Opciones: {', '.join(projects_map.keys())}\n")
+            sys.exit(1)
+    else:
+        for k, v in projects_map.items():
+            if v["id"] == project_id:
+                project_ident = k
+                break
+
+    force_refresh = getattr(args, "refresh", False)
+    get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=force_refresh)
+
+    rows = conn.execute("SELECT id, name, color FROM labels WHERE project_id = ? ORDER BY name ASC", (project_id,)).fetchall()
+
+    if getattr(args, "json", False):
+        print(json.dumps([{"id": r["id"], "name": r["name"], "color": r["color"]} for r in rows], indent=2))
+        return
+
+    print(f"\n🏷  Etiquetas disponibles para el proyecto {project_ident} ({len(rows)}):")
+    for r in rows:
+        color_str = f"({r['color']})" if r["color"] else ""
+        print(f"  • {r['name']:<18} {color_str}")
+    print(f"\n💡 Úsalas en: plane-tracker create ... --labels 'backend,bug'\n")
 
 def cmd_projects(args, conn, base_url, api_key, workspace):
     """Lista los proyectos disponibles en Plane y cacheados dinámicamente en SQLite."""
@@ -1153,6 +1267,12 @@ def main():
     p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
     p_list.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # labels
+    p_labels = subparsers.add_parser("labels", help="Listar etiquetas disponibles en un proyecto cacheadas en SQLite")
+    p_labels.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
+    p_labels.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
+    p_labels.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # projects
     p_proj = subparsers.add_parser("projects", help="Listar proyectos disponibles en Plane cacheados en SQLite")
     p_proj.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
@@ -1191,6 +1311,8 @@ def main():
             cmd_get(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "list":
             cmd_list(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "labels":
+            cmd_labels(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "projects":
             cmd_projects(args, conn, base_url, api_key, workspace)
         elif args.command == "report":
