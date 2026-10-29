@@ -785,6 +785,100 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
         print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
+def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
+    """Crea un nuevo ticket en Plane y devuelve su identificador para ramas Git."""
+    project_id = default_project_id
+    project_ident = "OMNIFY"
+
+    projects_map = get_projects_map(conn, base_url, api_key, workspace)
+    if getattr(args, "project", None):
+        p_upper = args.project.upper()
+        if p_upper in projects_map:
+            project_id = projects_map[p_upper]["id"]
+            project_ident = p_upper
+        else:
+            projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=True)
+            if p_upper in projects_map:
+                project_id = projects_map[p_upper]["id"]
+                project_ident = p_upper
+            else:
+                sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado. Opciones: {', '.join(projects_map.keys())}\n")
+                sys.exit(1)
+    else:
+        for k, v in projects_map.items():
+            if v["id"] == project_id:
+                project_ident = k
+                break
+
+    payload = {
+        "name": args.title.strip()
+    }
+
+    if getattr(args, "description", None):
+        desc = args.description.strip()
+        if desc.startswith("<") and desc.endswith(">"):
+            payload["description_html"] = desc
+        else:
+            paragraphs = "".join(f"<p>{p.strip()}</p>" for p in desc.split("\n\n") if p.strip())
+            payload["description_html"] = paragraphs if paragraphs else f"<p>{desc}</p>"
+
+    if getattr(args, "priority", None):
+        payload["priority"] = args.priority.lower()
+
+    if getattr(args, "state", None):
+        states_map = get_states_map(base_url, api_key, workspace, project_id)
+        norm_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
+        if norm_state in states_map:
+            payload["state"] = states_map[norm_state]
+        else:
+            sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos: {', '.join(states_map.keys())}\n")
+            sys.exit(1)
+
+    if getattr(args, "labels", None):
+        labels_map = get_labels_map(base_url, api_key, workspace, project_id)
+        label_ids = []
+        for l in args.labels.split(","):
+            l_clean = l.strip().lower()
+            if l_clean:
+                if l_clean in labels_map:
+                    label_ids.append(labels_map[l_clean])
+                else:
+                    sys.stderr.write(f"Advertencia: Etiqueta '{l_clean}' no encontrada en el proyecto. Se omitirá.\n")
+        if label_ids:
+            payload["labels"] = label_ids
+
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
+    res = api_request(url, api_key, method="POST", data=payload)
+
+    seq_id = res.get("sequence_id")
+    ticket_ref = f"{project_ident}-{seq_id}" if seq_id else res.get("id")
+    web_url = f"{base_url.rstrip('/')}/{workspace}/projects/{project_id}/issues/{res.get('id')}"
+
+    # Generar sugerencia de rama
+    clean_desc = re.sub(r"[^a-zA-Z0-9]+", "-", args.title.lower()).strip("-")
+    if len(clean_desc) > 35:
+        clean_desc = clean_desc[:35].rstrip("-")
+    branch_sugg = f"feat/{ticket_ref}-{clean_desc}"
+
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "status": "ok",
+            "action": "create",
+            "ticket": ticket_ref,
+            "id": res.get("id"),
+            "sequence_id": seq_id,
+            "name": res.get("name"),
+            "branch_suggestion": branch_sugg,
+            "url": web_url,
+            "raw": res
+        }, indent=2))
+    else:
+        print(f"\n🎉 Ticket creado exitosamente: {ticket_ref}")
+        print(f"   • Título: {res.get('name')}")
+        print(f"   • Prioridad: {res.get('priority', 'none').upper()}")
+        print(f"   • Enlace: {web_url}")
+        print(f"   • Sugerencia de rama Git: {branch_sugg}\n")
+
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
@@ -1031,6 +1125,16 @@ def main():
     p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # create
+    p_create = subparsers.add_parser("create", help="Crear un nuevo ticket / work item en Plane")
+    p_create.add_argument("title", help="Título del ticket")
+    p_create.add_argument("-d", "--description", help="Descripción o notas del ticket")
+    p_create.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
+    p_create.add_argument("--priority", choices=["urgent", "high", "medium", "low", "none"], default="none", help="Prioridad del ticket")
+    p_create.add_argument("--state", help="Estado inicial (por defecto Backlog)")
+    p_create.add_argument("--labels", help="Etiquetas separadas por comas (ej: backend,bug,spike)")
+    p_create.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
     p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
@@ -1079,6 +1183,8 @@ def main():
     try:
         if args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "create":
+            cmd_create(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "update":
             cmd_update(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "get":
