@@ -46,6 +46,7 @@
 - **Tickets Paraguas Semanales (Cadencia W{ISO_WEEK}, ambos viven en `OPS`):** El identifier del proyecto ya aporta el contexto, por eso el título no repite `[OPS]` ni usa jerga de gestión (evitar `L2/L3`, `SYNC`, `Ceremonias`).
   - Soporte / toil: `Tareas Rápidas y Soporte - W{XX}` (capacidad: `toil_support`).
   - Coordinación de equipo: `Reuniones de Equipo y Acuerdos - W{XX}` (capacidad: `coordination`).
+  - **Fechas obligatorias:** al crearlos define `--start-date` (lunes) y `--due-date` (domingo) de la semana ISO. Ej. W44/2026: `--start-date 2026-10-26 --due-date 2026-11-01`. Para existentes: `plane-tracker update <TICKET> --start-date ... --due-date ...`.
   - Cada intervención se registra con `plane-tracker comment <TICKET> --track "<tema>" --capacity "<balde>" --duration <minutos>`.
   - **La duración nunca se estima:** si el trabajo se hizo fuera de la conversación (ej. configurar una firma en el cliente de correo) y el agente no lo observó, **pregunta primero** cuánto demoró; si el usuario no lo sabe, no se registra el tiempo todavía.
 - **Protocolo de Relevo Asíncrono (Task Handoff):**

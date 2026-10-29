@@ -88,7 +88,7 @@ Ambos viven en el proyecto **`OPS` (Operaciones)**, no en OMNIFY. El identifier 
 ### 3.3 Cadencia de Operación
 1. **Lunes 09:00 am (Apertura):**
    - El desarrollador o el asistente verifica si existe el ticket de la semana (`W{ISO_WEEK}`).
-   - Si no existe, se crea con estado `Progreso`.
+   - Si no existe, se crea con estado `Progreso` y con `--start-date` = lunes y `--due-date` = domingo de la semana ISO (ej. W44/2026: `2026-10-26` → `2026-11-01`).
 2. **Durante la semana (Append-Only):**
    - Cada interrupción, reunión o imprevisto se comenta en **su** paraguas de `OPS`, con track y duración declarada:
      ```bash
