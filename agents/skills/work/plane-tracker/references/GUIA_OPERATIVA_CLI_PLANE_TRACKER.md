@@ -114,6 +114,29 @@ plane-tracker get OMNIFY-197 --full                          # sin truncar descr
 
 ---
 
+### C.1b Varios tickets en una misma sesión
+```bash
+# Atribución automática por foco: avisa en qué ticket trabajas al cambiar de uno a otro
+plane-tracker focus OMNIFY-205            # abre la marca (cierra la anterior)
+plane-tracker focus OPS-13                # cambio de ticket
+plane-tracker focus --status              # minutos atribuidos hoy por ticket y tiempo sin foco
+plane-tracker focus --off
+plane-tracker propose-duration OMNIFY-205 # solo cuenta los intervalos con foco en ese ticket
+
+# Reparto manual de lo medido (en un paso; cada parte se registra luego con su texto)
+plane-tracker propose-duration --split OMNIFY-205=60%,OPS-13=rest   # o 40m; suma exacta (mayor resto)
+plane-tracker comment OMNIFY-205 -m "..." --accept-proposal
+plane-tracker comment OPS-13 -m "..." --accept-proposal             # en cualquier orden
+
+# Ventana explícita (un solo día local; lo ya registrado de la sesión se excluye)
+plane-tracker propose-duration OMNIFY-205 --since 09:30 --until 11:00
+```
+- La medición usa **tramos de actividad** (huecos de más de 10 min excluidos). Un worklog medido guarda `segments` (los tramos reales) para que el reloj por ticket y el reporte diario no usen un rango envolvente que pise a otro ticket.
+- **Nada se cuenta dos veces:** de cada propuesta se restan los worklogs de la sesión (medidos o declarados, por su intervalo real) y las propuestas pendientes de otros tickets. Con foco activo, un ticket sin marcas hoy no recibe propuesta (usa `--duration`). Las marcas son locales (no se reconstruyen con `--sync`); los segmentos sí viajan en el bloque oculto del comentario.
+- `measured_by` distingue `proposal`, `proposal_split` y `declared`, con `attribution` (`session`, `focus`, `split`) y `window_override` si se usó `--since/--until`.
+
+---
+
 ### C.1 `plane-tracker propose-duration` (Duración medida)
 Mide la sesión del agente (solo timestamps, nunca contenido) y propone una duración sin registrar nada.
 

@@ -175,7 +175,7 @@ class PlaneIntegration(unittest.TestCase):
             agent = "claude"
             session = None
 
-        result = plane.build_proposal(None, Args, "toil_support", "agent:claude")
+        result = plane.build_proposal(None, Args, "toil_support", "agent:claude", "OPS-1")
         self.assertFalse(result["ok"])
 
 

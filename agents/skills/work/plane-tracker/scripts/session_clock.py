@@ -265,3 +265,167 @@ def measure(stamps, window_start, window_end, gap_minutes=10):
         "net_minutes": net.total_seconds() / 60.0,
         "pauses": pauses,
     }
+
+
+# ------------------------------------------------------------------------------
+# Tramos de actividad: base de la atribución por ticket (focus), el reparto (split) y la
+# resta de lo ya registrado. Todo son funciones puras sobre datetimes UTC.
+# ------------------------------------------------------------------------------
+
+def active_runs(stamps, window_start, window_end, gap_minutes=10):
+    """Tramos (inicio, fin) de actividad dentro de la ventana.
+
+    Cada intervalo entre eventos consecutivos que no supera `gap_minutes` cuenta, recortado a la
+    ventana; los contiguos se funden. Es aditivo: la suma sobre ventanas disjuntas es igual a la
+    suma sobre su unión, así que repartir una ventana no pierde ni duplica tiempo.
+    """
+    gap = timedelta(minutes=gap_minutes)
+    runs = []
+    for prev, cur in zip(stamps, stamps[1:]):
+        if cur - prev > gap:
+            continue
+        start, end = max(prev, window_start), min(cur, window_end)
+        if end <= start:
+            continue
+        if runs and start <= runs[-1][1]:
+            runs[-1] = (runs[-1][0], max(runs[-1][1], end))
+        else:
+            runs.append((start, end))
+    return runs
+
+
+def merge_intervals(intervals):
+    merged = []
+    for start, end in sorted(intervals):
+        if end <= start:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def intersect(runs, intervals):
+    """Partes de `runs` que caen dentro de `intervals`."""
+    out = []
+    for r_start, r_end in runs:
+        for i_start, i_end in merge_intervals(intervals):
+            start, end = max(r_start, i_start), min(r_end, i_end)
+            if end > start:
+                out.append((start, end))
+    return merge_intervals(out)
+
+
+def subtract(runs, covered):
+    """Partes de `runs` que NO están en `covered`."""
+    out = []
+    covered = merge_intervals(covered)
+    for r_start, r_end in runs:
+        cursor = r_start
+        for c_start, c_end in covered:
+            if c_end <= cursor or c_start >= r_end:
+                continue
+            if c_start > cursor:
+                out.append((cursor, c_start))
+            cursor = max(cursor, c_end)
+        if cursor < r_end:
+            out.append((cursor, r_end))
+    return merge_intervals(out)
+
+
+def total_minutes(runs):
+    return sum((end - start).total_seconds() for start, end in runs) / 60.0
+
+
+def cut_runs(runs, minutes_list):
+    """Reparte los tramos en orden cronológico: la parte i recibe minutes_list[i] minutos de actividad
+    (la última recibe lo que reste). Los pedazos son contiguos y no se solapan."""
+    parts, remaining = [], list(runs)
+    for idx, minutes in enumerate(minutes_list):
+        last = idx == len(minutes_list) - 1
+        budget = float("inf") if last else minutes * 60.0
+        taken = []
+        while remaining and budget > 0:
+            start, end = remaining[0]
+            length = (end - start).total_seconds()
+            if length <= budget:
+                taken.append((start, end))
+                remaining.pop(0)
+                budget -= length
+            else:
+                cut = start + timedelta(seconds=budget)
+                taken.append((start, cut))
+                remaining[0] = (cut, end)
+                budget = 0
+        parts.append(taken)
+    return parts
+
+
+def largest_remainder(total, weights):
+    """Reparte `total` (entero) según `weights` con el método del mayor resto: suma exacta."""
+    weight_sum = float(sum(weights))
+    exact = [total * w / weight_sum for w in weights]
+    base = [int(x) for x in exact]
+    order = sorted(range(len(weights)), key=lambda i: exact[i] - base[i], reverse=True)
+    for i in order[: total - sum(base)]:
+        base[i] += 1
+    return base
+
+
+def parse_split(spec, total):
+    """'A=60%,B=rest' | 'A=40m,B=rest' -> [(ticket, minutos)] que suma exactamente `total`.
+
+    Reglas: no mezclar % con m; % no suma más de 100; 'rest' una sola vez y con remanente;
+    sin tickets duplicados; ninguna parte de menos de 1 minuto. Sin 'rest' el remanente se deja
+    sin asignar (sigue siendo proponible).
+    """
+    if total < 1:
+        raise ValueError("No hay minutos medidos que repartir.")
+    entries, rest, kind = [], None, None
+    for raw in spec.split(","):
+        ticket, _, value = raw.partition("=")
+        ticket, value = ticket.strip().upper(), value.strip().lower()
+        if not ticket or not value:
+            raise ValueError(f"Parte inválida: '{raw}' (usa TICKET=60%, TICKET=40m o TICKET=rest).")
+        if any(ticket == t for t, _ in entries) or ticket == rest:
+            raise ValueError(f"Ticket repetido en el reparto: {ticket}")
+        if value == "rest":
+            if rest is not None:
+                raise ValueError("'rest' solo puede usarse una vez.")
+            rest = ticket
+            continue
+        unit = value[-1]
+        if unit not in ("%", "m") or not value[:-1].replace(".", "", 1).isdigit():
+            raise ValueError(f"Valor inválido para {ticket}: '{value}' (usa 60%, 40m o rest).")
+        if kind and kind != unit:
+            raise ValueError("No se puede mezclar porcentajes con minutos en el mismo reparto.")
+        kind = unit
+        entries.append((ticket, float(value[:-1])))
+    if not entries and rest is None:
+        raise ValueError("Reparto vacío.")
+
+    if kind == "%":
+        if sum(v for _, v in entries) > 100.0 + 1e-9:
+            raise ValueError("Los porcentajes suman más de 100%.")
+        wanted = [(t, total * v / 100.0) for t, v in entries]
+    else:
+        wanted = [(t, v) for t, v in entries]
+    if kind == "m" and sum(v for _, v in wanted) > total:
+        raise ValueError(f"Las partes ({sum(v for _, v in wanted):.0f} min) superan lo medido ({total} min).")
+
+    if kind == "%" and rest is None and abs(sum(v for _, v in entries) - 100.0) < 1e-9:
+        minutes = largest_remainder(total, [v for _, v in wanted])
+    else:
+        minutes = [int(round(v)) for _, v in wanted]
+    result = list(zip([t for t, _ in wanted], minutes))
+    if rest is not None:
+        remainder = total - sum(minutes)
+        if remainder < 1:
+            raise ValueError("'rest' no tiene remanente: las otras partes ya usan todo el tiempo medido.")
+        result.append((rest, remainder))
+    if any(m < 1 for _, m in result):
+        raise ValueError("Una parte resulta de menos de 1 minuto con el tiempo medido; ajusta el reparto.")
+    if sum(m for _, m in result) > total:
+        raise ValueError("El reparto supera el tiempo medido.")
+    return result
