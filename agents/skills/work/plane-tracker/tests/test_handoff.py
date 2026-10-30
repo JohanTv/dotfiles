@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stderr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import plane  # noqa: E402
+from plane_cli import cmd_ops  # noqa: E402
 from plane_cli import worklog  # noqa: E402
 
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t",
@@ -20,11 +20,11 @@ def git(cwd, *args):
 
 class Sanitize(unittest.TestCase):
     def test_remotes(self):
-        self.assertEqual(plane.sanitize_remote("git@github.com:Org/repo.git"), "Org/repo")
-        self.assertEqual(plane.sanitize_remote("https://github.com/Org/repo.git"), "Org/repo")
-        self.assertEqual(plane.sanitize_remote("https://user:tok3n@github.com/Org/repo"), "Org/repo")
-        self.assertIsNone(plane.sanitize_remote("https://gitlab.example.com/Org/repo.git"))
-        self.assertIsNone(plane.sanitize_remote("no-es-una-url"))
+        self.assertEqual(cmd_ops.sanitize_remote("git@github.com:Org/repo.git"), "Org/repo")
+        self.assertEqual(cmd_ops.sanitize_remote("https://github.com/Org/repo.git"), "Org/repo")
+        self.assertEqual(cmd_ops.sanitize_remote("https://user:tok3n@github.com/Org/repo"), "Org/repo")
+        self.assertIsNone(cmd_ops.sanitize_remote("https://gitlab.example.com/Org/repo.git"))
+        self.assertIsNone(cmd_ops.sanitize_remote("no-es-una-url"))
 
 
 class HandoffRepo(unittest.TestCase):
@@ -61,17 +61,17 @@ class HandoffRepo(unittest.TestCase):
         git(self.work, "commit", "-q", "-m", name)
 
     def test_unpushed_commits_block_the_handoff(self):
-        with self.assertRaises(plane.HandoffError) as ctx:
-            plane.handoff_facts()
+        with self.assertRaises(cmd_ops.HandoffError) as ctx:
+            cmd_ops.handoff_facts()
         self.assertIn("sin pushear", str(ctx.exception))
 
     def test_pushed_branch_with_base_and_clean_tree(self):
         git(self.work, "push", "-q", "-u", "origin", "feat/OMNIFY-1-x")
-        facts = plane.handoff_facts(base="dev")
+        facts = cmd_ops.handoff_facts(base="dev")
         self.assertEqual((facts["branch"], facts["where"], facts["dirty"]), ("feat/OMNIFY-1-x", "origin/feat/OMNIFY-1-x", 0))
         self.assertEqual((facts["base"], facts["ahead_of_base"]), ("dev", 1))
         self.assertEqual(len(facts["sha"]), 40)
-        text = plane.format_handoff(facts)
+        text = cmd_ops.format_handoff(facts)
         self.assertEqual(text.count(worklog.PLACEHOLDER), 3)
         self.assertIn("working tree limpio", text)
         self.assertNotIn(self.work, text)  # nunca rutas absolutas
@@ -80,24 +80,24 @@ class HandoffRepo(unittest.TestCase):
         git(self.work, "push", "-q", "-u", "origin", "feat/OMNIFY-1-x")
         with open(os.path.join(self.work, "nuevo"), "w") as f:
             f.write("x")
-        self.assertEqual(plane.handoff_facts()["dirty"], 1)
+        self.assertEqual(cmd_ops.handoff_facts()["dirty"], 1)
 
     def test_detached_head_and_missing_base(self):
         git(self.work, "push", "-q", "-u", "origin", "feat/OMNIFY-1-x")
-        with self.assertRaises(plane.HandoffError) as ctx:
-            plane.handoff_facts(base="no-existe")
+        with self.assertRaises(cmd_ops.HandoffError) as ctx:
+            cmd_ops.handoff_facts(base="no-existe")
         self.assertIn("origin/no-existe", str(ctx.exception))
-        with self.assertRaises(plane.HandoffError):
-            plane.handoff_facts(base="--evil")
+        with self.assertRaises(cmd_ops.HandoffError):
+            cmd_ops.handoff_facts(base="--evil")
         git(self.work, "checkout", "-q", "--detach")
-        with self.assertRaises(plane.HandoffError) as ctx:
-            plane.handoff_facts()
+        with self.assertRaises(cmd_ops.HandoffError) as ctx:
+            cmd_ops.handoff_facts()
         self.assertIn("desacoplado", str(ctx.exception))
 
     def test_no_remote(self):
         git(self.work, "remote", "remove", "origin")
-        with self.assertRaises(plane.HandoffError) as ctx:
-            plane.handoff_facts()
+        with self.assertRaises(cmd_ops.HandoffError) as ctx:
+            cmd_ops.handoff_facts()
         self.assertIn("no tiene remoto", str(ctx.exception))
 
 

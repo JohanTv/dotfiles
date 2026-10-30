@@ -9,7 +9,7 @@ from contextlib import redirect_stderr
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import plane  # noqa: E402
+from plane_cli import cmd_ops  # noqa: E402
 from plane_cli import attachments  # noqa: E402
 from plane_cli import proposals  # noqa: E402
 from plane_cli import worklog  # noqa: E402
@@ -168,7 +168,7 @@ class PlaneIntegration(unittest.TestCase):
             {"ts": iso_(3), "method": "GET", "path": "/b", "status": None, "ms": 10000, "attempt": 1, "error": "URLError: timed out"},
             {"ts": iso_(2000), "method": "GET", "path": "/old", "status": 500, "ms": 50, "attempt": 1, "error": None},
         ]
-        summary = plane.summarize_requests(records, now - timedelta(hours=1))
+        summary = cmd_ops.summarize_requests(records, now - timedelta(hours=1))
         self.assertEqual((summary["requests"], summary["failures"], summary["retried"]), (3, 1, 1))
         self.assertEqual(summary["errors"], {"URLError: timed out": 1})
         self.assertEqual(summary["max_ms"], 300)
