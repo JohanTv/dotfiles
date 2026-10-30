@@ -1,6 +1,6 @@
 """Comando `comment`: publicar un comentario con su worklog.
 
-Expone: register(), cmd_comment().
+Expone: register_comment(), cmd_comment().
 No hace: editar ni borrar comentarios.
 """
 

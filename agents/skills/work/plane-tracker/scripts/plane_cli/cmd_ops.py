@@ -1,6 +1,7 @@
 """Comandos operativos: `health`, `focus` y `handoff`.
 
-Expone: register(), cmd_health(), cmd_focus(), cmd_handoff(), summarize_requests(), handoff_facts(), format_handoff(), sanitize_remote(), HandoffError.
+Expone: register_health(), register_focus(), register_handoff(), cmd_health(), cmd_focus(), cmd_handoff(),
+summarize_requests(), handoff_facts(), format_handoff(), sanitize_remote(), HandoffError.
 No hace: escribir en Plane.
 """
 

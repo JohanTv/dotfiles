@@ -1,4 +1,4 @@
-"""Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación de consistencia.
+"""Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación.
 
 Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), replace_metadata_block(),
 corrected_metadata(), derived_start(), upsert_worklog(), check_worklogs(), reject_placeholders(), PLACEHOLDER.

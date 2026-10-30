@@ -1,6 +1,7 @@
 """Comandos `comment-edit`, `comment-delete` y `propose-duration`.
 
-Expone: register(), cmd_comment_edit(), cmd_comment_delete(), cmd_propose_duration().
+Expone: register_comment_edit(), register_comment_delete(), register_propose_duration(), cmd_comment_edit(),
+cmd_comment_delete(), cmd_propose_duration().
 No hace: publicar comentarios nuevos.
 """
 

@@ -1,6 +1,7 @@
 """Adjuntos del work item: subida por almacenamiento firmado, borrado y listado.
 
-Expone: upload_attachment(), validate_attachment_paths(), build_multipart(), cmd_attach(), cmd_attachments().
+Expone: upload_attachment(), validate_attachment_paths(), build_multipart(), cmd_attach(), cmd_attachments(),
+register_attach(), register_attachments().
 No hace: crear tickets.
 """
 

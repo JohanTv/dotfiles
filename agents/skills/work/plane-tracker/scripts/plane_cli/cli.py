@@ -1,8 +1,9 @@
 """Punto de entrada de la CLI: parser raíz, registro ordenado de subcomandos y despacho.
 
 Expone: COMMAND_REGISTRARS, build_parser(), main().
-No hace: lógica de comandos (vive en cmd_*.py). El orden de COMMAND_REGISTRARS es el orden de los subcomandos en `--help`.
-Orden de arranque: parsear argumentos, validar el entorno y solo entonces abrir la base de datos (así `--help` funciona sin credenciales).
+No hace: lógica de comandos (vive en cmd_*.py).
+El orden de COMMAND_REGISTRARS es el orden de los subcomandos en `--help`. El arranque es: parsear argumentos, validar
+el entorno y solo entonces abrir la base de datos (así `--help` funciona sin credenciales).
 """
 
 import argparse

@@ -1,6 +1,7 @@
 """Almacén de propuestas de duración (last_proposal.json) con exclusión entre procesos y vigencia.
 
-Expone: save_proposal(), save_group(), load_recent_proposal(), consume_proposal(), proposal_store(), PROPOSAL_TTL_SECONDS.
+Expone: save_proposal(), save_group(), load_recent_proposal(), consume_proposal(), proposal_store(),
+PROPOSAL_TTL_SECONDS.
 No hace: medir sesiones ni calcular propuestas.
 """
 
