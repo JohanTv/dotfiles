@@ -1,7 +1,9 @@
 """Base de datos local SQLite3 (WAL): conexión y esquema.
 
-Expone: get_db(), ensure_columns(), init_snapshot_table(), init_db().
+Expone: get_db(), ensure_columns(), init_snapshot_table(), init_outbox_tables(), init_db().
 No hace: consultas de negocio ni acceso a red.
+La caché contiene texto de comentarios: el directorio se deja en 0700 y la base en 0600 (los archivos -wal y -shm
+heredan los permisos de la base).
 """
 
 import os
@@ -10,9 +12,22 @@ import sqlite3
 from plane_cli import config
 
 
+def _restrict_permissions(path, mode):
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+
+
 def get_db():
     """Retorna una conexión a SQLite3 con WAL mode y timeout defensivo."""
     os.makedirs(config.CACHE_DIR, exist_ok=True)
+    _restrict_permissions(config.CACHE_DIR, 0o700)
+    try:
+        os.close(os.open(config.db_file(), os.O_RDWR | os.O_CREAT, 0o600))
+    except OSError:
+        pass
+    _restrict_permissions(config.db_file(), 0o600)
     conn = sqlite3.connect(config.db_file(), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
@@ -42,6 +57,30 @@ def init_snapshot_table(conn):
             issue_id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL, fetched_at REAL NOT NULL,
             issue_json TEXT NOT NULL, comments_json TEXT, comments_fetched_at REAL
         );
+    """)
+
+
+def init_outbox_tables(conn):
+    """Cola de salida de comentarios pendientes de publicar (ver outbox.py)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id TEXT NOT NULL UNIQUE,
+            kind TEXT NOT NULL DEFAULT 'comment' CHECK (kind IN ('comment')),
+            ticket_ref TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            wl_ticket_id TEXT NOT NULL, wl_track TEXT NOT NULL, wl_date TEXT NOT NULL, wl_start_time TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','sending','sent','failed','dropped')),
+            attempts INTEGER NOT NULL DEFAULT 0,
+            maybe_delivered INTEGER NOT NULL DEFAULT 0 CHECK (maybe_delivered IN (0,1)),
+            last_error TEXT, plane_comment_id TEXT, lease_until REAL,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sent_at TEXT
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_state ON outbox(state, id);")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open
+            ON outbox(wl_ticket_id, wl_track, wl_date, wl_start_time) WHERE state IN ('pending','sending','failed');
     """)
 
 
@@ -180,6 +219,7 @@ def init_db(conn):
         })
 
         init_snapshot_table(conn)
+        init_outbox_tables(conn)
 
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
