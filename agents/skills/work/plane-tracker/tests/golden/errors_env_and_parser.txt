@@ -27,18 +27,16 @@ $ plane.py bogus
 --- stdout ---
 
 --- stderr ---
-usage: plane.py [-h] [--json]
-                {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report} ...
-plane.py: error: argument command: invalid choice: 'bogus' (choose from comment, link, attach, attachments, health, handoff, focus, propose-duration, create, comment-delete, comment-edit, update, get, list, search, labels, projects, whoami, report)
+usage: plane.py [-h] [--json] <comando> ...
+plane.py: error: argument <comando>: invalid choice: 'bogus' (choose from search, get, list, create, update, comment, attachment, link, focus, worklog, report, handoff, labels, projects, whoami, health)
 
 $ plane.py 
 [exit 2]
 --- stdout ---
 
 --- stderr ---
-usage: plane.py [-h] [--json]
-                {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report} ...
-plane.py: error: the following arguments are required: command
+usage: plane.py [-h] [--json] <comando> ...
+plane.py: error: the following arguments are required: <comando>
 
 $ plane.py get --last 0 OMNIFY-1
 [exit 2]
@@ -58,19 +56,19 @@ $ plane.py health --hours x
 usage: plane.py health [-h] [--hours HOURS] [--json]
 plane.py health: error: argument --hours: invalid positive_int value: 'x'
 
-$ plane.py comment OMNIFY-1 --capacity nada
+$ plane.py comment add OMNIFY-1 --capacity nada
 [exit 2]
 --- stdout ---
 
 --- stderr ---
-usage: plane.py comment [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
-                        [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
-                        [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                        [--duration MIN] [--accept-proposal]
-                        [--agent {claude,opencode,agy}] [--session ID]
-                        [--json]
-                        [issue]
-plane.py comment: error: argument --capacity/--capacity-bucket: invalid choice: 'nada' (choose from deep_work, toil_support, coordination, tooling_dx, research_rd, tech_debt_paydown)
+usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
+                            [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
+                            [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
+                            [--duration MIN] [--accept-proposal]
+                            [--agent {claude,opencode,agy}] [--session ID]
+                            [--json]
+                            [issue]
+plane.py comment add: error: argument --capacity/--capacity-bucket: invalid choice: 'nada' (choose from deep_work, toil_support, coordination, tooling_dx, research_rd, tech_debt_paydown)
 
 $ plane.py report --today --week
 [exit 2]
@@ -78,8 +76,9 @@ $ plane.py report --today --week
 
 --- stderr ---
 usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
-                       [--track TRACK] [--worker-type WORKER_TYPE] [--sync]
-                       [--check] [--flow] [--json]
+                       [--track TRACK] [--worker-type WORKER_TYPE] [--refresh]
+                       [--json]
+                       [{flow}]
 plane.py report: error: argument --week: not allowed with argument --today
 
 $ plane.py get X1

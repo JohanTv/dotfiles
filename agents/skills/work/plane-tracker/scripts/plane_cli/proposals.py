@@ -211,7 +211,7 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
         mine = marks.get(ticket)
         if not mine:
             return {"ok": False, "agent": agent, "session_id": session_id,
-                    "reason": f"Hay marcas de foco hoy ({', '.join(sorted(marks))}) pero ninguna para {ticket}: usa `plane-tracker focus {ticket}` o registra con --duration."}
+                    "reason": f"Hay marcas de foco hoy ({', '.join(sorted(marks))}) pero ninguna para {ticket}: usa `plane-tracker focus set {ticket}` o registra con --duration."}
         runs = session_clock.intersect(runs, mine)
         extras["attribution"] = "focus"
 

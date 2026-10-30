@@ -1,322 +1,52 @@
 $ plane.py --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py [-h] [--json]
-                {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report} ...
+usage: plane.py [-h] [--json] <comando> ...
 
 CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3 SQLite3)
 
 positional arguments:
-  {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report}
-    comment             Publicar comentario en un ticket
-    link                Adjuntar un enlace (PR, doc) al work item
-    attach              Subir archivos al work item
-    attachments         Listar los adjuntos del work item
-    health              Latencia y errores recientes de la API de Plane
-    handoff             Imprimir el borrador del relevo (Handoff Snapshot) con
-                        los hechos de git del directorio actual
-    focus               Marcar en qué ticket trabaja esta sesión (reparte el
-                        tiempo medido por ticket)
-    propose-duration    Medir la sesión del agente y proponer una duración (no
-                        registra nada)
-    create              Crear un nuevo ticket / work item en Plane
-    comment-delete      Eliminar un comentario (por defecto el último propio)
-                        y su worklog local
-    comment-edit        Editar un comentario y/o vincularle su worklog local
-                        sin publicar otro
-    update              Actualizar estado, prioridad o etiquetas de un ticket
-    get                 Obtener detalles de un ticket
-    list                Listar tickets del proyecto
-    search              Búsqueda ultra-rápida FTS5 (< 2ms) de tickets en
-                        Momento Cero
-    labels              Listar etiquetas disponibles en un proyecto cacheadas
-                        en SQLite
-    projects            Listar proyectos disponibles en Plane cacheados en
-                        SQLite
-    whoami              Verificar configuración activa: muestra workspace,
-                        usuario y UUID resuelto
-    report              Generar reporte de actividades en formato híbrido con
-                        Interval Merging
-
-options:
-  -h, --help            show this help message and exit
-  --json                Salida en formato JSON para agentes
---- stderr ---
-
-
-$ plane.py comment --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py comment [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
-                        [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
-                        [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                        [--duration MIN] [--accept-proposal]
-                        [--agent {claude,opencode,agy}] [--session ID]
-                        [--json]
-                        [issue]
-
-positional arguments:
-  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
-                        Git)
-
-options:
-  -h, --help            show this help message and exit
-  -m, --message MESSAGE
-                        Mensaje del comentario
-  -f, --file FILE       Archivo con el contenido
-  --track TRACK         Frente de trabajo (ej: main, subagent, review,
-                        datepicker)
-  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
-                        Balde de capacidad de la sesión
-  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
-                        Tipo de ejecutor
-  --duration MIN        Duración neta de la sesión en minutos (requerido si el
-                        contenido no lleva metadata telemétrica). Ej:
-                        --duration 5
-  --accept-proposal     Registrar la duración propuesta (solo vale si se
-                        mostró hace menos de 30 min para este ticket)
-  --agent {claude,opencode,agy}
-                        Agente cuya sesión se mide (por defecto: según
-                        --worker-type o el entorno)
-  --session ID          ID de la sesión del agente (por defecto: variable de
-                        entorno o directorio de trabajo)
-  --json                Salida en JSON
---- stderr ---
-
-
-$ plane.py link --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py link [-h] [--title TITLE] [issue] url
-
-positional arguments:
-  issue          Ticket (ej: OMNIFY-205)
-  url            URL del enlace (https://...)
-
-options:
-  -h, --help     show this help message and exit
-  --title TITLE  Texto visible del enlace (por defecto: la URL)
---- stderr ---
-
-
-$ plane.py attach --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py attach [-h] [--replace ID] issue files [files ...]
-
-positional arguments:
-  issue         Ticket (ej: OMNIFY-205)
-  files         Archivo(s) a adjuntar (máx. 50 MB cada uno)
+  <comando>
+    search      Búsqueda ultra-rápida FTS5 (< 2ms) de tickets en Momento Cero
+    get         Obtener detalles de un ticket
+    list        Listar tickets del proyecto
+    create      Crear un nuevo ticket / work item en Plane
+    update      Actualizar estado, prioridad o etiquetas de un ticket
+    comment     Comentarios: add | edit | delete
+    attachment  Adjuntos: add | list | delete | replace
+    link        Enlaces: add
+    focus       Foco de la sesión: set | clear | status
+    worklog     Tiempos: propose | check
+    report      Reporte de actividad por día o semana
+    handoff     Imprimir el borrador del relevo (Handoff Snapshot) con los
+                hechos de git del directorio actual
+    labels      Listar etiquetas disponibles en un proyecto cacheadas en
+                SQLite
+    projects    Listar proyectos disponibles en Plane cacheados en SQLite
+    whoami      Verificar configuración activa: muestra workspace, usuario y
+                UUID resuelto
+    health      Latencia y errores recientes de la API de Plane
 
 options:
   -h, --help    show this help message and exit
-  --replace ID  Id de un adjunto a sustituir: sube el nuevo y, si salió bien,
-                borra el anterior
+  --json        Salida en formato JSON para agentes
 --- stderr ---
 
 
-$ plane.py attachments --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+$ plane.py search --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py attachments [-h] [--json] [--delete ID] [issue]
+usage: plane.py search [-h] [-p PROJECT] [--refresh] [--json] query
 
 positional arguments:
-  issue        Ticket (ej: OMNIFY-205)
-
-options:
-  -h, --help   show this help message and exit
-  --json       Salida en JSON
-  --delete ID  Eliminar el adjunto con ese id
---- stderr ---
-
-
-$ plane.py health --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py health [-h] [--hours HOURS] [--json]
-
-options:
-  -h, --help     show this help message and exit
-  --hours HOURS  Ventana en horas (por defecto 24)
-  --json         Salida en JSON
---- stderr ---
-
-
-$ plane.py handoff --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py handoff [-h] [--base BRANCH] [issue]
-
-positional arguments:
-  issue          Ticket (solo para la sugerencia de publicación)
-
-options:
-  -h, --help     show this help message and exit
-  --base BRANCH  Rama base para contar 'N commits sobre origin/BRANCH' (nunca
-                 se asume)
---- stderr ---
-
-
-$ plane.py focus --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py focus [-h] [--off] [--status] [--agent {claude,opencode,agy}]
-                      [--session ID] [--json]
-                      [issue]
-
-positional arguments:
-  issue                 Ticket en el que empiezas a trabajar
+  query                 Texto de búsqueda (ej: 'validaciones formulario',
+                        'webhook sms')
 
 options:
   -h, --help            show this help message and exit
-  --off                 Cerrar la marca de foco actual
-  --status              Ver el tiempo atribuido hoy a cada ticket
-  --agent {claude,opencode,agy}
-                        Agente de la sesión (por defecto: según el entorno)
-  --session ID          ID de la sesión del agente
-  --json                Salida en JSON
---- stderr ---
-
-
-$ plane.py propose-duration --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py propose-duration [-h] [--agent {claude,opencode,agy}]
-                                 [--session ID]
-                                 [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                                 [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
-                                 [--split SPEC] [--date YYYY-MM-DD]
-                                 [--since HH:MM|ISO] [--until HH:MM|ISO]
-                                 [--json]
-                                 [issue]
-
-positional arguments:
-  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
-                        Git)
-
-options:
-  -h, --help            show this help message and exit
-  --agent {claude,opencode,agy}
-                        Agente cuya sesión se mide
-  --session ID          ID de la sesión del agente
-  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
-                        Tipo de ejecutor
-  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
-                        Balde de capacidad (toil_support y coordination no
-                        admiten propuesta)
-  --split SPEC          Repartir lo medido entre tickets: 'A=60%,B=rest' o
-                        'A=40m,B=rest' (ignora las marcas de foco)
-  --date YYYY-MM-DD     Día a medir (por defecto hoy): para sesiones de días
-                        anteriores
-  --since HH:MM|ISO     Inicio de la ventana medida (hora local del día
-                        medido)
-  --until HH:MM|ISO     Fin de la ventana medida (hora local del día medido)
-  --json                Salida en JSON
---- stderr ---
-
-
-$ plane.py create --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py create [-h] [-d DESCRIPTION] [-p PROJECT]
-                       [--priority {urgent,high,medium,low,none}]
-                       [--state STATE] [--labels LABELS]
-                       [--start-date START_DATE] [--due-date DUE_DATE]
-                       [--attach FILE [FILE ...]] [--json]
-                       title
-
-positional arguments:
-  title                 Título del ticket
-
-options:
-  -h, --help            show this help message and exit
-  -d, --description DESCRIPTION
-                        Descripción o notas del ticket
   -p, --project PROJECT
                         Identificador del proyecto (por defecto OMNIFY)
-  --priority {urgent,high,medium,low,none}
-                        Prioridad del ticket
-  --state STATE         Estado inicial (por defecto Backlog)
-  --labels LABELS       Etiquetas separadas por comas (ej: backend,bug,spike)
-  --start-date START_DATE
-                        Fecha de inicio YYYY-MM-DD
-  --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
-  --attach FILE [FILE ...]
-                        Archivo(s) a adjuntar al crear el ticket (máx. 50 MB
-                        cada uno)
-  --json                Salida en JSON
---- stderr ---
-
-
-$ plane.py comment-delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py comment-delete [-h] [--comment-id COMMENT_ID] [issue]
-
-positional arguments:
-  issue                 Ticket (ej: OPS-13)
-
-options:
-  -h, --help            show this help message and exit
-  --comment-id COMMENT_ID
-                        UUID del comentario (por defecto: último comentario
-                        propio)
---- stderr ---
-
-
-$ plane.py comment-edit --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py comment-edit [-h] [--comment-id COMMENT_ID] [-m MESSAGE]
-                             [--track TRACK]
-                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
-                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                             [--duration MIN] [--embed-metadata] [--force]
-                             [issue]
-
-positional arguments:
-  issue                 Ticket (ej: OPS-13)
-
-options:
-  -h, --help            show this help message and exit
-  --comment-id COMMENT_ID
-                        UUID del comentario (por defecto: último comentario
-                        propio)
-  -m, --message MESSAGE
-                        Nuevo texto del comentario
-  --track TRACK         Frente de trabajo
-  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
-  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
-  --duration MIN        Duración en minutos: registra el worklog usando la
-                        hora de publicación como fin
-  --embed-metadata      Añadir al comentario el bloque oculto de metadata de
-                        su worklog local (sin cambiar el texto visible)
-  --force               Con --duration: descartar los tramos medidos del
-                        worklog cuando la nueva duración no coincide
---- stderr ---
-
-
-$ plane.py update --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py update [-h] [--state STATE] [--priority PRIORITY]
-                       [--labels LABELS] [--start-date START_DATE]
-                       [--due-date DUE_DATE] [--json]
-                       [issue]
-
-positional arguments:
-  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
-                        Git)
-
-options:
-  -h, --help            show this help message and exit
-  --state STATE         Nuevo estado: Backlog, Pendiente, Progreso, Pruebas,
-                        Revisión, Completado, Pausado, Cancelado
-  --priority PRIORITY   Prioridad: urgent, high, medium, low, none
-  --labels LABELS       Etiquetas separadas por comas (ej: sms,backend,bug)
-  --start-date START_DATE
-                        Fecha de inicio YYYY-MM-DD
-  --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
+  --refresh             Forzar sincronización remota con Plane
   --json                Salida en JSON
 --- stderr ---
 
@@ -359,21 +89,106 @@ options:
 --- stderr ---
 
 
-$ plane.py search --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+$ plane.py create --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py search [-h] [-p PROJECT] [--refresh] [--json] query
+usage: plane.py create [-h] [-d DESCRIPTION] [-p PROJECT]
+                       [--priority {urgent,high,medium,low,none}]
+                       [--state STATE] [--labels LABELS]
+                       [--start-date START_DATE] [--due-date DUE_DATE]
+                       [--attach FILE [FILE ...]] [--json]
+                       title
 
 positional arguments:
-  query                 Texto de búsqueda (ej: 'validaciones formulario',
-                        'webhook sms')
+  title                 Título del ticket
 
 options:
   -h, --help            show this help message and exit
+  -d, --description DESCRIPTION
+                        Descripción o notas del ticket
   -p, --project PROJECT
                         Identificador del proyecto (por defecto OMNIFY)
-  --refresh             Forzar sincronización remota con Plane
+  --priority {urgent,high,medium,low,none}
+                        Prioridad del ticket
+  --state STATE         Estado inicial (por defecto Backlog)
+  --labels LABELS       Etiquetas separadas por comas (ej: backend,bug,spike)
+  --start-date START_DATE
+                        Fecha de inicio YYYY-MM-DD
+  --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
+  --attach FILE [FILE ...]
+                        Archivo(s) a adjuntar al crear el ticket (máx. 50 MB
+                        cada uno)
   --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py update --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py update [-h] [--state STATE] [--priority PRIORITY]
+                       [--labels LABELS] [--start-date START_DATE]
+                       [--due-date DUE_DATE] [--json]
+                       [issue]
+
+positional arguments:
+  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
+                        Git)
+
+options:
+  -h, --help            show this help message and exit
+  --state STATE         Nuevo estado: Backlog, Pendiente, Progreso, Pruebas,
+                        Revisión, Completado, Pausado, Cancelado
+  --priority PRIORITY   Prioridad: urgent, high, medium, low, none
+  --labels LABELS       Etiquetas separadas por comas (ej: sms,backend,bug)
+  --start-date START_DATE
+                        Fecha de inicio YYYY-MM-DD
+  --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py report --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
+                       [--track TRACK] [--worker-type WORKER_TYPE] [--refresh]
+                       [--json]
+                       [{flow}]
+
+Reporte de actividad con Interval Merging; `report flow` muestra el flujo por
+ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).
+
+positional arguments:
+  {flow}                Vista: flujo por ticket (por defecto, actividad)
+
+options:
+  -h, --help            show this help message and exit
+  --today               Día actual (por defecto)
+  --week                Semana actual
+  --date DATE           Fecha específica (YYYY-MM-DD)
+  -p, --project PROJECT
+                        Filtrar por proyecto (ej: OMNIFY, OPS)
+  --track TRACK         Filtrar por track (ej: main, subagent)
+  --worker-type WORKER_TYPE
+                        Filtrar por tipo de trabajador (human, subagent)
+  --refresh             Forzar sincronización remota con Plane (vista de
+                        actividad)
+  --json                Salida en formato JSON
+--- stderr ---
+
+
+$ plane.py handoff --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py handoff [-h] [--base BRANCH] [issue]
+
+positional arguments:
+  issue          Ticket (solo para la sugerencia de publicación)
+
+options:
+  -h, --help     show this help message and exit
+  --base BRANCH  Rama base para contar 'N commits sobre origin/BRANCH' (nunca
+                 se asume)
 --- stderr ---
 
 
@@ -413,30 +228,372 @@ options:
 --- stderr ---
 
 
-$ plane.py report --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+$ plane.py health --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
-                       [--track TRACK] [--worker-type WORKER_TYPE] [--sync]
-                       [--check] [--flow] [--json]
+usage: plane.py health [-h] [--hours HOURS] [--json]
+
+options:
+  -h, --help     show this help message and exit
+  --hours HOURS  Ventana en horas (por defecto 24)
+  --json         Salida en JSON
+--- stderr ---
+
+
+$ plane.py comment --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py comment [-h] {add,edit,delete} ...
+
+Comentarios: add | edit | delete
+
+positional arguments:
+  {add,edit,delete}
+    add              Publicar comentario en un ticket
+    edit             Editar un comentario y/o vincularle su worklog local sin
+                     publicar otro
+    delete           Eliminar un comentario (por defecto el último propio) y
+                     su worklog local
+
+options:
+  -h, --help         show this help message and exit
+--- stderr ---
+
+
+$ plane.py attachment --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py attachment [-h] {add,list,delete,replace} ...
+
+Adjuntos: add | list | delete | replace
+
+positional arguments:
+  {add,list,delete,replace}
+    add                 Subir archivos al work item
+    list                Listar los adjuntos del work item
+    delete              Eliminar un adjunto del work item
+    replace             Sustituir un adjunto: sube el nuevo y borra el
+                        anterior
 
 options:
   -h, --help            show this help message and exit
-  --today               Reporte del día actual (por defecto)
-  --week                Reporte de la semana actual
-  --date DATE           Reporte de fecha específica (YYYY-MM-DD)
+--- stderr ---
+
+
+$ plane.py link --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py link [-h] {add} ...
+
+Enlaces: add
+
+positional arguments:
+  {add}
+    add       Adjuntar un enlace (PR, doc) al work item
+
+options:
+  -h, --help  show this help message and exit
+--- stderr ---
+
+
+$ plane.py focus --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py focus [-h] {set,clear,status} ...
+
+Foco de la sesión: set | clear | status
+
+positional arguments:
+  {set,clear,status}
+    set               Marcar en qué ticket trabaja esta sesión (reparte el
+                      tiempo medido por ticket)
+    clear             Cerrar la marca de foco actual
+    status            Ver el tiempo atribuido hoy a cada ticket
+
+options:
+  -h, --help          show this help message and exit
+--- stderr ---
+
+
+$ plane.py worklog --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py worklog [-h] {propose,check} ...
+
+Tiempos: propose | check
+
+positional arguments:
+  {propose,check}
+    propose        Medir la sesión del agente y proponer una duración (no
+                   registra nada)
+    check          Comparar los worklogs locales con sus comentarios
+
+options:
+  -h, --help       show this help message and exit
+--- stderr ---
+
+
+$ plane.py comment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
+                            [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
+                            [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
+                            [--duration MIN] [--accept-proposal]
+                            [--agent {claude,opencode,agy}] [--session ID]
+                            [--json]
+                            [issue]
+
+positional arguments:
+  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
+                        Git)
+
+options:
+  -h, --help            show this help message and exit
+  -m, --message MESSAGE
+                        Mensaje del comentario
+  -f, --file FILE       Archivo con el contenido
+  --track TRACK         Frente de trabajo (ej: main, subagent, review,
+                        datepicker)
+  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
+                        Balde de capacidad de la sesión
+  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
+                        Tipo de ejecutor
+  --duration MIN        Duración neta de la sesión en minutos (requerido si el
+                        contenido no lleva metadata telemétrica). Ej:
+                        --duration 5
+  --accept-proposal     Registrar la duración propuesta (solo vale si se
+                        mostró hace menos de 30 min para este ticket)
+  --agent {claude,opencode,agy}
+                        Agente cuya sesión se mide (por defecto: según
+                        --worker-type o el entorno)
+  --session ID          ID de la sesión del agente (por defecto: variable de
+                        entorno o directorio de trabajo)
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py comment edit --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py comment edit [-h] [--comment-id COMMENT_ID] [-m MESSAGE]
+                             [--track TRACK]
+                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
+                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
+                             [--duration MIN] [--embed-metadata] [--force]
+                             [issue]
+
+positional arguments:
+  issue                 Ticket (ej: OPS-13)
+
+options:
+  -h, --help            show this help message and exit
+  --comment-id COMMENT_ID
+                        UUID del comentario (por defecto: último comentario
+                        propio)
+  -m, --message MESSAGE
+                        Nuevo texto del comentario
+  --track TRACK         Frente de trabajo
+  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
+  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
+  --duration MIN        Duración en minutos: registra el worklog usando la
+                        hora de publicación como fin
+  --embed-metadata      Añadir al comentario el bloque oculto de metadata de
+                        su worklog local (sin cambiar el texto visible)
+  --force               Con --duration: descartar los tramos medidos del
+                        worklog cuando la nueva duración no coincide
+--- stderr ---
+
+
+$ plane.py comment delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py comment delete [-h] [--comment-id COMMENT_ID] [issue]
+
+positional arguments:
+  issue                 Ticket (ej: OPS-13)
+
+options:
+  -h, --help            show this help message and exit
+  --comment-id COMMENT_ID
+                        UUID del comentario (por defecto: último comentario
+                        propio)
+--- stderr ---
+
+
+$ plane.py attachment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py attachment add [-h] issue files [files ...]
+
+positional arguments:
+  issue       Ticket (ej: OMNIFY-205)
+  files       Archivo(s) a adjuntar (máx. 50 MB cada uno)
+
+options:
+  -h, --help  show this help message and exit
+--- stderr ---
+
+
+$ plane.py attachment list --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py attachment list [-h] [--json] [issue]
+
+positional arguments:
+  issue       Ticket (ej: OMNIFY-205)
+
+options:
+  -h, --help  show this help message and exit
+  --json      Salida en JSON
+--- stderr ---
+
+
+$ plane.py attachment delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py attachment delete [-h] issue id
+
+positional arguments:
+  issue       Ticket (ej: OMNIFY-205)
+  id          UUID del adjunto (ver `attachment list`)
+
+options:
+  -h, --help  show this help message and exit
+--- stderr ---
+
+
+$ plane.py attachment replace --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py attachment replace [-h] issue id file
+
+positional arguments:
+  issue       Ticket (ej: OMNIFY-205)
+  id          UUID del adjunto a sustituir (ver `attachment list`)
+  file        Archivo nuevo (máx. 50 MB)
+
+options:
+  -h, --help  show this help message and exit
+--- stderr ---
+
+
+$ plane.py link add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py link add [-h] [--title TITLE] [issue] url
+
+positional arguments:
+  issue          Ticket (ej: OMNIFY-205)
+  url            URL del enlace (https://...)
+
+options:
+  -h, --help     show this help message and exit
+  --title TITLE  Texto visible del enlace (por defecto: la URL)
+--- stderr ---
+
+
+$ plane.py focus set --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py focus set [-h] [--agent {claude,opencode,agy}] [--session ID]
+                          issue
+
+positional arguments:
+  issue                 Ticket en el que empiezas a trabajar
+
+options:
+  -h, --help            show this help message and exit
+  --agent {claude,opencode,agy}
+                        Agente de la sesión (por defecto: según el entorno)
+  --session ID          ID de la sesión del agente
+--- stderr ---
+
+
+$ plane.py focus clear --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py focus clear [-h] [--agent {claude,opencode,agy}]
+                            [--session ID]
+
+options:
+  -h, --help            show this help message and exit
+  --agent {claude,opencode,agy}
+                        Agente de la sesión (por defecto: según el entorno)
+  --session ID          ID de la sesión del agente
+--- stderr ---
+
+
+$ plane.py focus status --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py focus status [-h] [--agent {claude,opencode,agy}]
+                             [--session ID] [--json]
+
+options:
+  -h, --help            show this help message and exit
+  --agent {claude,opencode,agy}
+                        Agente de la sesión (por defecto: según el entorno)
+  --session ID          ID de la sesión del agente
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py worklog propose --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py worklog propose [-h] [--agent {claude,opencode,agy}]
+                                [--session ID]
+                                [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
+                                [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
+                                [--split SPEC] [--date YYYY-MM-DD]
+                                [--since HH:MM|ISO] [--until HH:MM|ISO]
+                                [--json]
+                                [issue]
+
+positional arguments:
+  issue                 Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de
+                        Git)
+
+options:
+  -h, --help            show this help message and exit
+  --agent {claude,opencode,agy}
+                        Agente cuya sesión se mide
+  --session ID          ID de la sesión del agente
+  --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
+                        Tipo de ejecutor
+  --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
+                        Balde de capacidad (toil_support y coordination no
+                        admiten propuesta)
+  --split SPEC          Repartir lo medido entre tickets: 'A=60%,B=rest' o
+                        'A=40m,B=rest' (ignora las marcas de foco)
+  --date YYYY-MM-DD     Día a medir (por defecto hoy): para sesiones de días
+                        anteriores
+  --since HH:MM|ISO     Inicio de la ventana medida (hora local del día
+                        medido)
+  --until HH:MM|ISO     Fin de la ventana medida (hora local del día medido)
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py worklog check --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py worklog check [-h] [--today | --week | --date DATE]
+                              [-p PROJECT] [--json]
+
+Solo lectura: compara los worklogs locales con sus comentarios en Plane
+(duplicados, huérfanos, diferencias). Sale con código 1 si hay
+inconsistencias.
+
+options:
+  -h, --help            show this help message and exit
+  --today               Día actual (por defecto)
+  --week                Semana actual
+  --date DATE           Fecha específica (YYYY-MM-DD)
   -p, --project PROJECT
                         Filtrar por proyecto (ej: OMNIFY, OPS)
-  --track TRACK         Filtrar por track (ej: main, subagent)
-  --worker-type WORKER_TYPE
-                        Filtrar por tipo de trabajador (human, subagent)
-  --sync                Forzar sincronización remota con Plane
-  --check               Solo lectura: compara los worklogs locales con sus
-                        comentarios en Plane (duplicados, huérfanos,
-                        diferencias)
-  --flow                Flujo por ticket del periodo: lead/cycle time, tiempo
-                        por estado y esfuerzo
-  --json                Salida en formato JSON
+  --json                Salida en JSON
 --- stderr ---
 
 

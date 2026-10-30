@@ -121,28 +121,28 @@ $ plane.py create [FEAT] Algo --attach no-existe.txt
 --- stderr ---
 Error: 'no-existe.txt' no es un archivo.
 
-$ plane.py link OMNIFY-1 https://example.com/pr/1 --title PR 1
+$ plane.py link add OMNIFY-1 https://example.com/pr/1 --title PR 1
 [exit 0]
 --- stdout ---
 ✔ Enlace añadido a OMNIFY-1: PR 1
 --- stderr ---
 
 
-$ plane.py link OMNIFY-1 https://example.com/pr/1
+$ plane.py link add OMNIFY-1 https://example.com/pr/1
 [exit 0]
 --- stdout ---
 ✔ OMNIFY-1 ya tiene ese enlace
 --- stderr ---
 
 
-$ plane.py link OMNIFY-1 ftp://mal
+$ plane.py link add OMNIFY-1 ftp://mal
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: la URL debe empezar por http:// o https://
 
-$ plane.py link OMNIFY-1 https://example.com/doc
+$ plane.py link add OMNIFY-1 https://example.com/doc
 [exit 0]
 --- stdout ---
 ✔ Enlace añadido a OMNIFY-1: https://example.com/doc

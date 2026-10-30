@@ -1,4 +1,4 @@
-$ plane.py report --date 2026-10-14 --sync
+$ plane.py report --date 2026-10-14 --refresh
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -19,7 +19,7 @@ notas: [General (15:00-16:00)]: Cierre del acortador
 🔄 Sincronizando registros de actividad desde Plane API...
 ✔ Se sincronizaron 4 registros telemétricos en SQLite3.
 
-$ plane.py report --date 2026-10-14 --flow
+$ plane.py report flow --date 2026-10-14
 [exit 0]
 --- stdout ---
 
@@ -33,7 +33,7 @@ $ plane.py report --date 2026-10-14 --flow
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-14 --flow --json
+$ plane.py report flow --date 2026-10-14 --json
 [exit 0]
 --- stdout ---
 {
@@ -82,23 +82,37 @@ $ plane.py report --date 2026-10-14 --flow --json
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-14 --check
+$ plane.py worklog check --date 2026-10-14
 [exit 0]
 --- stdout ---
 
 🔎 Consistencia worklogs ↔ comentarios · 2026-10-14 → 2026-10-14
    ✔ OMNIFY-2: 1 worklog(s)
 
-   Resumen: 0 inconsistencia(s), 0 aviso(s). Solo lectura: corrige con comment-edit o report --sync.
+   Resumen: 0 inconsistencia(s), 0 aviso(s). Solo lectura: corrige con comment edit o report --refresh.
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-14 --flow -p OPS
+$ plane.py report flow --date 2026-10-14 -p OPS
 [exit 0]
 --- stdout ---
 
 🔁 Flujo por ticket · 2026-10-14 → 2026-10-14 (calendario; lead/cycle en UTC)
-   (sin tickets con worklogs en caché ni cerrados en el periodo; usa --sync para traer más)
+   (sin tickets con worklogs en caché ni cerrados en el periodo; `report --refresh` trae a la caché los worklogs de Plane)
+--- stderr ---
+
+
+$ plane.py report flow --date 2026-10-14 --refresh
+[exit 0]
+--- stdout ---
+
+🔁 Flujo por ticket · 2026-10-14 → 2026-10-14 (calendario; lead/cycle en UTC)
+  ✔ OMNIFY-2   lead 5.1 d    cycle 3.1 d    esfuerzo 1h 00m reloj / 1h 00m cómputo [unknown_state]
+      Acortador de enlaces
+
+   Resumen: 1 completados · 0 cancelados · 0 abiertos
+   Mediana lead 5.1 d (n=1) · cycle 3.1 d (n=1); 0 excluidos (umbrella, instant_close, no_transition)
+   Nota: el esfuerzo sale de los worklogs de la caché local y de la metadata en los comentarios; lo no registrado no aparece.
 --- stderr ---
 
 
@@ -107,8 +121,10 @@ GET /api/v1/workspaces/ws/projects/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/activities/?per_page=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/comments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/comments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/comments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/comments/

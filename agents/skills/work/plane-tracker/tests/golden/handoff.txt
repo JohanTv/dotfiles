@@ -10,7 +10,7 @@ $ plane.py handoff
 --- stderr ---
 
 Completa los [COMPLETAR], guarda el texto en un archivo y publícalo con:
-  plane-tracker comment OMNIFY-1 -f relevo.md --duration <min>   (o --accept-proposal)
+  plane-tracker comment add OMNIFY-1 -f relevo.md --duration <min>   (o --accept-proposal)
 
 $ plane.py handoff OMNIFY-9 --base main
 [exit 0]
@@ -24,7 +24,7 @@ $ plane.py handoff OMNIFY-9 --base main
 --- stderr ---
 
 Completa los [COMPLETAR], guarda el texto en un archivo y publícalo con:
-  plane-tracker comment OMNIFY-9 -f relevo.md --duration <min>   (o --accept-proposal)
+  plane-tracker comment add OMNIFY-9 -f relevo.md --duration <min>   (o --accept-proposal)
 
 $ plane.py handoff --base nope
 [exit 1]

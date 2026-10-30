@@ -1,4 +1,4 @@
-$ plane.py focus --status --agent claude --session sess-golden-0001
+$ plane.py focus status --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 
@@ -8,7 +8,7 @@ $ plane.py focus --status --agent claude --session sess-golden-0001
 --- stderr ---
 
 
-$ plane.py focus --status --json --agent claude --session sess-golden-0001
+$ plane.py focus status --json --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 {
@@ -21,75 +21,115 @@ $ plane.py focus --status --json --agent claude --session sess-golden-0001
 --- stderr ---
 
 
-$ plane.py focus --off --agent claude --session sess-golden-0001
+$ plane.py --json focus status --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+{
+  "session": "sess-golden-0001",
+  "agent": "claude",
+  "current": null,
+  "tickets": {},
+  "unattributed_minutes": 0.0
+}
+--- stderr ---
+
+
+$ plane.py focus clear --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco cerrado (no había foco abierto)
 --- stderr ---
 
 
-$ plane.py focus OMNIFY-1 --agent claude --session sess-golden-0001
+$ plane.py focus set OMNIFY-1 --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco en OMNIFY-1 · sesión sess-golden-0001 (claude)
 --- stderr ---
 
 
-$ plane.py focus OMNIFY-1 --agent claude --session sess-golden-0001
+$ plane.py focus set OMNIFY-1 --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ El foco ya está en OMNIFY-1
 --- stderr ---
 
 
-$ plane.py focus OPS-13 --agent claude --session sess-golden-0001
+$ plane.py focus set OPS-13 --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco en OPS-13 (antes OMNIFY-1) · sesión sess-golden-0001 (claude)
 --- stderr ---
 
 
-$ plane.py focus OMNIFY-2 --agent claude --session sess-golden-0001
+$ plane.py focus set OMNIFY-2 --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco en OMNIFY-2 (antes OPS-13) · sesión sess-golden-0001 (claude)
 --- stderr ---
 
 
-$ plane.py focus --off --agent claude --session sess-golden-0001
+$ plane.py focus clear --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco cerrado (era OMNIFY-2)
 --- stderr ---
 
 
-$ plane.py focus --off --agent claude --session sess-golden-0001
+$ plane.py focus clear --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Foco cerrado (no había foco abierto)
 --- stderr ---
 
 
-$ plane.py focus --agent claude --session sess-golden-0001
-[exit 1]
+$ plane.py focus set --agent claude --session sess-golden-0001
+[exit 2]
 --- stdout ---
 
 --- stderr ---
-Error: indica el ticket (plane-tracker focus OMNIFY-205), o usa --off / --status.
+usage: plane.py focus set [-h] [--agent {claude,opencode,agy}] [--session ID]
+                          issue
+plane.py focus set: error: the following arguments are required: issue
 
-$ plane.py focus OMNIFY-1
+$ plane.py focus set OMNIFY-1
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: no se pudo determinar el agente (usa --agent claude|opencode|agy).
 
-$ plane.py focus OMNIFY-1 --agent claude --session no-existe
+$ plane.py focus set OMNIFY-1 --agent claude --session no-existe
 [exit 0]
 --- stdout ---
 ✔ Foco en OMNIFY-1 · sesión no-existe (claude)
 --- stderr ---
 
+
+$ plane.py focus clear --agent claude --session no-existe
+[exit 0]
+--- stdout ---
+✔ Foco cerrado (era OMNIFY-1)
+--- stderr ---
+
+
+$ plane.py focus status --agent claude --session no-existe
+[exit 0]
+--- stdout ---
+
+🎯 Foco de la sesión no-existe (claude) · hoy
+   • Ahora: — (sin foco)
+   • Sin foco : 0 min (no se atribuyen solos)
+--- stderr ---
+
+
+$ plane.py focus
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py focus [-h] {set,clear,status} ...
+plane.py focus: error: the following arguments are required: {set,clear,status}
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/

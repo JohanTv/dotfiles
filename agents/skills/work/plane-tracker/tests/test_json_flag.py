@@ -17,6 +17,7 @@ ON = [
     ["list", "--json", "-p", "OPS"],
     ["--json", "report", "--date", "2026-10-20"],
     ["report", "--json", "--week"],
+    ["report", "flow", "--json"],
     ["--json", "search", "x"],
     ["search", "x", "--json", "--json"],
     ["labels", "--json"],
@@ -24,14 +25,23 @@ ON = [
     ["health", "--json", "--hours", "2"],
     ["--json", "create", "T"],
     ["update", "OMNIFY-1", "--json"],
-    ["--json", "comment", "OMNIFY-1", "-m", "x"],
-    ["comment", "OMNIFY-1", "-m", "x", "--json"],
-    ["propose-duration", "OMNIFY-1", "--json"],
-    ["--json", "attachments", "OMNIFY-1"],
-    ["focus", "--status", "--json"],
+    ["--json", "comment", "add", "OMNIFY-1", "-m", "x"],
+    ["comment", "add", "OMNIFY-1", "-m", "x", "--json"],
+    ["comment", "--json", "add", "OMNIFY-1", "-m", "x"],
+    ["--json", "comment", "--json", "add", "OMNIFY-1", "--json"],
+    ["worklog", "propose", "OMNIFY-1", "--json"],
+    ["worklog", "--json", "check"],
+    ["worklog", "check", "--week", "--json"],
+    ["--json", "attachment", "list", "OMNIFY-1"],
+    ["attachment", "list", "--json"],
+    ["focus", "status", "--json"],
+    ["--json", "focus", "status"],
 ]
-# Comandos cuya hoja no declara --json: solo vale el de la raíz y se ignora.
-ROOT_ONLY = [["--json", "whoami"], ["--json", "handoff"], ["--json", "link", "OMNIFY-1", "https://x.example"]]
+# Hojas que no declaran --json: solo vale el de la raíz o el del grupo, y se ignora.
+ROOT_ONLY = [["--json", "whoami"], ["--json", "handoff"], ["--json", "link", "add", "OMNIFY-1", "https://x.example"],
+             ["link", "--json", "add", "OMNIFY-1", "https://x.example"], ["--json", "focus", "clear"],
+             ["--json", "comment", "edit", "OMNIFY-1"], ["comment", "--json", "delete"], ["--json", "attachment", "delete", "OMNIFY-1",
+                                                                                           "d0000000-0000-4000-8000-000000000001"]]
 
 
 class JsonFlag(unittest.TestCase):
@@ -41,11 +51,12 @@ class JsonFlag(unittest.TestCase):
                 self.assertTrue(PARSER.parse_args(argv).json)
 
     def test_off_by_default(self):
-        for argv in (["get", "OMNIFY-1"], ["list"], ["report"], ["comment", "OMNIFY-1", "-m", "x"], ["whoami"]):
+        for argv in (["get", "OMNIFY-1"], ["list"], ["report"], ["comment", "add", "OMNIFY-1", "-m", "x"], ["whoami"],
+                     ["worklog", "check"], ["focus", "status"]):
             with self.subTest(argv=argv):
                 self.assertFalse(getattr(PARSER.parse_args(argv), "json", False))
 
-    def test_root_flag_is_accepted_by_leafs_without_their_own(self):
+    def test_root_and_group_flags_are_accepted_by_leafs_without_their_own(self):
         for argv in ROOT_ONLY:
             with self.subTest(argv=argv):
                 self.assertTrue(PARSER.parse_args(argv).json)

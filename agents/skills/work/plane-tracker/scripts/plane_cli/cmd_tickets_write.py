@@ -1,6 +1,6 @@
-"""Comandos que escriben en el work item: `create`, `update` y `link`.
+"""Comandos que escriben en el work item: `create`, `update` y `link add`.
 
-Expone: register_create(), register_update(), register_link(), cmd_create(), cmd_update(), cmd_link().
+Expone: register_create(), register_update(), register_link_add(), cmd_create(), cmd_update(), cmd_link().
 No hace: comentarios ni adjuntos sueltos.
 """
 
@@ -229,12 +229,12 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         if attached:
             print(f"   • Adjuntos: {', '.join(attached)}")
         for err in attach_errors:
-            sys.stderr.write(f"   ⚠ No se pudo adjuntar {err} (el ticket sí se creó; usa plane-tracker attach {ticket_ref} <archivo>)\n")
+            sys.stderr.write(f"   ⚠ No se pudo adjuntar {err} (el ticket sí se creó; usa plane-tracker attachment add {ticket_ref} <archivo>)\n")
         print("")
 
 
-def register_link(sub):
-    p_link = sub.add_parser("link", help="Adjuntar un enlace (PR, doc) al work item")
+def register_link_add(sub):
+    p_link = sub.add_parser("add", help="Adjuntar un enlace (PR, doc) al work item")
     p_link.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
     p_link.add_argument("url", help="URL del enlace (https://...)")
     p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")

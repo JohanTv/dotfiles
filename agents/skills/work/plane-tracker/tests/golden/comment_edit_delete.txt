@@ -1,95 +1,95 @@
-$ plane.py comment-delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001
+$ plane.py comment delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001
 [exit 0]
 --- stdout ---
 ✔ Comentario c1000000-0000-4000-8000-000000000001 eliminado de OMNIFY-1 (0 worklog local(es) borrado(s))
 --- stderr ---
 
 
-$ plane.py comment-delete OMNIFY-1
+$ plane.py comment delete OMNIFY-1
 [exit 0]
 --- stdout ---
 ✔ Comentario c1000000-0000-4000-8000-000000000004 eliminado de OMNIFY-1 (0 worklog local(es) borrado(s))
 --- stderr ---
 
 
-$ plane.py comment-delete OMNIFY-3
+$ plane.py comment delete OMNIFY-3
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: No hay comentarios propios en el ticket. Indica el ID con --comment-id.
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 -m Texto **nuevo**
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 -m Texto **nuevo**
 [exit 0]
 --- stdout ---
 ✔ Comentario c1000000-0000-4000-8000-000000000001 actualizado en OMNIFY-1
 --- stderr ---
 
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m <p>HTML nuevo</p>
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m <p>HTML nuevo</p>
 [exit 0]
 --- stdout ---
 ✔ Comentario c1000000-0000-4000-8000-000000000004 actualizado en OMNIFY-1
 --- stderr ---
 
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m Pendiente [COMPLETAR]
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m Pendiente [COMPLETAR]
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: el texto aún tiene marcadores [COMPLETAR]; complétalos antes de publicar.
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --duration 30 --track rev --capacity research_rd --worker-type subagent
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --duration 30 --track rev --capacity research_rd --worker-type subagent
 [exit 0]
 --- stdout ---
 ✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 13:30-14:00 (30 min, rev, research_rd)
 --- stderr ---
 
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --embed-metadata
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --embed-metadata
 [exit 0]
 --- stdout ---
 ✔ Metadata del worklog añadida al comentario c1000000-0000-4000-8000-000000000004 (sin cambiar su texto visible)
 --- stderr ---
 
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --embed-metadata
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --embed-metadata
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --duration 45 --track otro
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --duration 45 --track otro
 [exit 0]
 --- stdout ---
 ✔ Worklog corregido en c1000000-0000-4000-8000-000000000001: 2026-10-20 10:00-11:00 (45 min, otro, deep_work)
 --- stderr ---
 
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-0000000000ff --embed-metadata
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-0000000000ff --embed-metadata
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.
 
-$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
 [exit 0]
 --- stdout ---
 
 --- stderr ---
 Advertencia: nada que hacer (usa -m y/o --duration).
 
-$ plane.py comment-edit OMNIFY-1 --duration 10
+$ plane.py comment edit OMNIFY-1 --duration 10
 [exit 0]
 --- stdout ---
 ✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 13:50-14:00 (10 min, main, deep_work)
 --- stderr ---
 
 
-$ plane.py comment-delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
+$ plane.py comment delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
 [exit 0]
 --- stdout ---
 ✔ Comentario c1000000-0000-4000-8000-000000000004 eliminado de OMNIFY-1 (1 worklog local(es) borrado(s))

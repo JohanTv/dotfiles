@@ -1,15 +1,15 @@
-$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 0]
 --- stdout ---
 ⏱  Reparto de 45 min medidos (grupo <GRP>):
    • OMNIFY-1     22 min  (10:00–10:22)
    • OPS-13       23 min  (10:22–14:15)
    • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
-   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+   Registra cada parte con: plane-tracker comment add <TICKET> -m "..." --accept-proposal
 --- stderr ---
 
 
-$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20 --json
+$ plane.py worklog propose --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20 --json
 [exit 0]
 --- stdout ---
 {
@@ -101,7 +101,7 @@ $ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --se
 --- stderr ---
 
 
-$ plane.py propose-duration --split OMNIFY-1=10m,OPS-999=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose --split OMNIFY-1=10m,OPS-999=rest --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 0]
 --- stdout ---
 ⏱  Reparto de 22 min medidos (grupo <GRP>):
@@ -109,11 +109,11 @@ $ plane.py propose-duration --split OMNIFY-1=10m,OPS-999=rest --agent claude --s
    • OPS-999      12 min  (10:10–10:22)
    • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
    ⚠ Se excluyeron 23 min ya registrados o reservados para esta sesión.
-   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+   Registra cada parte con: plane-tracker comment add <TICKET> -m "..." --accept-proposal
 --- stderr ---
 
 
-$ plane.py propose-duration --split A=hola --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose --split A=hola --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para reparto: No hay minutos medidos que repartir.
@@ -121,7 +121,7 @@ $ plane.py propose-duration --split A=hola --agent claude --session sess-golden-
 --- stderr ---
 
 
-$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 0]
 --- stdout ---
 ⏱  Reparto de 33 min medidos (grupo <GRP>):
@@ -130,25 +130,25 @@ $ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --se
    • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
    ⚠ Hay 1 pausa(s) de más de 10 min descontadas (pueden ser lectura humana, no inactividad).
    ⚠ Se excluyeron 12 min ya registrados o reservados para esta sesión.
-   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+   Registra cada parte con: plane-tracker comment add <TICKET> -m "..." --accept-proposal
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m Parte uno --accept-proposal --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m Parte uno --accept-proposal --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000001)
 --- stderr ---
 
 
-$ plane.py comment OPS-13 -m Parte dos --accept-proposal --agent claude --session sess-golden-0001
+$ plane.py comment add OPS-13 -m Parte dos --accept-proposal --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Comentario publicado exitosamente en OPS-13 (ID Comentario: c9000000-0000-4000-8000-000000000002)
 --- stderr ---
 
 
-$ plane.py comment OPS-13 -m Sin reparto --agent claude --session sess-golden-0001
+$ plane.py comment add OPS-13 -m Sin reparto --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 

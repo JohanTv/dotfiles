@@ -1,7 +1,7 @@
-"""Comando `report`: reporte de actividad (día/semana) y comprobación de consistencia (`--check`).
+"""Comandos `report` (actividad por día/semana; `report flow` delega en flow.py) y `worklog check`.
 
-Expone: register_report(), cmd_report(), cmd_report_check().
-No hace: el reporte de flujo (vive en flow.py).
+Expone: register_report(), register_worklog_check(), add_period_args(), cmd_report(), cmd_worklog_check(), cmd_report_check().
+No hace: el cálculo del flujo por ticket (vive en flow.py).
 """
 
 import json
@@ -70,37 +70,43 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
         for i in issues:
             if i["code"] == "unreachable":
                 print(f"   ? {i['ticket']}: {i['detail']}")
-        print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment-edit o report --sync.\n")
+        print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment edit o report --refresh.\n")
     sys.exit(1 if errors else 0)
+
+
+def _period(args, today):
+    """(inicio, fin) del periodo pedido: semana actual, fecha concreta o hoy; termina si la fecha es inválida."""
+    custom_date = getattr(args, "date", None)
+    if getattr(args, "week", False):
+        start_date = today - timedelta(days=today.weekday())
+        return start_date, start_date + timedelta(days=6)
+    if custom_date:
+        try:
+            target = datetime.strptime(custom_date, "%Y-%m-%d").date()
+        except ValueError:
+            sys.stderr.write(f"Error: Formato de fecha inválido '{custom_date}'. Usa YYYY-MM-DD.\n")
+            sys.exit(1)
+        return target, target
+    return today, today
+
+
+def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_id):
+    start_date, end_date = _period(args, datetime.now().date())
+    return cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id,
+                            start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
 
 def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     today = datetime.now().date()
     is_week = getattr(args, "week", False)
-    custom_date = getattr(args, "date", None)
-    force_sync = getattr(args, "sync", False)
+    force_sync = getattr(args, "refresh", False)
 
-    if is_week:
-        start_date = today - timedelta(days=today.weekday())
-        end_date = start_date + timedelta(days=6)
-    elif custom_date:
-        try:
-            target = datetime.strptime(custom_date, "%Y-%m-%d").date()
-            start_date = target
-            end_date = target
-        except ValueError:
-            sys.stderr.write(f"Error: Formato de fecha inválido '{custom_date}'. Usa YYYY-MM-DD.\n")
-            sys.exit(1)
-    else:
-        start_date = today
-        end_date = today
+    start_date, end_date = _period(args, today)
 
     s_str = start_date.strftime("%Y-%m-%d")
     e_str = end_date.strftime("%Y-%m-%d")
 
-    if getattr(args, "check", False):
-        return cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
-    if getattr(args, "flow", False):
+    if getattr(args, "view", None) == "flow":
         return cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
 
     # Verificar si necesitamos sincronizar remotamente
@@ -202,17 +208,29 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
         print("\n" + "=" * 80)
 
 
+def add_period_args(parser):
+    """Periodo y proyecto compartidos por `report` y `worklog check`."""
+    group_date = parser.add_mutually_exclusive_group()
+    group_date.add_argument("--today", action="store_true", help="Día actual (por defecto)")
+    group_date.add_argument("--week", action="store_true", help="Semana actual")
+    group_date.add_argument("--date", help="Fecha específica (YYYY-MM-DD)")
+    parser.add_argument("-p", "--project", help="Filtrar por proyecto (ej: OMNIFY, OPS)")
+
+
 def register_report(sub):
-    p_report = sub.add_parser("report", help="Generar reporte de actividades en formato híbrido con Interval Merging")
-    group_date = p_report.add_mutually_exclusive_group()
-    group_date.add_argument("--today", action="store_true", help="Reporte del día actual (por defecto)")
-    group_date.add_argument("--week", action="store_true", help="Reporte de la semana actual")
-    group_date.add_argument("--date", help="Reporte de fecha específica (YYYY-MM-DD)")
-    p_report.add_argument("-p", "--project", help="Filtrar por proyecto (ej: OMNIFY, OPS)")
+    p_report = sub.add_parser("report", help="Reporte de actividad por día o semana", description="Reporte de actividad con Interval Merging; `report flow` muestra el flujo por ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).")
+    p_report.add_argument("view", nargs="?", choices=["flow"], help="Vista: flujo por ticket (por defecto, actividad)")
+    add_period_args(p_report)
     p_report.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
     p_report.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
-    p_report.add_argument("--sync", action="store_true", help="Forzar sincronización remota con Plane")
-    p_report.add_argument("--check", action="store_true", help="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias)")
-    p_report.add_argument("--flow", action="store_true", help="Flujo por ticket del periodo: lead/cycle time, tiempo por estado y esfuerzo")
+    p_report.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane (vista de actividad)")
     add_json_flag(p_report, help="Salida en formato JSON")
     p_report.set_defaults(handler=cmd_report)
+
+
+def register_worklog_check(sub):
+    p_check = sub.add_parser("check", help="Comparar los worklogs locales con sus comentarios",
+                             description="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias). Sale con código 1 si hay inconsistencias.")
+    add_period_args(p_check)
+    add_json_flag(p_check)
+    p_check.set_defaults(handler=cmd_worklog_check)

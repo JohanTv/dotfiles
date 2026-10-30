@@ -1,4 +1,4 @@
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 0]
 --- stdout ---
 ⏱  Propuesta para OMNIFY-1: 45 min (10:00–14:15, 2026-10-20)
@@ -9,7 +9,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --json
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --json
 [exit 0]
 --- stdout ---
 {
@@ -54,7 +54,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --since 10:00 --until 10:20
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --since 10:00 --until 10:20
 [exit 0]
 --- stdout ---
 ⏱  Propuesta para OMNIFY-1: 20 min (10:00–10:20, 2026-10-20)
@@ -64,7 +64,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --since 25:00
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20 --since 25:00
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para OMNIFY-1: hour must be in 0..23, not 25
@@ -72,7 +72,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OPS-13 --capacity toil_support --agent claude --session sess-golden-0001
+$ plane.py worklog propose OPS-13 --capacity toil_support --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para OPS-13: El balde 'toil_support' (soporte/reuniones) no deja huella en un transcript: pregunta la duración.
@@ -80,7 +80,7 @@ $ plane.py propose-duration OPS-13 --capacity toil_support --agent claude --sess
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2999-01-01
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2999-01-01
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para OMNIFY-1: --date no puede ser una fecha futura.
@@ -88,7 +88,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date mal
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date mal
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para OMNIFY-1: --date debe tener el formato YYYY-MM-DD.
@@ -96,7 +96,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session no-existe --date 2026-10-20
+$ plane.py worklog propose OMNIFY-1 --agent claude --session no-existe --date 2026-10-20
 [exit 1]
 --- stdout ---
 ✖ Sin propuesta para OMNIFY-1: Sin evidencia de tiempos para la sesión no-existe (claude).
@@ -104,7 +104,7 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session no-existe --date 2
 --- stderr ---
 
 
-$ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20
+$ plane.py worklog propose OMNIFY-1 --agent claude --session sess-golden-0001 --date 2026-10-20
 [exit 0]
 --- stdout ---
 ⏱  Propuesta para OMNIFY-1: 45 min (10:00–14:15, 2026-10-20)
@@ -115,21 +115,21 @@ $ plane.py propose-duration OMNIFY-1 --agent claude --session sess-golden-0001 -
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m Aceptada --accept-proposal --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m Aceptada --accept-proposal --agent claude --session sess-golden-0001
 [exit 0]
 --- stdout ---
 ✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000001)
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m Otra vez --accept-proposal --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m Otra vez --accept-proposal --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: no hay una propuesta reciente (<30 min) de esta sesión para OMNIFY-1. Repite sin --accept-proposal para generarla.
 
-$ plane.py comment OMNIFY-1 -m Se propone --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m Se propone --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 

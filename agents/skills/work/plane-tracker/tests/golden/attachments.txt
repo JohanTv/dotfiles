@@ -1,11 +1,26 @@
-$ plane.py attach OMNIFY-1 adj.txt
+$ plane.py attachment add OMNIFY-1 adj.txt
 [exit 0]
 --- stdout ---
 ✔ Adjunto subido a OMNIFY-1: adj.txt (0.0 KB)
 --- stderr ---
 
 
-$ plane.py attach OMNIFY-1 adj.txt --replace d0000000-0000-4000-8000-000000000001
+$ plane.py attachment add OMNIFY-1 adj.txt adj.txt
+[exit 0]
+--- stdout ---
+✔ Adjunto subido a OMNIFY-1: adj.txt (0.0 KB)
+✔ Adjunto subido a OMNIFY-1: adj.txt (0.0 KB)
+--- stderr ---
+
+
+$ plane.py attachment add OMNIFY-1 no-existe.bin
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: 'no-existe.bin' no es un archivo.
+
+$ plane.py attachment replace OMNIFY-1 d0000000-0000-4000-8000-000000000001 adj.txt
 [exit 0]
 --- stdout ---
 ✔ Adjunto subido a OMNIFY-1: adj.txt (0.0 KB)
@@ -13,21 +28,22 @@ $ plane.py attach OMNIFY-1 adj.txt --replace d0000000-0000-4000-8000-00000000000
 --- stderr ---
 
 
-$ plane.py attach OMNIFY-1 adj.txt adj.txt --replace x
-[exit 1]
+$ plane.py attachment replace OMNIFY-1 x adj.txt
+[exit 2]
 --- stdout ---
 
 --- stderr ---
-Error: --replace admite exactamente un archivo.
+usage: plane.py attachment replace [-h] issue id file
+plane.py attachment replace: error: argument id: 'x' no es un UUID de adjunto (ver `attachment list`)
 
-$ plane.py attach OMNIFY-1 no-existe.bin
+$ plane.py attachment replace OMNIFY-1 d0000000-0000-4000-8000-000000000001 no-existe.bin
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: 'no-existe.bin' no es un archivo.
 
-$ plane.py attachments OMNIFY-1
+$ plane.py attachment list OMNIFY-1
 [exit 0]
 --- stdout ---
 
@@ -36,7 +52,7 @@ $ plane.py attachments OMNIFY-1
 --- stderr ---
 
 
-$ plane.py attachments OMNIFY-1 --json
+$ plane.py attachment list OMNIFY-1 --json
 [exit 0]
 --- stdout ---
 [
@@ -50,12 +66,50 @@ $ plane.py attachments OMNIFY-1 --json
 --- stderr ---
 
 
-$ plane.py attachments OMNIFY-1 --delete d0000000-0000-4000-8000-000000000001
+$ plane.py --json attachment list OMNIFY-1
+[exit 0]
+--- stdout ---
+[
+  {
+    "id": "d0000000-0000-4000-8000-000000000001",
+    "name": "informe.pdf",
+    "size": 2048,
+    "created_at": "2026-10-16T10:00:00Z"
+  }
+]
+--- stderr ---
+
+
+$ plane.py attachment delete OMNIFY-1 d0000000-0000-4000-8000-000000000001
 [exit 0]
 --- stdout ---
 ✔ Adjunto d0000000-0000-4000-8000-000000000001 eliminado de OMNIFY-1
 --- stderr ---
 
+
+$ plane.py attachment delete OMNIFY-1 no-es-uuid
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py attachment delete [-h] issue id
+plane.py attachment delete: error: argument id: 'no-es-uuid' no es un UUID de adjunto (ver `attachment list`)
+
+$ plane.py attachment delete OMNIFY-1
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py attachment delete [-h] issue id
+plane.py attachment delete: error: the following arguments are required: id
+
+$ plane.py attachment
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py attachment [-h] {add,list,delete,replace} ...
+plane.py attachment: error: the following arguments are required: {add,list,delete,replace}
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/
@@ -67,9 +121,18 @@ GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/ {"name": "adj.txt", "size": 13, "type": "text/plain"}
 POST /upload/bucket <multipart>
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/e0000000-0000-4000-8000-000000000002/ {"is_uploaded": true}
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/ {"name": "adj.txt", "size": 13, "type": "text/plain"}
+POST /upload/bucket <multipart>
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/e0000000-0000-4000-8000-000000000003/ {"is_uploaded": true}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/ {"name": "adj.txt", "size": 13, "type": "text/plain"}
+POST /upload/bucket <multipart>
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/e0000000-0000-4000-8000-000000000004/ {"is_uploaded": true}
 DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/d0000000-0000-4000-8000-000000000001/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
