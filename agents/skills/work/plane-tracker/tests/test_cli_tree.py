@@ -64,6 +64,21 @@ class CommandTree(unittest.TestCase):
                         build_parser().parse_args([command, "--help"])
                     self.assertIn("{" + ",".join(verbs) + "}", out.getvalue())
 
+    def test_one_line_helps_and_compact_global_help(self):
+        def walk(parser, path):
+            for action in parser._actions:
+                if isinstance(action, argparse._SubParsersAction):
+                    for choice in action._choices_actions:
+                        self.assertLessEqual(len(choice.help), 60, f"{path} {choice.dest}: {choice.help!r}")
+                        self.assertFalse(choice.help.endswith("."), f"{path} {choice.dest}")
+                    for name, child in action.choices.items():
+                        walk(child, f"{path} {name}".strip())
+
+        walk(build_parser(), "")
+        root = build_parser()
+        root.prog = "plane.py"
+        self.assertLessEqual(len(root.format_help()) / 4, 260)
+
     def test_retired_names_are_not_registered(self):
         names = set(command_tree(build_parser()))
         for old in ("attach", "attachments", "comment-edit", "comment-delete", "propose-duration"):

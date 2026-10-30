@@ -158,7 +158,8 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
 
 
 def register_worklog_propose(sub):
-    p_prop = sub.add_parser("propose", help="Medir la sesión del agente y proponer una duración (no registra nada)")
+    p_prop = sub.add_parser("propose", help="Medir la sesión y proponer una duración",
+                               description="Mide la sesión del agente y propone una duración; no registra nada.")
     p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_prop.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide")
     p_prop.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
@@ -175,14 +176,16 @@ def register_worklog_propose(sub):
 
 
 def register_comment_delete(sub):
-    p_cdel = sub.add_parser("delete", help="Eliminar un comentario (por defecto el último propio) y su worklog local")
+    p_cdel = sub.add_parser("delete", help="Eliminar un comentario y su worklog local",
+                              description="Elimina un comentario (por defecto el último propio) y su worklog local.")
     p_cdel.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
     p_cdel.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
     p_cdel.set_defaults(handler=cmd_comment_delete)
 
 
 def register_comment_edit(sub):
-    p_cedit = sub.add_parser("edit", help="Editar un comentario y/o vincularle su worklog local sin publicar otro")
+    p_cedit = sub.add_parser("edit", help="Editar un comentario y/o su worklog",
+                              description="Edita un comentario y/o le vincula su worklog local sin publicar otro.")
     p_cedit.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
     p_cedit.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
     p_cedit.add_argument("-m", "--message", help="Nuevo texto del comentario")

@@ -234,7 +234,8 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def register_link_add(sub):
-    p_link = sub.add_parser("add", help="Adjuntar un enlace (PR, doc) al work item")
+    p_link = sub.add_parser("add", help="Adjuntar un enlace al ticket",
+                             description="Adjunta un enlace (PR, documento) al work item.")
     p_link.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
     p_link.add_argument("url", help="URL del enlace (https://...)")
     p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")
@@ -242,7 +243,7 @@ def register_link_add(sub):
 
 
 def register_update(sub):
-    p_update = sub.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
+    p_update = sub.add_parser("update", help="Cambiar estado, prioridad, etiquetas o fechas")
     p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
@@ -254,7 +255,7 @@ def register_update(sub):
 
 
 def register_create(sub):
-    p_create = sub.add_parser("create", help="Crear un nuevo ticket / work item en Plane")
+    p_create = sub.add_parser("create", help="Crear un ticket")
     p_create.add_argument("title", help="Título del ticket")
     p_create.add_argument("-d", "--description", help="Descripción o notas del ticket")
     p_create.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
