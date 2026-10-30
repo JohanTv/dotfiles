@@ -134,8 +134,12 @@ plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo
 - **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.
 - **Cycle time** = suma del tiempo en estados del grupo *started* (Progreso, Revisión, Pruebas); **Pausado se excluye del activo** y se muestra en el bruto. Reaperturas suman cada tramo.
 - **Esfuerzo**: *reloj* = unión de intervalos de los worklogs (sin doble conteo) y *cómputo* = suma de `duration_minutes` (puede superar al reloj con agentes en paralelo). Fuente: worklogs locales ∪ metadata en comentarios de Plane.
-- **Banderas** (`sin_transicion`, `sin_started`, `cierre_instantaneo`, `paraguas`, `estado_desconocido`) excluyen el ticket de las medianas. Todo en calendario; lead/cycle en UTC, worklogs convertidos desde hora local.
+- **Flags** (internal identifiers, English): `no_transition` (no state history), `no_started` (never entered a *started* state), `instant_close` (closed in under 5 min: bulk close or backfill), `umbrella` (weekly umbrella ticket `- W{NN}`), `unknown_state` (a state id missing from the project's states). Medians of lead time exclude `umbrella`, `instant_close` and `no_transition`; cycle medians skip `no_started`; `unknown_state` only warns. All times are calendar; lead/cycle in UTC, worklogs converted from local time.
 - Las transiciones salen de `/issues/<id>/activities/` (una llamada por ticket, cacheada en `state_transitions`; los cerrados no se vuelven a pedir si su `updated_at` no cambió).
+
+---
+
+> **Telemetry travels with the comment:** `comment` always appends the hidden `<!-- PLANE_WORKLOG_METADATA {...} -->` block to the HTML (Plane preserves it, verified), so hours survive losing the local cache and can be rebuilt with `report --sync`. Comments published before this change have no block.
 
 ---
 

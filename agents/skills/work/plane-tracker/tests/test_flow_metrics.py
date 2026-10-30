@@ -65,19 +65,19 @@ class Timeline(unittest.TestCase):
     def test_4_jump_backlog_to_completed(self):
         f = flow(issue("co", h(0.01)), [tr(0.01, "bk", "co")])
         self.assertIsNone(f["cycle_active_minutes"])
-        self.assertIn("sin_started", f["flags"])
-        self.assertIn("cierre_instantaneo", f["flags"])
+        self.assertIn("no_started", f["flags"])
+        self.assertIn("instant_close", f["flags"])
 
     def test_5_no_transitions_open(self):
         f = flow(issue("pr"), [])
         self.assertEqual(f["outcome"], "open")
-        self.assertIn("sin_transicion", f["flags"])
+        self.assertIn("no_transition", f["flags"])
         self.assertEqual(f["by_state_minutes"], {"Progreso": 30 * 24 * 60})
 
     def test_6_created_completed_without_transition(self):
         f = flow(issue("co", h(2)), [])
         self.assertEqual(f["lead_minutes"], 120)
-        self.assertIn("sin_transicion", f["flags"])
+        self.assertIn("no_transition", f["flags"])
 
     def test_7_cancelled_has_no_completed_at(self):
         f = flow(issue("ca", None), [tr(1, "bk", "pr"), tr(4, "pr", "pa"), tr(20, "pa", "ca")])
@@ -92,11 +92,11 @@ class Timeline(unittest.TestCase):
 
     def test_unknown_state_is_flagged(self):
         f = flow(issue("co", h(5)), [tr(1, "zz", "pr"), tr(5, "pr", "co")])
-        self.assertIn("estado_desconocido", f["flags"])
+        self.assertIn("unknown_state", f["flags"])
 
     def test_12_umbrella_flag(self):
         f = flow(issue("pr", name="Tareas Rápidas y Soporte - W44"), [])
-        self.assertIn("paraguas", f["flags"])
+        self.assertIn("umbrella", f["flags"])
 
 
 class Effort(unittest.TestCase):
