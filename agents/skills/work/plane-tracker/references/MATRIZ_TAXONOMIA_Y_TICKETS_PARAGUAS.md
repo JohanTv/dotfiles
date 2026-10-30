@@ -92,8 +92,8 @@ Ambos viven en el proyecto **`OPS` (Operaciones)**, no en OMNIFY. El identifier 
 2. **Durante la semana (Append-Only):**
    - Cada interrupción, reunión o imprevisto se comenta en **su** paraguas de `OPS`, con track y duración declarada:
      ```bash
-     plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 12 -m "..."
-     plane-tracker comment OPS-45 --track "daily-pierre" --capacity "coordination" --duration 25 -m "..."
+     plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 12 -m "..."
+     plane-tracker comment add OPS-45 --track "daily-pierre" --capacity "coordination" --duration 25 -m "..."
      ```
    - `--duration` (minutos netos) es obligatorio. Si el hecho ocurrió **fuera de la conversación** del agente, el agente **pregunta** cuánto demoró antes de comentar; nunca estima.
 3. **Viernes 06:30 pm (Cierre):**

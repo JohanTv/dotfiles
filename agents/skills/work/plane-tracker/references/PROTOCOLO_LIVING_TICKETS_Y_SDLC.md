@@ -32,7 +32,7 @@ Para evitar la creación de micro-tickets basura que destruyan las métricas del
   * *Acción:* **NO crear ticket en Omnify**.
   * *Destino:* Absorber en el ticket paraguas semanal de `OPS`:
     `Tareas Rápidas y Soporte - W{XX}`.
-  * *Registro:* `plane-tracker comment OPS-XX --track "soporte" --capacity "toil_support" --duration 10 -m "..."`.
+  * *Registro:* `plane-tracker comment add OPS-XX --track "soporte" --capacity "toil_support" --duration 10 -m "..."`.
 * **Tareas > 15 minutos (Trabajo Estructurado):**  
   * *Acción:* Crear ticket formal en Plane **al minuto 15**.
   * *Destino:* Proyecto respectivo (`OMNIFY` por defecto, o `OPS`).
@@ -124,6 +124,6 @@ Explicación técnica precisa del fallo estructural o bug identificado tras la a
 
 Al marcar la Fase 3, se publica el comentario final con la **Bitácora Dual-Layer**:
 ```bash
-plane-tracker comment OMNIFY-180 -f /tmp/worklog_cierre.md --duration 95
+plane-tracker comment add OMNIFY-180 -f /tmp/worklog_cierre.md --duration 95
 plane-tracker update OMNIFY-180 --state "Completado"
 ```
