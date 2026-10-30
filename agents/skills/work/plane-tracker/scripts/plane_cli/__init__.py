@@ -3,7 +3,7 @@
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
   1. config        rutas de caché, reloj, variables de entorno
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
-  3. mdhtml, cache, resolve, timeutil, worklog, sync, proposal_store, proposals, flow, attachments, renamed
+  3. mdhtml, cache, resolve, timeutil, worklog, outbox, outbox_flush, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -18,6 +18,8 @@ Módulos:
   resolve         proyectos, tickets, estados, etiquetas y usuario activo (con caché)
   timeutil        horarios y fusión de intervalos (Klee) para los reportes
   worklog         metadata oculta de los comentarios, upsert local y check_worklogs()
+  outbox          cola de salida de `comment add`: guardado previo, reclamo atómico, entrega idempotente, list y drop
+  outbox_flush    publicación de la cola (`outbox flush`)
   sync            sincroniza worklogs de los comentarios de Plane a SQLite
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)
@@ -29,6 +31,7 @@ Módulos:
   cmd_tickets_write `create`, `update`, `link add`
   cmd_read        `get`, `list`, `search`, `labels`, `projects`, `whoami`
   cmd_report      `report`, `worklog check`
+  cmd_outbox      `outbox list|flush|drop`
   cmd_ops         `health`, `focus set|clear|status`, `handoff`
   cli             parser raíz, grupos de verbos y despacho
 """

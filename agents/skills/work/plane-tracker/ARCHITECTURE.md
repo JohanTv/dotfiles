@@ -14,37 +14,42 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 | Módulo | Líneas | Responsabilidad |
 |---|---|---|
 | `plane.py` | 16 | Punto de entrada: ajusta `sys.path` y llama a `cli.main()`. |
-| `plane_cli/__init__.py` | 30 | Docstring con el mapa de capas y módulos. |
+| `plane_cli/__init__.py` | 35 | Docstring con el mapa de capas y módulos. |
 | `plane_cli/config.py` | 80 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), reloj `now()`, `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
-| `plane_cli/db.py` | 180 | Conexión SQLite (WAL), `ensure_columns()` y esquema (`init_db()`). |
-| `plane_cli/api.py` | 75 | `api_request()` con reintento ante 429 y `log_request()` (JSONL de latencias). |
+| `plane_cli/db.py` | 230 | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
+| `plane_cli/circuit.py` | 220 | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
+| `plane_cli/api.py` | 235 | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`) y `log_request()` (JSONL de latencias). |
 | `plane_cli/mdhtml.py` | 150 | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
-| `plane_cli/resolve.py` | 285 | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()`. |
+| `plane_cli/cache.py` | 160 | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
+| `plane_cli/resolve.py` | 300 | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
 | `plane_cli/timeutil.py` | 215 | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs y `render_day_block()`. |
-| `plane_cli/worklog.py` | 220 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
-| `plane_cli/sync.py` | 145 | `sync_remote_worklogs()`: comentarios de Plane a SQLite. |
+| `plane_cli/worklog.py` | 230 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
+| `plane_cli/outbox.py` | 360 | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
+| `plane_cli/outbox_flush.py` | 125 | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
+| `plane_cli/sync.py` | 165 | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
 | `plane_cli/proposal_store.py` | 100 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | 290 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
 | `plane_cli/flow.py` | 210 | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
 | `plane_cli/renamed.py` | 150 | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
 | `plane_cli/attachments.py` | 170 | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
-| `plane_cli/cmd_comment.py` | 235 | Comando `comment add`. |
+| `plane_cli/cmd_comment.py` | 250 | Comando `comment add`. |
 | `plane_cli/cmd_comment_ops.py` | 200 | Comandos `comment edit`, `comment delete` y `worklog propose`. |
 | `plane_cli/cmd_tickets_write.py` | 270 | Comandos `create`, `update` y `link add`. |
-| `plane_cli/cmd_read.py` | 405 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
-| `plane_cli/cmd_report.py` | 235 | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
-| `plane_cli/cmd_ops.py` | 255 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
-| `plane_cli/cli.py` | 105 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()` y `main()`. |
+| `plane_cli/cmd_read.py` | 390 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
+| `plane_cli/cmd_report.py` | 255 | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
+| `plane_cli/cmd_outbox.py` | 100 | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
+| `plane_cli/cmd_ops.py` | 260 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
+| `plane_cli/cli.py` | 125 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |
 
 ## Capas y regla de dependencias
 
 1. `config`: no importa nada del paquete.
-2. `db`, `api`: dependen de `config`.
-3. Lógica reutilizable (`mdhtml`, `resolve`, `timeutil`, `worklog`, `sync`, `proposal_store`, `proposals`, `flow`,
-   `attachments`, `renamed`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (grupo
+2. `db`, `circuit`, `api`: dependen de `config` (`api` también de `circuit`).
+3. Lógica reutilizable (`mdhtml`, `cache`, `resolve`, `timeutil`, `worklog`, `outbox`, `outbox_flush`, `sync`,
+   `proposal_store`, `proposals`, `flow`, `attachments`, `renamed`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (grupo
    `attachment`) y `flow` (`report flow`), que además contienen el comando que los usa, no definen parsers.
 4. `cmd_*`: importan de las capas 1 a 3; **nunca** se importan entre sí ni importan `cli`.
-5. `cli`: importa los `cmd_*`, `attachments` y `renamed` para registrar el árbol de comandos y consultar las pistas.
+5. `cli`: importa los `cmd_*`, `attachments`, `renamed` y `outbox` para registrar el árbol de comandos, consultar las pistas y avisar de los registros sin publicar.
 
 Ninguna biblioteca importa un `cmd_*`. No hay ciclos de import. `tests/test_structure.py` lo verifica con un análisis del
 AST, además de los nombres globales no definidos, el tamaño de archivos (450 líneas) y de funciones (150 líneas) y que
@@ -78,7 +83,7 @@ Reglas:
    plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
 2. Toda otra familia es un grupo `<sustantivo singular> <verbo>`, aunque tenga un solo verbo (`link add`).
 3. Un flag nunca elige la operación: la operación es el verbo (o la vista posicional `report flow`).
-4. Verbos: `add`, `list`, `edit`, `delete`, `replace`; marcas: `set`, `clear`, `status`; derivados: `propose`, `check`.
+4. Verbos: `add`, `list`, `edit`, `delete`, `replace`, `flush`; marcas: `set`, `clear`, `status`; derivados: `propose`, `check`.
 5. Los sinónimos de verbo y los nombres retirados no son alias: terminan con código 2 y una pista (`renamed.py`).
 6. El ID requerido de un hijo es posicional (`attachment delete ISSUE ID`); si es opcional (por defecto, el último
    propio) es un flag (`--comment-id`).
@@ -92,6 +97,54 @@ cada hoja que produce JSON. Sin valor por defecto, el último nivel que lo vea n
 `main()` llama primero a `renamed.suggestion(argv, command_tree(parser))`: `command_tree()` deriva `{comando: (verbos)}`
 del propio parser, así que `renamed.py` no duplica el árbol ni importa `cli`. Si devuelve texto, se imprime como
 `plane-tracker: error: <texto>` con código 2, antes de validar el entorno.
+
+## Modo sin conexión
+
+**Transporte (`api`, `circuit`).** Todo acceso a Plane pasa por `api_request()`. Un fallo transitorio (502/503/504,
+timeouts, conexión rechazada o cortada, DNS, fallo de handshake TLS, respuesta ilegible) lanza `PlaneUnavailable`, que
+lleva `kind`, `delivered` (`"no"`: la petición no llegó a enviarse; `"unknown"`: pudo procesarse) y el `method` de la
+petición. Los errores definitivos (4xx, 500, certificado TLS no verificable) imprimen el error y terminan con código 1 sin
+contar para el circuito. Solo los GET se reintentan (una vez, nunca tras un timeout); el 429 se reintenta con cualquier
+método porque la petición no se procesó. `PLANE_OFFLINE=1` impide cualquier acceso a la red.
+El circuito (`<CACHE_DIR>/circuit.json`, compartido entre procesos con flock) se abre tras 2 fallos consecutivos dentro de
+120 s; abierto, las llamadas fallan sin tocar la red hasta que vence el enfriamiento (30, 60, 120 y 300 s según las sondas
+fallidas), cuando un solo proceso sondea `GET /users/me/`. `outbox flush` sondea siempre (`probe_plane(force=True)`).
+
+**Lecturas (`cache`).** Con red, los TTL siguen mandando. Ante `PlaneUnavailable`, `search`, `list`, `get`, `labels` y
+`projects` responden con lo local aunque haya vencido, con el aviso de antigüedad en stderr; sin nada local terminan con
+código 3.
+
+**Cola de salida (`outbox`, `outbox_flush`).** Solo `comment add` se encola; `update`, `create`, `link add`,
+`comment edit|delete` y `attachment *` fallan con código 3. La cola vive en la tabla SQLite `outbox` (texto de
+comentarios: por eso el directorio de caché es 0700 y la base 0600; el payload nunca incluye la API key).
+
+- *Guardado previo.* `outbox.publish_comment()` inserta el item `pending` y la fila provisional de `worklogs` (sin
+  `plane_comment_id`, misma clave que `wl_*` del item) en una sola transacción **antes** del POST. Así lo encolado sigue
+  contando como registrado (`session_coverage`, `report`) y no hay ventana en la que Plane tenga el comentario y la base
+  local no. Límites: 64 KB por comentario y 200 items abiertos; una clave de worklog (ticket, track, fecha, inicio) solo
+  admite un item abierto (índice único parcial).
+- *Idempotencia.* Cada comentario lleva un `client_id` determinista (`pt-` + 20 hex del hash de ticket, track, fecha,
+  inicio y texto visible) dentro de su bloque oculto y como `external_id` del POST (`external_source="plane-tracker"`).
+  Un 409 con el `id` del comentario existente cuenta como enviado.
+- *Entrega ambigua.* Un item con `maybe_delivered=1` (el POST pudo llegar) o en `sending` con el lease vencido (180 s) no
+  se reenvía sin antes buscar su `client_id` en los comentarios del ticket (GET paginado, hasta 10 páginas, en el HTML o
+  en `external_id`). La ambigüedad solo se limpia al enviarse o descartarse. Un comentario borrado a mano en Plane mientras
+  seguía en la cola con `maybe_delivered=1` puede recrearse una vez.
+- *Reclamo atómico.* `claim()` (`BEGIN IMMEDIATE` + `UPDATE` a `sending` con lease) deja pasar a un solo proceso por item.
+- *Flush.* Orden por `id`, 25 por ejecución, 1 s entre items; omite los de más de 7 días (salvo `--include-old`) y poda los
+  `sent`/`dropped` de más de 30 días. Un fallo transitorio detiene el flush (código 3); un error definitivo (400, 403,
+  404, 422, 500) deja el item en `failed` con su `last_error` y sigue (código 1); un 401 lo detiene todo (código 1).
+- *Sync.* `sync_remote_worklogs()` vincula y marca `sent` un comentario remoto con el `client_id` del item abierto de su
+  clave, y omite (con aviso) el que coincide con la clave pero es de otro. `worklog check` marca esas filas como `pending`
+  (aviso, no inconsistencia) y `report` avisa de los registros del periodo sin publicar.
+- *Avisos.* `cli.main()` imprime por stderr, una vez y salvo en `outbox *`, cuántos registros siguen sin publicar. No hay
+  envío automático: la cola solo se vacía con `outbox flush`.
+
+**Códigos de salida.** 0 éxito (también un comentario encolado); 1 error definitivo, de validación, registros `failed` o
+inconsistencias de `worklog check`; 2 uso; 3 Plane no disponible.
+
+**Variables.** `PLANE_OFFLINE=1`: ninguna petición sale (todo lo que necesita Plane termina con código 3 y `comment add`
+encola). `PLANE_NO_QUEUE=1`: `comment add` falla con código 3 en lugar de encolar, sin dejar item ni fila provisional.
 
 ## Agregar un comando
 
@@ -125,6 +178,13 @@ python3 -m unittest discover -s tests
 - `test_structure.py` guarda las reglas estructurales descritas arriba.
 - `test_cli_tree.py` fija el árbol exacto (y su orden), que cada hoja tenga `handler` y los grupos no, y el tamaño de la
   ayuda global; `test_renamed.py` las pistas de nombres retirados; `test_json_flag.py` las posiciones válidas de `--json`.
+- `test_transport.py`, `test_circuit.py`, `test_degrade.py`, `test_offline_reads.py`, `test_outbox.py`,
+  `test_outbox_flush.py` y `test_outbox_sync.py` prueban el modo sin conexión con el servidor falso con fallos: cada regla
+  `fake.add_fault(método, regex, tipo, arg, n)` responde con un código (`status`), retiene la conexión (`hang`), la corta
+  (`drop`), aplica la escritura y corta la respuesta (`commit_drop`), retrasa (`delay`), alterna (`flap`) o envía bytes
+  crudos (`raw`); `fake.store_comments` guarda los comentarios con su `external_id` (409 si se repite) y `fake.close()` /
+  `reopen()` simulan una conexión rechazada. `Sandbox.write_circuit()` fija el estado del circuito. Los procesos
+  concurrentes y los interrumpidos se prueban con procesos reales.
 - Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando los módulos de
   `plane_cli` directamente y sustituyendo `config.CACHE_DIR` / `config.now`.
 
@@ -145,4 +205,5 @@ python3 -m unittest discover -s tests
 
 ## Propuestas pendientes
 
-Los diseños acordados que aún no están implementados (p. ej. el modo sin conexión con cola de salida) viven en `ROADMAP.md`; ahí se marca explícitamente qué no existe en el código.
+Lo acordado que aún no está implementado (p. ej. la idempotencia de `create`) vive en `ROADMAP.md`, que marca
+explícitamente qué no existe en el código.
