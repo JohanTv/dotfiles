@@ -266,6 +266,55 @@ class Terminals(Base):
         self.assertTrue(self.propose("OMNIFY-2")["ok"])
 
 
+class Corrections(Base):
+    OLD = {"date": "2026-10-29", "start_time": "09:00", "end_time": "11:00", "duration_minutes": 80, "track": "main",
+           "worker_type": "agent:claude", "capacity_bucket": "deep_work", "notes": "n",
+           "segments": [{"start": "09:00", "end": "10:00", "minutes": 60}, {"start": "10:40", "end": "11:00", "minutes": 20}],
+           "measured_by": {"kind": "proposal", "session": SID}}
+
+    def test_block_is_replaced_not_duplicated_and_visible_text_is_kept(self):
+        html = "<p>texto visible</p>\n" + plane.worklog_metadata_block(self.OLD)
+        new_meta = plane.corrected_metadata(self.OLD, 80, track="review")
+        out = plane.replace_metadata_block(html, new_meta)
+        self.assertEqual(out.count("PLANE_WORKLOG_METADATA"), 1)
+        self.assertTrue(out.startswith("<p>texto visible</p>"))
+        self.assertEqual(plane.extract_metadata_from_comment(out)["track"], "review")
+
+    def test_correction_keeps_session_and_leaves_a_trail(self):
+        meta = plane.corrected_metadata(self.OLD, 80, capacity_bucket="tooling_dx", edited_at="2026-10-29T20:00:00+00:00")
+        self.assertEqual(meta["measured_by"]["session"], SID)
+        self.assertEqual((meta["measured_by"]["kind"], meta["measured_by"]["was"]), ("corrected", "proposal"))
+        self.assertEqual((meta["previous_duration_minutes"], meta["capacity_bucket"]), (80, "tooling_dx"))
+        self.assertEqual(meta["segments"], self.OLD["segments"])
+
+    def test_changing_duration_needs_force_when_segments_exist(self):
+        with self.assertRaises(ValueError):
+            plane.corrected_metadata(self.OLD, 50)
+        meta = plane.corrected_metadata(self.OLD, 50, force=True)
+        self.assertNotIn("segments", meta)
+        self.assertEqual(meta["duration_minutes"], 50)
+        # sin tramos, el bounding start-end sigue cubriendo la sesión (no se vuelve a contar)
+        self.conn.execute("DELETE FROM worklogs")
+        plane.upsert_worklog(self.conn, {"ticket_id": "OMNIFY-1", "track": "main", "date": "2026-10-29", "start_time": meta["start_time"],
+                                         "end_time": meta["end_time"], "duration_minutes": 50, "raw_payload": meta})
+        self.assertFalse(self.propose("OMNIFY-2")["ok"])
+
+    def test_sync_after_a_correction_leaves_one_row_per_comment(self):
+        plane.upsert_worklog(self.conn, {"ticket_id": "OMNIFY-1", "track": "main", "date": "2026-10-29", "start_time": "09:00", "end_time": "11:00",
+                                         "duration_minutes": 80, "plane_comment_id": "c1", "raw_payload": self.OLD})
+        meta = plane.corrected_metadata(self.OLD, 80, track="review")
+        with self.conn:
+            self.conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", ("c1",))
+        plane.upsert_worklog(self.conn, {"ticket_id": "OMNIFY-1", "track": "review", "date": meta["date"], "start_time": meta["start_time"],
+                                         "end_time": meta["end_time"], "duration_minutes": 80, "plane_comment_id": "c1", "raw_payload": meta})
+        # el sync re-importa el bloque ya corregido: misma clave -> una sola fila
+        parsed = plane.extract_metadata_from_comment(plane.worklog_metadata_block(meta))
+        plane.upsert_worklog(self.conn, {"ticket_id": "OMNIFY-1", "track": parsed["track"], "date": parsed["date"], "start_time": parsed["start_time"],
+                                         "end_time": parsed["end_time"], "duration_minutes": parsed["duration_minutes"], "plane_comment_id": "c1", "raw_payload": parsed})
+        rows = self.conn.execute("SELECT track FROM worklogs WHERE plane_comment_id = 'c1'").fetchall()
+        self.assertEqual([r["track"] for r in rows], ["review"])
+
+
 class Reporting(Base):
     def test_expand_segments_and_flow_clock(self):
         p = self.propose()

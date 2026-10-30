@@ -1453,6 +1453,39 @@ def worklog_metadata_block(meta):
     payload = json.dumps(meta, ensure_ascii=False, sort_keys=True).replace("--", "\\u002d\\u002d")
     return f"<!-- PLANE_WORKLOG_METADATA {payload} -->"
 
+_BLOCK_RE = re.compile(r"<!--\s*PLANE_WORKLOG_METADATA[\s\S]*?-->")
+
+def find_metadata_block(html):
+    match = _BLOCK_RE.search(html or "")
+    return match.group(0) if match else None
+
+def replace_metadata_block(html, meta):
+    """Sustituye el bloque oculto (o lo añade si no existe) sin tocar el texto visible."""
+    block = worklog_metadata_block(meta)
+    if _BLOCK_RE.search(html or ""):
+        return _BLOCK_RE.sub(lambda _m: block, html, count=1)
+    return (html or "") + "\n" + block
+
+def corrected_metadata(old, duration, track=None, capacity_bucket=None, worker_type=None, force=False, edited_at=None):
+    """Metadata corregida de un worklog existente: conserva sesión, tramos y demás, y deja rastro de la corrección."""
+    meta = dict(old)
+    segments = meta.get("segments")
+    if segments and duration != sum(seg.get("minutes", 0) for seg in segments):
+        if not force:
+            raise ValueError("El worklog tiene tramos medidos que suman otra duración; usa --force para descartar los tramos y fijar la duración.")
+        meta.pop("segments", None)
+    meta["previous_duration_minutes"] = old.get("duration_minutes")
+    meta["duration_minutes"] = duration
+    for key, value in (("track", track), ("capacity_bucket", capacity_bucket), ("worker_type", worker_type)):
+        if value:
+            meta[key] = value
+    measured_by = dict(meta.get("measured_by") or {})
+    measured_by["was"] = measured_by.get("kind")
+    measured_by["kind"] = "corrected"
+    meta["measured_by"] = measured_by
+    meta["edited_at"] = edited_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return meta
+
 def derived_start(end_dt, duration):
     """HH:MM de inicio derivado de la duración; nunca antes de las 00:00 del día del fin."""
     start = end_dt - timedelta(minutes=duration)
@@ -1716,8 +1749,13 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
     local_meta = json.loads(row["raw_payload"]) if row else None
     if content is not None:
         html = content if content.strip().startswith("<") and ">" in content else markdown_to_html(content)
-        if local_meta and "PLANE_WORKLOG_METADATA" not in html:
-            html += "\n" + worklog_metadata_block(local_meta)
+        if "PLANE_WORKLOG_METADATA" not in html:
+            # Editar el texto no debe perder la telemetría: se conserva el bloque que ya traía el comentario.
+            existing = find_metadata_block(api_request(url, api_key).get("comment_html"))
+            if existing:
+                html += "\n" + existing
+            elif local_meta:
+                html += "\n" + worklog_metadata_block(local_meta)
         api_request(url, api_key, method="PATCH", data={"comment_html": html})
         print(f"✔ Comentario {cid} actualizado en {issue_ref}")
     elif getattr(args, "embed_metadata", False):
@@ -1733,24 +1771,31 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
 
     if args.duration:
         c = api_request(url, api_key)
-        # El comentario ya existe: su hora de publicación (local) es el fin; inicio = fin - duración
-        end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
-        start = end - timedelta(minutes=args.duration)
-        track = args.track or "main"
-        bucket = args.capacity_bucket or "deep_work"
-        worker = args.worker_type or "human"
+        current_html = c.get("comment_html") or ""
         proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
-        notes = re.sub(r"<[^>]+>", "", c.get("comment_html") or "").strip()[:120] or issue.get("name", "")
-        meta = {"schema_version": "2.2", "date": start.strftime("%Y-%m-%d"), "start_time": start.strftime("%H:%M"),
-                "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": track,
-                "worker_type": worker, "capacity_bucket": bucket, "notes": notes, "stoppers": [], "phase": "dev"}
-        with conn:  # reemplaza el worklog previo de este comentario (idempotente)
+        old_meta = extract_metadata_from_comment(current_html) if find_metadata_block(current_html) else None
+        if old_meta:
+            # Corrección: se parte del bloque existente (sesión, tramos, fechas) y se cambia solo lo pedido.
+            try:
+                meta = corrected_metadata(old_meta, args.duration, args.track, args.capacity_bucket, args.worker_type, getattr(args, "force", False))
+            except ValueError as exc:
+                sys.stderr.write(f"Error: {exc}\n")
+                sys.exit(1)
+        else:
+            # Comentario sin telemetría: su hora de publicación (local) es el fin; inicio = fin - duración
+            end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
+            start = end - timedelta(minutes=args.duration)
+            notes = re.sub(r"<[^>]+>", "", current_html).strip()[:120] or issue.get("name", "")
+            meta = {"schema_version": "2.2", "date": start.strftime("%Y-%m-%d"), "start_time": start.strftime("%H:%M"),
+                    "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": args.track or "main",
+                    "worker_type": args.worker_type or "human", "capacity_bucket": args.capacity_bucket or "deep_work",
+                    "notes": notes, "stoppers": [], "phase": "dev", "measured_by": {"kind": "declared", "worker_type": args.worker_type or "human"}}
+        with conn:  # un worklog por comentario: se reemplaza por id de comentario (no por clave primaria)
             conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,))
         upsert_worklog(conn, {**meta, "ticket_id": f"{proj_ident}-{issue.get('sequence_id') or seq_id}",
                               "issue_name": issue.get("name", ""), "plane_comment_id": cid, "raw_payload": meta})
-        if "PLANE_WORKLOG_METADATA" not in (c.get("comment_html") or ""):
-            api_request(url, api_key, method="PATCH", data={"comment_html": (c.get("comment_html") or "") + "\n" + worklog_metadata_block(meta)})
-        print(f"✔ Worklog local vinculado a {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {track}, {bucket})")
+        api_request(url, api_key, method="PATCH", data={"comment_html": replace_metadata_block(current_html, meta)})
+        print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {meta['track']}, {meta['capacity_bucket']})")
     elif content is None and not getattr(args, "embed_metadata", False):
         sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
 
@@ -2972,6 +3017,7 @@ def main():
     p_cedit.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"])
     p_cedit.add_argument("--duration", type=int, metavar="MIN", help="Duración en minutos: registra el worklog usando la hora de publicación como fin")
     p_cedit.add_argument("--embed-metadata", action="store_true", help="Añadir al comentario el bloque oculto de metadata de su worklog local (sin cambiar el texto visible)")
+    p_cedit.add_argument("--force", action="store_true", help="Con --duration: descartar los tramos medidos del worklog cuando la nueva duración no coincide")
 
     # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
