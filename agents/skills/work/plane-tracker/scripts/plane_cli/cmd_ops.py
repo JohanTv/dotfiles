@@ -19,7 +19,7 @@ import session_clock
 from plane_cli import circuit, config
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.proposals import FOCUS_KEEP_DAYS, focus_intervals
-from plane_cli.resolve import detect_ticket_from_git, resolve_issue, resolve_project_and_seq
+from plane_cli.resolve import detect_ticket_from_git, local_ticket_label
 from plane_cli.worklog import PLACEHOLDER
 
 
@@ -122,14 +122,12 @@ def cmd_focus_clear(args, conn, base_url, api_key, workspace, default_project_id
 
 
 def cmd_focus_set(args, conn, base_url, api_key, workspace, default_project_id):
-    """Marca en qué ticket trabaja esta sesión; `worklog propose` atribuye a cada ticket solo sus intervalos."""
+    """Marca en qué ticket trabaja esta sesión (solo local); `worklog propose` atribuye a cada ticket solo sus intervalos. Avisa de un estado terminal solo si la caché local lo conoce."""
     agent, session_id, now, current = _focus_context(args, conn)
-    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    ticket = issue_ref.upper()
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-    state = conn.execute("SELECT group_name FROM states WHERE id = ?", (issue.get("state"),)).fetchone()
-    if state and state["group_name"] in flow_metrics.TERMINAL_GROUPS:
-        sys.stderr.write(f"⚠ {ticket} está en un estado terminal ({state['group_name']}); la marca se crea igual.\n")
+    ticket = local_ticket_label(args.issue).upper()
+    state = conn.execute("SELECT state_group FROM issues_cache WHERE ticket_id = ?", (ticket,)).fetchone()
+    if state and state["state_group"] in flow_metrics.TERMINAL_GROUPS:
+        sys.stderr.write(f"⚠ {ticket} está en un estado terminal ({state['state_group']}); la marca se crea igual.\n")
     if any(row["ticket"] == ticket for row in current):
         print(f"✔ El foco ya está en {ticket}")
         return

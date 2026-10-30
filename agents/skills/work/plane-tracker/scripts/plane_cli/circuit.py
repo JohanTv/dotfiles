@@ -27,7 +27,7 @@ FRESH_OK = 60
 CAUSES = {
     "timeout": "tiempo de espera agotado", "read_timeout": "tiempo de espera agotado", "refused": "conexión rechazada",
     "dns": "DNS no resuelve", "http_502": "HTTP 502", "http_503": "HTTP 503", "http_504": "HTTP 504",
-    "reset": "conexión cortada", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)",
+    "reset": "conexión cortada", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)", "no_cache": "sin caché local",
 }
 
 
@@ -41,12 +41,13 @@ class PlaneUnavailable(urllib.error.URLError):
     Hereda de URLError para que los sitios que ya capturan fallos de red la traten igual.
     """
 
-    def __init__(self, kind, delivered, since=None, cause_kind=None):
+    def __init__(self, kind, delivered, since=None, cause_kind=None, message=None):
         super().__init__(kind)
         self.kind = kind
         self.delivered = delivered
         self.since = since
         self.cause_kind = cause_kind
+        self.message = message
 
     @property
     def cause(self):
@@ -200,6 +201,8 @@ def describe():
 
 def format_unavailable(exc):
     """Mensaje de stderr para un PlaneUnavailable sin capturar."""
+    if exc.message:
+        return exc.message + "\n"
     if exc.kind == "offline":
         return "Modo sin conexión (PLANE_OFFLINE=1). No se envió nada.\n"
     since = exc.since or hhmm(_now())

@@ -100,7 +100,21 @@ $ plane.py list
 --- stdout ---
 
 --- stderr ---
+Plane no responde y no hay caché local de los tickets del proyecto.
+
+$ plane.py attachment list 10000000-0000-4000-8000-000000000001
+[exit 3]
+--- stdout ---
+
+--- stderr ---
 Plane no responde desde las <HH:MM> (conexión rechazada). No se envió nada; reintenta en 30 s.
+
+$ plane.py attachment list 10000000-0000-4000-8000-000000000001
+[exit 3]
+--- stdout ---
+
+--- stderr ---
+Modo sin conexión (PLANE_OFFLINE=1). No se envió nada.
 
 $ plane.py comment OMNIFY-1 -m x   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 2]

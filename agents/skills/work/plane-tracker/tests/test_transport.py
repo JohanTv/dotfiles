@@ -196,6 +196,10 @@ class Transport(unittest.TestCase):
             self.assertEqual(circuit.describe()["state"], "closed")
 
 
+ISSUE = "10000000-0000-4000-8000-000000000001"
+READ = ["attachment", "list", ISSUE]  # no tiene caché de respaldo: el fallo llega tal cual al usuario
+
+
 class Cli(unittest.TestCase):
     def setUp(self):
         self.sb = gs.Sandbox()
@@ -203,7 +207,7 @@ class Cli(unittest.TestCase):
 
     def test_open_circuit_fails_fast_without_touching_the_server(self):
         self.sb.write_circuit(opened_ago=5)
-        code, out, err = self.sb.run(["list"])
+        code, out, err = self.sb.run(READ)
         self.assertEqual(code, 3)
         self.assertLess(self.sb.last_elapsed, 2)
         self.assertIn("Plane no responde desde las", err)
@@ -211,7 +215,7 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.sb.fake.requests, [])
 
     def test_offline_env_makes_no_request(self):
-        code, out, err = self.sb.run(["list"], env_set={"PLANE_OFFLINE": "1"})
+        code, out, err = self.sb.run(READ, env_set={"PLANE_OFFLINE": "1"})
         self.assertEqual(code, 3)
         self.assertIn("PLANE_OFFLINE=1", err)
         self.assertEqual(self.sb.fake.requests, [])
@@ -219,13 +223,13 @@ class Cli(unittest.TestCase):
     def test_expired_cooldown_probes_once(self):
         self.sb.fake.add_fault("*", "/users/me/", "status", 503)
         self.sb.write_circuit(opened_ago=40)
-        code, out, err = self.sb.run(["list"])
+        code, out, err = self.sb.run(READ)
         self.assertEqual(code, 3)
         self.assertEqual([p for _, p, _ in self.sb.fake.requests], ["/api/v1/users/me/"])
         self.assertEqual(self.sb.circuit_state()["level"], 1)
         self.sb.fake.clear_faults()
         self.sb.write_circuit(opened_ago=40)
-        code, out, err = self.sb.run(["list"])
+        code, out, err = self.sb.run(READ)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.sb.circuit_state()["opened_at"], None)
 

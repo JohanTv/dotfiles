@@ -1,6 +1,6 @@
 """Base de datos local SQLite3 (WAL): conexión y esquema.
 
-Expone: get_db(), ensure_columns(), init_db().
+Expone: get_db(), ensure_columns(), init_snapshot_table(), init_db().
 No hace: consultas de negocio ni acceso a red.
 """
 
@@ -33,6 +33,16 @@ def ensure_columns(conn, table, columns):
         except sqlite3.OperationalError as exc:
             if "duplicate column" not in str(exc).lower():
                 raise
+
+
+def init_snapshot_table(conn):
+    """Última lectura completa de cada ticket (get), para consultarla sin conexión."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issue_snapshots (
+            issue_id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL, fetched_at REAL NOT NULL,
+            issue_json TEXT NOT NULL, comments_json TEXT, comments_fetched_at REAL
+        );
+    """)
 
 
 def init_db(conn):
@@ -168,6 +178,8 @@ def init_db(conn):
             "created_at": "TEXT", "completed_at": "TEXT", "start_date": "TEXT",
             "target_date": "TEXT", "archived_at": "TEXT",
         })
+
+        init_snapshot_table(conn)
 
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(

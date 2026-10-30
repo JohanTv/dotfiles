@@ -27,7 +27,7 @@ $ plane.py list -p OPS
 --- stdout ---
 
 --- stderr ---
-Plane no responde desde las <HH:MM> (HTTP 503). No se envió nada; reintenta en 30 s.
+Plane no responde y no hay caché local de los tickets del proyecto.
 
 $ plane.py health
 [exit 0]

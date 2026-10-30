@@ -1,8 +1,9 @@
 """Resolución de proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite.
 
-Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), resolve_issue(), get_states_map(),
-get_labels_map(), get_actor_uuid(), detect_ticket_from_git().
-No hace: imprimir resultados ni escribir en Plane.
+Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(),
+get_states_map(), get_labels_map(), get_actor_uuid(), detect_ticket_from_git().
+No hace: imprimir resultados ni escribir en Plane. Ante PlaneUnavailable, proyectos, estados y etiquetas se sirven de la
+caché local aunque haya vencido (con aviso), y sin caché lanzan PlaneUnavailable (código 3 en el CLI).
 """
 
 import os
@@ -12,7 +13,8 @@ import sys
 import time
 import urllib.parse
 
-from plane_cli.api import api_request
+from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.cache import serve_stale
 
 
 PROJECTS_TTL = 86400  # 24 horas
@@ -21,13 +23,16 @@ PROJECTS_TTL = 86400  # 24 horas
 def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
     """Obtiene el mapa de identifier -> UUID de proyectos desde SQLite o Plane API."""
     now = time.time()
-    if not force_refresh:
-        rows = conn.execute("SELECT identifier, project_id, name, updated_at FROM projects WHERE workspace = ?", (workspace,)).fetchall()
-        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
-            return {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"]} for r in rows}
+    rows = conn.execute("SELECT identifier, project_id, name, updated_at FROM projects WHERE workspace = ?", (workspace,)).fetchall()
+    as_map = lambda items: {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"]} for r in items}
+    if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+        return as_map(rows)
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/"
-    data = api_request(url, api_key)
+    try:
+        data = api_request(url, api_key)
+    except PlaneUnavailable:
+        return as_map(serve_stale(rows, "proyectos"))
     projects_map = {}
     with conn:
         for proj in data.get("results", []):
@@ -98,11 +103,8 @@ def detect_ticket_from_git():
     return None
 
 
-def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref=None):
-    """
-    Deduce el proyecto y número de secuencia a partir del issue_ref o rama de Git.
-    Soporta: 'OMNIFY-162', 'OPS-44', '162', UUID o None/@ (autodetección de Git).
-    """
+def _ref_or_git(issue_ref):
+    """El ticket pedido o, si falta (o es '@', '.', 'current'...), el de la rama de git; termina con error si no hay ninguno."""
     if not issue_ref or issue_ref in ("@", ".", "current", "--current", "this"):
         git_ticket = detect_ticket_from_git()
         if git_ticket:
@@ -112,7 +114,29 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
             sys.stderr.write("Error: No se especificó ticket y no se detectó identificador en la rama actual de Git.\n")
             sys.stderr.write("Usa: 'plane-tracker comment add OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.\n")
             sys.exit(1)
+    return issue_ref
 
+
+def local_ticket_label(issue_ref):
+    """'PREFIJO-N' de un ticket sin consultar Plane (el UUID se devuelve tal cual); termina con error si el formato no se reconoce."""
+    issue_ref = _ref_or_git(issue_ref)
+    match = re.match(r"^([A-Za-z0-9_]+)-(\d+)$", issue_ref.strip())
+    if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
+        return issue_ref
+    if match:
+        return f"{match.group(1).upper()}-{int(match.group(2))}"
+    if re.match(r"^\d+$", issue_ref.strip()):
+        return f"OMNIFY-{issue_ref.strip()}"
+    sys.stderr.write(f"Error: Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.\n")
+    sys.exit(1)
+
+
+def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref=None):
+    """
+    Deduce el proyecto y número de secuencia a partir del issue_ref o rama de Git.
+    Soporta: 'OMNIFY-162', 'OPS-44', '162', UUID o None/@ (autodetección de Git).
+    """
+    issue_ref = _ref_or_git(issue_ref)
     if re.match(r"^[0-9a-fA-F-]{36}$", issue_ref):
         return default_project_id, None, issue_ref, issue_ref
 
@@ -164,33 +188,33 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
     sys.exit(1)
 
 
+def _states_mapping(items):
+    """{nombre, slug y nombre sin tildes -> UUID} a partir de filas locales o resultados de la API (ambos indexan id, name y slug)."""
+    mapping = {}
+    for st in items:
+        name_clean = st["name"].lower().strip()
+        slug_clean = st["slug"].lower().strip()
+        mapping[name_clean] = st["id"]
+        mapping[slug_clean] = st["id"]
+        mapping[name_clean.replace("ó", "o").replace("é", "e").replace("á", "a").replace("í", "i").replace("ú", "u")] = st["id"]
+    return mapping
+
+
 def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
     """Mapea nombres y slugs de estados a su UUID usando caché SQLite3 con TTL."""
     now = time.time()
-    if conn and not force_refresh:
-        rows = conn.execute("SELECT id, name, slug, group_name, is_default, updated_at FROM states WHERE project_id = ?", (project_id,)).fetchall()
-        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
-            mapping = {}
-            for r in rows:
-                name_clean = r["name"].lower().strip()
-                slug_clean = r["slug"].lower().strip()
-                mapping[name_clean] = r["id"]
-                mapping[slug_clean] = r["id"]
-                norm = name_clean.replace("ó", "o").replace("é", "e").replace("á", "a").replace("í", "i").replace("ú", "u")
-                mapping[norm] = r["id"]
-            return mapping
+    rows = conn.execute("SELECT id, name, slug, group_name, is_default, updated_at FROM states WHERE project_id = ?", (project_id,)).fetchall() if conn else []
+    if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+        return _states_mapping(rows)
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/"
-    data = api_request(url, api_key)
-    mapping = {}
+    try:
+        data = api_request(url, api_key)
+    except PlaneUnavailable:
+        return _states_mapping(serve_stale(rows, "estados"))
     if conn:
         with conn:
             for st in data.get("results", []):
-                s_id = st["id"]
-                s_name = st["name"]
-                s_slug = st["slug"]
-                s_group = st.get("group", "")
-                s_def = 1 if st.get("default") else 0
                 conn.execute("""
                     INSERT INTO states (id, project_id, name, slug, group_name, is_default, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -200,25 +224,16 @@ def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh
                         group_name = excluded.group_name,
                         is_default = excluded.is_default,
                         updated_at = excluded.updated_at;
-                """, (s_id, project_id, s_name, s_slug, s_group, s_def, now))
-
-    for st in data.get("results", []):
-        name_clean = st["name"].lower().strip()
-        slug_clean = st["slug"].lower().strip()
-        mapping[name_clean] = st["id"]
-        mapping[slug_clean] = st["id"]
-        norm = name_clean.replace("ó", "o").replace("é", "e").replace("á", "a").replace("í", "i").replace("ú", "u")
-        mapping[norm] = st["id"]
-    return mapping
+                """, (st["id"], project_id, st["name"], st["slug"], st.get("group", ""), 1 if st.get("default") else 0, now))
+    return _states_mapping(data.get("results", []))
 
 
 def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
     """Mapea nombres de etiquetas a su UUID con paginación y caché SQLite3 con TTL."""
     now = time.time()
-    if conn and not force_refresh:
-        rows = conn.execute("SELECT id, name, color, updated_at FROM labels WHERE project_id = ?", (project_id,)).fetchall()
-        if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
-            return {r["name"].lower().strip(): r["id"] for r in rows}
+    rows = conn.execute("SELECT id, name, color, updated_at FROM labels WHERE project_id = ?", (project_id,)).fetchall() if conn else []
+    if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+        return {r["name"].lower().strip(): r["id"] for r in rows}
 
     mapping = {}
     cursor = None
@@ -228,7 +243,10 @@ def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh
         if cursor:
             url += f"?cursor={urllib.parse.quote(cursor)}"
 
-        data = api_request(url, api_key)
+        try:
+            data = api_request(url, api_key)
+        except PlaneUnavailable:
+            return {r["name"].lower().strip(): r["id"] for r in serve_stale(rows, "etiquetas")}
         for lb in data.get("results", []):
             mapping[lb["name"].lower().strip()] = lb["id"]
             all_labels.append(lb)

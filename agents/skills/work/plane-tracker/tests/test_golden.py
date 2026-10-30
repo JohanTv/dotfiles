@@ -48,6 +48,8 @@ class Golden(unittest.TestCase):
             {"args": ["get", "X1"]},
             {"args": ["get", "OTRO-5"]},
             {"args": ["list"], "env_set": {"PLANE_BASE_URL": "{DEAD}"}},
+            {"args": ["attachment", "list", "10000000-0000-4000-8000-000000000001"], "env_set": {"PLANE_BASE_URL": "{DEAD}"}},
+            {"args": ["attachment", "list", "10000000-0000-4000-8000-000000000001"], "env_set": {"PLANE_OFFLINE": "1"}},
             {"args": ["comment", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
             {"args": ["comment-edit", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
             {"args": ["--json", "attachments", "OMNIFY-1"], "env_drop": NO_ENV},
