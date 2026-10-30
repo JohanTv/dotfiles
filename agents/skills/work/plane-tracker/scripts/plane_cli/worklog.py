@@ -1,6 +1,6 @@
 """Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación.
 
-Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), replace_metadata_block(),
+Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), strip_metadata_block(), replace_metadata_block(),
 corrected_metadata(), derived_start(), upsert_worklog(), check_worklogs(), reject_placeholders(), PLACEHOLDER.
 No hace: llamadas a Plane.
 """
@@ -130,6 +130,11 @@ _BLOCK_RE = re.compile(r"<!--\s*PLANE_WORKLOG_METADATA[\s\S]*?-->")
 def find_metadata_block(html):
     match = _BLOCK_RE.search(html or "")
     return match.group(0) if match else None
+
+
+def strip_metadata_block(html):
+    """El HTML sin el bloque oculto (el texto visible)."""
+    return _BLOCK_RE.sub("", html or "")
 
 
 def replace_metadata_block(html, meta):

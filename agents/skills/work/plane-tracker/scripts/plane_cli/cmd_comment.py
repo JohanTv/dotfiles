@@ -1,7 +1,7 @@
 """Comando `comment add`: publicar un comentario con su worklog.
 
 Expone: register_comment_add(), cmd_comment().
-No hace: editar ni borrar comentarios.
+No hace: editar ni borrar comentarios, ni la entrega a Plane (outbox.publish_comment guarda, publica o encola).
 """
 
 import json
@@ -12,19 +12,15 @@ from datetime import datetime
 
 import session_clock
 
-from plane_cli.api import api_request
+from plane_cli.cache import issue_stub
+from plane_cli.circuit import PlaneUnavailable
 from plane_cli.config import add_json_flag
 from plane_cli.mdhtml import markdown_to_html
+from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
-from plane_cli.resolve import get_project_identifier, resolve_issue, resolve_project_and_seq
-from plane_cli.worklog import (
-    derived_start,
-    extract_metadata_from_comment,
-    reject_placeholders,
-    upsert_worklog,
-    worklog_metadata_block,
-)
+from plane_cli.resolve import get_project_identifier, local_ticket_label, resolve_issue, resolve_project_and_seq
+from plane_cli.worklog import derived_start, extract_metadata_from_comment, reject_placeholders
 
 
 def _resolve_duration(args, conn, meta, issue_ref):
@@ -104,8 +100,31 @@ def _record_measurement(meta, args, proposal, worker_type):
         meta["measured_by"] = declared
 
 
+def _print_result(args, result, issue, ticket_label, duration):
+    """Salida de `comment add`: publicado (idéntica con o sin cola) o en cola."""
+    as_json = getattr(args, "json", False)
+    if result.note:
+        sys.stderr.write(f"ℹ {result.note}\n")
+    if result.state == "sent":
+        if as_json:
+            print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": result.comment_id}))
+        else:
+            print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {result.comment_id})")
+    elif as_json:
+        print(json.dumps({"status": "queued", "action": "comment", "outbox_id": result.outbox_id, "client_id": result.client_id, "issue": ticket_label,
+                          "duration_minutes": duration, "reason": result.reason}))
+    else:
+        print(f"⏳ En cola (#{result.outbox_id}): comentario para {ticket_label}, {duration} min. Plane no responde; el tiempo ya cuenta como registrado. "
+              "Publícalo con: plane-tracker outbox flush")
+
+
 def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    unavailable = None
+    try:
+        project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    except PlaneUnavailable as exc:
+        unavailable, project_id, seq_id, uuid_ref = exc, None, None, None
+        issue_ref = local_ticket_label(args.issue)
     args.issue = issue_ref
     content = ""
     if args.file:
@@ -121,27 +140,34 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         sys.exit(1)
     reject_placeholders(content)
 
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    if unavailable is None:
+        try:
+            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+        except PlaneUnavailable as exc:
+            unavailable = exc
+    if unavailable is not None:
+        issue = issue_stub(conn, project_id, seq_id, uuid_ref, issue_ref)
 
     meta = extract_metadata_from_comment(content)
     duration, proposal = _resolve_duration(args, conn, meta, issue_ref)
 
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     # Convertir Markdown → HTML si el contenido no viene ya como HTML
     if content.strip().startswith("<") and ">" in content:
         comment_html = content
     else:
         comment_html = markdown_to_html(content)
 
-    # Caching atómico en SQLite3
     now = datetime.now()
-    # Etiqueta real del ticket: identifier del proyecto resuelto (OPS-13, nunca OMNIFY-13 por defecto)
-    proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
-    if not proj_ident and issue_ref and "-" in issue_ref:
-        proj_ident = issue_ref.split("-")[0].upper()
-    seq_label = issue.get("sequence_id") or seq_id
-    ticket_label = f"{proj_ident}-{seq_label}" if proj_ident and seq_label else args.issue
-    
+    if unavailable is None:
+        # Etiqueta real del ticket: identifier del proyecto resuelto (OPS-13, nunca OMNIFY-13 por defecto)
+        proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
+        if not proj_ident and issue_ref and "-" in issue_ref:
+            proj_ident = issue_ref.split("-")[0].upper()
+        seq_label = issue.get("sequence_id") or seq_id
+        ticket_label = f"{proj_ident}-{seq_label}" if proj_ident and seq_label else args.issue
+    else:
+        ticket_label = issue.get("ticket_id") or issue_ref
+
     # Determinar track, worker_type y capacity_bucket (prioridad: flags de CLI -> metadata -> default)
     track = getattr(args, "track", None) or (meta.get("track") if meta else None) or "main"
     worker_type = getattr(args, "worker_type", None) or (meta.get("worker_type") if meta else None) or "human"
@@ -178,12 +204,8 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
     # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --refresh`.
-    if "PLANE_WORKLOG_METADATA" not in comment_html:
-        comment_html += "\n" + worklog_metadata_block(meta)
-    res = api_request(url, api_key, method="POST", data={"comment_html": comment_html})
-
     entry = {
-        "id": res.get("id"),
+        "id": None,
         "ticket_id": ticket_label,
         "track": track,
         "issue_name": issue.get("name", ""),
@@ -197,24 +219,15 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "role": meta.get("role", "backend_engineer"),
         "notes": meta.get("notes", issue.get("name", "")),
         "stoppers": meta.get("stoppers", []),
-        "plane_comment_id": res.get("id"),
+        "plane_comment_id": None,
         "created_at": datetime.now().isoformat(),
         "raw_payload": meta
     }
-    clash = conn.execute(
-        "SELECT 1 FROM worklogs WHERE ticket_id = ? AND track = ? AND date = ? AND start_time = ?",
-        (entry["ticket_id"], entry["track"], entry["date"], entry["start_time"]),
-    ).fetchone()
-    if clash:
-        sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
-    upsert_worklog(conn, entry)
+    draft = Draft(base_url, api_key, workspace, project_id, issue, ticket_label, comment_html, meta, entry, unavailable)
+    result = publish_comment(conn, draft)
     if proposal:
         consume_proposal(issue_ref.upper(), proposal["session_id"])
-
-    if getattr(args, "json", False):
-        print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": res.get("id")}))
-    else:
-        print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
+    _print_result(args, result, issue, ticket_label, duration)
 
 
 def register_comment_add(sub):

@@ -1,7 +1,7 @@
 """Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets y snapshots.
 
 Expone: age_text(), warn_stale(), serve_stale(), fail_no_cache(), sync_issues_cache(), save_snapshot(), offline_issue(),
-cached_issues(), iso_utc().
+cached_issues(), issue_stub(), iso_utc().
 No hace: formatear la salida de los comandos ni decidir cuándo estar sin conexión (eso lo señala PlaneUnavailable).
 Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen mandando.
 """
@@ -149,3 +149,12 @@ def cached_issues(conn, project_id):
                         "ORDER BY sequence_id DESC LIMIT ?", (project_id, LIST_LIMIT)).fetchall()
     return [{"id": r["id"], "sequence_id": r["sequence_id"], "name": r["title"], "priority": r["priority"], "state_name": r["state_name"],
              "cached_at": iso_utc(r["updated_at"])} for r in rows], (min(r["updated_at"] for r in rows) if rows else None)
+
+
+def issue_stub(conn, project_id, seq_id, uuid_ref, ticket_label):
+    """Ticket reconstruido desde lo local para encolar sin red: {"id": None, "name", "sequence_id", "ticket_id"} (id nunca se conoce)."""
+    local = offline_issue(conn, project_id, seq_id, uuid_ref, ticket_label)
+    issue = local["issue"] if local else {}
+    row = conn.execute("SELECT ticket_id, sequence_id, title FROM issues_cache WHERE ticket_id = ? OR id = ? LIMIT 1", (ticket_label, uuid_ref or "")).fetchone()
+    return {"id": None, "name": issue.get("name") or (row["title"] if row else ""), "sequence_id": issue.get("sequence_id") or (row["sequence_id"] if row else seq_id),
+            "ticket_id": row["ticket_id"] if row else None}

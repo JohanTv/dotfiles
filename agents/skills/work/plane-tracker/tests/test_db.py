@@ -46,6 +46,7 @@ class Permissions(unittest.TestCase):
 class OutboxSchema(unittest.TestCase):
     def setUp(self):
         self.conn = sqlite3.connect(":memory:")
+        self.addCleanup(self.conn.close)
         db.init_db(self.conn)
         db.init_db(self.conn)
 

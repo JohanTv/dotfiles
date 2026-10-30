@@ -490,8 +490,10 @@ def _scrub_body(text, keys):
             return "<!-- PLANE_WORKLOG_METADATA " + json.dumps(meta, sort_keys=True, ensure_ascii=False) + " -->"
         return _META_RE.sub(sub, value)
 
-    if isinstance(parsed, dict) and isinstance(parsed.get("comment_html"), str):
-        parsed["comment_html"] = fix_html(parsed["comment_html"])
+    if isinstance(parsed, dict):
+        parsed = _scrub(parsed, keys)
+        if isinstance(parsed.get("comment_html"), str):
+            parsed["comment_html"] = fix_html(parsed["comment_html"])
     return json.dumps(parsed, sort_keys=True, ensure_ascii=False)
 
 
