@@ -143,6 +143,15 @@ plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo
 
 ---
 
+### C.3 `plane-tracker link` y `comment-edit --embed-metadata`
+```bash
+plane-tracker link OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
+plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
+```
+Prefiere `link` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
+
+---
+
 ### D. `plane-tracker update` (Transiciones de Estado)
 Permite mover tickets entre columnas del Kanban sin abrir el navegador.
 
