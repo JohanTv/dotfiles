@@ -1,0 +1,183 @@
+$ plane.py update OMNIFY-1 --state Revisión --priority HIGH --labels backend,nope,BUG --start-date 2026-10-01 --due-date 2026-11-01
+[exit 0]
+--- stdout ---
+✔ Ticket OMNIFY-1 actualizado con éxito: [Estado ➔ Revisión, Prioridad ➔ HIGH, Etiquetas ➔ backend,nope,BUG, Inicio ➔ 2026-10-01, Vence ➔ 2026-11-01]
+--- stderr ---
+Advertencia: Etiqueta 'nope' no existe en el proyecto. Ignorada.
+
+$ plane.py update OMNIFY-1 --state completado --json
+[exit 0]
+--- stdout ---
+{"status": "ok", "action": "update", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "patched": {"state": "11005808-0000-4000-8000-11111111-111"}}
+--- stderr ---
+
+
+$ plane.py update OMNIFY-1 --state inexistente
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Estado desconocido 'inexistente'. Estados válidos en proyecto: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
+
+$ plane.py update OMNIFY-1 --priority enorme
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Prioridad desconocida 'enorme'. Opciones: urgent, high, medium, low, none.
+
+$ plane.py update OMNIFY-1 --due-date 31/12/2026
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Fecha inválida '31/12/2026'. Formato: YYYY-MM-DD.
+
+$ plane.py update OMNIFY-1
+[exit 0]
+--- stdout ---
+
+--- stderr ---
+Advertencia: No se indicaron cambios para actualizar (--state, --priority, --labels, --start-date o --due-date).
+
+$ plane.py update 1 --labels sms
+[exit 0]
+--- stdout ---
+✔ Ticket OMNIFY-1 actualizado con éxito: [Etiquetas ➔ sms]
+--- stderr ---
+
+
+$ plane.py create [FIX] Corregir validación del campo teléfono en formularios de campaña -d Texto **md**
+
+1. uno
+2. dos -p OPS --priority urgent --state Pendiente --labels backend,bug,zzz --start-date 2026-10-26 --due-date 2026-11-01
+[exit 0]
+--- stdout ---
+
+🎉 Ticket creado exitosamente: OPS-101
+   • Título: [FIX] Corregir validación del campo teléfono en formularios de campaña
+   • Prioridad: URGENT
+   • Enlace: http://127.0.0.1:PORT/ws/projects/22222222-2222-4222-8222-222222222222/issues/99000000-0000-4000-8000-000000000001
+   • Sugerencia de rama Git: fix/OPS-101-corregir-validaci-n-del-campo-tel-f
+--- stderr ---
+Advertencia: Etiqueta 'zzz' no encontrada en el proyecto. Se omitirá.
+
+$ plane.py create [QA] Probar flujo --json --attach adj.txt
+[exit 0]
+--- stdout ---
+{
+  "status": "ok",
+  "action": "create",
+  "ticket": "OMNIFY-102",
+  "id": "99000000-0000-4000-8000-000000000002",
+  "sequence_id": 102,
+  "name": "[QA] Probar flujo",
+  "branch_suggestion": "test/OMNIFY-102-probar-flujo",
+  "url": "http://127.0.0.1:PORT/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002",
+  "attachments": [
+    "adj.txt"
+  ],
+  "attachment_errors": [],
+  "raw": {
+    "id": "99000000-0000-4000-8000-000000000002",
+    "sequence_id": 102,
+    "name": "[QA] Probar flujo",
+    "priority": "none"
+  }
+}
+--- stderr ---
+
+
+$ plane.py create Sin fase -d <p>ya html</p>
+[exit 0]
+--- stdout ---
+
+🎉 Ticket creado exitosamente: OMNIFY-104
+   • Título: Sin fase
+   • Prioridad: NONE
+   • Enlace: http://127.0.0.1:PORT/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000004
+   • Sugerencia de rama Git: feat/OMNIFY-104-sin-fase
+--- stderr ---
+
+
+$ plane.py create [RFC] Algo -p nope
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'nope' no encontrado. Opciones: OMNIFY, OPS
+
+$ plane.py create [FEAT] Algo --state nope
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Estado desconocido 'nope'. Estados válidos: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
+
+$ plane.py create [FEAT] Algo --attach no-existe.txt
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: 'no-existe.txt' no es un archivo.
+
+$ plane.py link OMNIFY-1 https://example.com/pr/1 --title PR 1
+[exit 0]
+--- stdout ---
+✔ Enlace añadido a OMNIFY-1: PR 1
+--- stderr ---
+
+
+$ plane.py link OMNIFY-1 https://example.com/pr/1
+[exit 0]
+--- stdout ---
+✔ OMNIFY-1 ya tiene ese enlace
+--- stderr ---
+
+
+$ plane.py link OMNIFY-1 ftp://mal
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: la URL debe empezar por http:// o https://
+
+$ plane.py link OMNIFY-1 https://example.com/doc
+[exit 0]
+--- stdout ---
+✔ Enlace añadido a OMNIFY-1: https://example.com/doc
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b000000-0000-4000-8000-11111111-111", "1b100000-0000-4000-8000-11111111-111"], "priority": "high", "start_date": "2026-10-01", "state": "11004844-0000-4000-8000-11111111-111", "target_date": "2026-11-01"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"state": "11005808-0000-4000-8000-11111111-111"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b200000-0000-4000-8000-11111111-111"]}
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
+POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/ {"description_html": "<p>Texto <strong>md</strong></p>\n<ol><li>uno</li><li>dos</li></ol>", "labels": ["1b000000-0000-4000-8000-22222222-222", "1b100000-0000-4000-8000-22222222-222"], "name": "[FIX] Corregir validación del campo teléfono en formularios de campaña", "priority": "urgent", "start_date": "2026-10-26", "state": "22004750-0000-4000-8000-22222222-222", "target_date": "2026-11-01"}
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/ {"name": "[QA] Probar flujo", "priority": "none"}
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002/issue-attachments/ {"name": "adj.txt", "size": 13, "type": "text/plain"}
+POST /upload/bucket <multipart>
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002/issue-attachments/e0000000-0000-4000-8000-000000000003/ {"is_uploaded": true}
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/ {"description_html": "<p>ya html</p>", "name": "Sin fase", "priority": "none"}
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/ {"title": "PR 1", "url": "https://example.com/pr/1"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/ {"title": "https://example.com/doc", "url": "https://example.com/doc"}

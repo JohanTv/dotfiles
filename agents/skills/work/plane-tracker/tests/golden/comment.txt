@@ -1,0 +1,143 @@
+$ plane.py comment OMNIFY-1 -m **Hola** mundo
+
+- uno
+- dos --duration 15 --track t1 --capacity tooling_dx
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000001)
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-1 -m mismo minuto --duration 15 --track t1 --capacity tooling_dx --json
+[exit 0]
+--- stdout ---
+{"status": "ok", "action": "comment", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "comment_id": "c9000000-0000-4000-8000-000000000002"}
+--- stderr ---
+⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).
+
+$ plane.py comment OPS-13 -f cuerpo.md --duration 5 --worker-type agent:claude --session sess-golden-0001 --json
+[exit 0]
+--- stdout ---
+{"status": "ok", "action": "comment", "issue_id": "20000000-0000-4000-8000-000000000013", "sequence_id": 13, "comment_id": "c9000000-0000-4000-8000-000000000003"}
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-2 --duration 7
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-2 (ID Comentario: c9000000-0000-4000-8000-000000000004)
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-1 -m <p>Ya es <b>HTML</b></p> --duration 3
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000005)
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-1 -m Con metadata
+<!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "meta", "track": "mm"} -->
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000006)
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-1 -m x --duration 0
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+✖ Sin propuesta para OMNIFY-1: No se pudo determinar el agente (usa --agent claude|opencode|agy o --worker-type agent:<x>).
+   Pregunta cuánto demoró; no se infiere ni se inventa.
+Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
+
+$ plane.py comment OMNIFY-1 -m x --duration 9999
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: duración fuera de rango (9999 min). Debe estar entre 1 y 1440 minutos.
+
+$ plane.py comment OMNIFY-1 -m    
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: El comentario está vacío.
+
+$ plane.py comment OMNIFY-1 -m Pendiente [COMPLETAR] --duration 5
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: el texto aún tiene marcadores [COMPLETAR]; complétalos antes de publicar.
+
+$ plane.py comment OMNIFY-1 -m sin duración --capacity toil_support --agent claude --session sess-golden-0001
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+✖ Sin propuesta para OMNIFY-1: El balde 'toil_support' (soporte/reuniones) no deja huella en un transcript: pregunta la duración.
+   Pregunta cuánto demoró; no se infiere ni se inventa.
+Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
+
+$ plane.py comment OMNIFY-1 -m sin duración --accept-proposal --agent claude --session sess-golden-0001
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no hay una propuesta reciente (<30 min) de esta sesión para OMNIFY-1. Repite sin --accept-proposal para generarla.
+
+$ plane.py comment OMNIFY-1 -m sin duración --capacity coordination --accept-proposal
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: el balde 'coordination' (soporte/reuniones) no admite propuesta medida; usa --duration.
+
+$ plane.py comment OMNIFY-1 -m sin duración --agent claude --session sess-golden-0001
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+✖ Sin propuesta para OMNIFY-1: No hay actividad medible en la ventana (o ya está registrada/reservada para esta sesión).
+   Pregunta cuánto demoró; no se infiere ni se inventa.
+Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
+
+$ plane.py comment OMNIFY-999 -m x --duration 5
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Ticket #999 no encontrado en el proyecto.
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p><strong>Hola</strong> mundo</p>\n<ul><li>uno</li><li>dos</li></ul>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"tooling_dx\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 15, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"**Hola** mundo\\n\\n- uno\\n- dos\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"t1\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>mismo minuto</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"tooling_dx\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 15, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"mismo minuto\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"t1\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/20000000-0000-4000-8000-000000000013/comments/ {"comment_html": "<h1>Título</h1>\n<p>Texto con <code>código</code> y <a href=\"https://x.example\">enlace</a></p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 5, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"session\": \"sess-golden-0001\", \"worker_type\": \"agent:claude\"}, \"notes\": \"# Título\\n\\nTexto con `código` y [enlace](https://x.example)\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"agent:claude\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/comments/ {"comment_html": "<p>Desde stdin</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 7, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Desde stdin\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Ya es <b>HTML</b></p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 3, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Ya es HTML\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Con metadata<br>&lt;!-- PLANE_WORKLOG_METADATA {\"date\": \"2026-10-21\", \"start_time\": \"08:00\", \"duration_minutes\": 20, \"notes\": \"meta\", \"track\": \"mm\"} --&gt;</p>"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+
+=== worklogs ===
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 3, "end_time": "<VOLATIL>", "issue_name": "Validaciones de formulario SMS", "notes": "Ya es HTML", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000005", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "<VOLATIL>", "duration_minutes": 3, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Ya es HTML", "phase": "dev", "schema_version": "2.2", "start_time": "<VOLATIL>", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "issue_name": "Validaciones de formulario SMS", "notes": "meta", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000006", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "meta", "start_time": "<VOLATIL>", "track": "mm", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "mm", "worker_type": "human"}
+{"capacity_bucket": "tooling_dx", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 15, "end_time": "<VOLATIL>", "issue_name": "Validaciones de formulario SMS", "notes": "mismo minuto", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000002", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "tooling_dx", "date": "<VOLATIL>", "duration_minutes": 15, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "mismo minuto", "phase": "dev", "schema_version": "2.2", "start_time": "<VOLATIL>", "stoppers": [], "track": "t1", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "t1", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 7, "end_time": "<VOLATIL>", "issue_name": "Acortador de enlaces", "notes": "Desde stdin", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000004", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "<VOLATIL>", "duration_minutes": 7, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Desde stdin", "phase": "dev", "schema_version": "2.2", "start_time": "<VOLATIL>", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-2", "track": "main", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 5, "end_time": "<VOLATIL>", "issue_name": "Tareas Rápidas y Soporte - W43", "notes": "# Título\n\nTexto con `código` y [enlace](https://x.example)", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000003", "project_id": "OPS", "raw_payload": {"capacity_bucket": "deep_work", "date": "<VOLATIL>", "duration_minutes": 5, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "session": "sess-golden-0001", "worker_type": "agent:claude"}, "notes": "# Título\n\nTexto con `código` y [enlace](https://x.example)", "phase": "dev", "schema_version": "2.2", "start_time": "<VOLATIL>", "stoppers": [], "track": "main", "worker_type": "agent:claude"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OPS-13", "track": "main", "worker_type": "agent:claude"}

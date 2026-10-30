@@ -1,0 +1,55 @@
+$ plane.py whoami
+[exit 0]
+--- stdout ---
+🌐 PLANE_BASE_URL  : http://127.0.0.1:PORT
+🏢 PLANE_WORKSPACE : ws
+🔑 PLANE_ACTOR_UUID: aaaaaaaa-0000-4000-8000-000000000001 (configurado directamente)
+
+✅ Configuración válida. Puedes usar plane-tracker normalmente.
+--- stderr ---
+
+
+$ plane.py whoami   [sin PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+🌐 PLANE_BASE_URL  : http://127.0.0.1:PORT
+🏢 PLANE_WORKSPACE : ws
+⚠️  Ni PLANE_USERNAME ni PLANE_ACTOR_UUID están configurados.
+   El sync funcionará pero mezclará horas de todos los autores en tickets compartidos.
+
+📋 Setup requerido en ~/.zshrc.local:
+   export PLANE_USERNAME="tu@email.com"  # o tu display_name en Plane
+   # Opcional (más robusto):
+   export PLANE_ACTOR_UUID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+--- stderr ---
+
+
+$ plane.py whoami   [sin PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+🌐 PLANE_BASE_URL  : http://127.0.0.1:PORT
+🏢 PLANE_WORKSPACE : ws
+👤 PLANE_USERNAME  : tester (resolviendo UUID...)
+✅ UUID resuelto   : aaaaaaaa-0000-4000-8000-000000000001
+
+💡 Tip: para acelerar futuros syncs, agrega a ~/.zshrc.local:
+   export PLANE_ACTOR_UUID="aaaaaaaa-0000-4000-8000-000000000001"
+
+✅ Configuración válida. Puedes usar plane-tracker normalmente.
+--- stderr ---
+
+
+$ plane.py whoami   [sin PLANE_ACTOR_UUID]
+[exit 1]
+--- stdout ---
+🌐 PLANE_BASE_URL  : http://127.0.0.1:PORT
+🏢 PLANE_WORKSPACE : ws
+👤 PLANE_USERNAME  : nadie (resolviendo UUID...)
+❌ No se pudo resolver el UUID para PLANE_USERNAME='nadie'
+   Verifica que el nombre o email coincida exactamente con tu perfil en Plane.
+--- stderr ---
+⚠ PLANE_USERNAME='nadie' no coincide con ningún miembro del workspace.
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/members/
+GET /api/v1/workspaces/ws/members/

@@ -1,0 +1,51 @@
+$ plane.py handoff
+[exit 0]
+--- stdout ---
+### 🔄 Relevo de Tarea (Handoff Snapshot)
+- **Avance realizado:** [COMPLETAR]
+- **Rama Git / Commit:** `feat/OMNIFY-1-validaciones` @ `<SHA>` (en origin/feat/OMNIFY-1-validaciones, según el último fetch local)
+  Repo: Org/repo · working tree limpio
+- **Estado actual:** [COMPLETAR]
+- **Stoppers / Próximo paso:** [COMPLETAR]
+--- stderr ---
+
+Completa los [COMPLETAR], guarda el texto en un archivo y publícalo con:
+  plane-tracker comment OMNIFY-1 -f relevo.md --duration <min>   (o --accept-proposal)
+
+$ plane.py handoff OMNIFY-9 --base main
+[exit 0]
+--- stdout ---
+### 🔄 Relevo de Tarea (Handoff Snapshot)
+- **Avance realizado:** [COMPLETAR]
+- **Rama Git / Commit:** `feat/OMNIFY-1-validaciones` @ `<SHA>` (en origin/feat/OMNIFY-1-validaciones, según el último fetch local)
+  Repo: Org/repo · Base: main (0 commit(s) sobre origin/main) · working tree limpio
+- **Estado actual:** [COMPLETAR]
+- **Stoppers / Próximo paso:** [COMPLETAR]
+--- stderr ---
+
+Completa los [COMPLETAR], guarda el texto en un archivo y publícalo con:
+  plane-tracker comment OMNIFY-9 -f relevo.md --duration <min>   (o --accept-proposal)
+
+$ plane.py handoff --base nope
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+ERROR: No existe origin/nope localmente (¿falta un fetch?).
+
+$ plane.py handoff --base --evil
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py handoff [-h] [--base BRANCH] [issue]
+plane.py handoff: error: argument --base: expected one argument
+
+$ plane.py handoff
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+ERROR: No estás dentro de un repositorio git.
+
+=== peticiones al servidor ===

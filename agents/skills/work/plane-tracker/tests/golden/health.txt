@@ -1,0 +1,85 @@
+$ plane.py projects
+[exit 0]
+--- stdout ---
+
+📂 Proyectos en el workspace 'ws':
+  • OMNIFY         ➔  Omnify
+  • OPS            ➔  Operaciones
+
+💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').
+   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.
+--- stderr ---
+
+
+$ plane.py list
+[exit 0]
+--- stdout ---
+
+📋 Tickets recientes (3 obtenidos):
+  • #1    [HIGH]    Validaciones de formulario SMS
+  • #2    [MEDIUM]  Acortador de enlaces
+  • #3    [LOW]     Webhook SMS duplicado
+--- stderr ---
+
+
+$ plane.py list -p OPS
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 503 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=50: {"detail": "ca\u00eddo"}
+
+$ plane.py health
+[exit 0]
+--- stdout ---
+
+🩺 Plane · últimas 24 h: 3 llamadas, 1 fallidas, 0 con reintento
+   • Latencia: p50 <N> ms · p95 <N> ms · máx <N> ms
+   • 1 × HTTP 503
+     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+--- stderr ---
+
+
+$ plane.py health --json
+[exit 0]
+--- stdout ---
+{
+  "requests": 3,
+  "failures": 1,
+  "retried": 0,
+  "p50_ms": "<VOLATIL>",
+  "p95_ms": "<VOLATIL>",
+  "max_ms": "<VOLATIL>",
+  "errors": {
+    "HTTP 503": 1
+  },
+  "last_failures": [
+    {
+      "ts": "<VOLATIL>",
+      "method": "GET",
+      "path": "/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/",
+      "status": 503,
+      "ms": "<VOLATIL>",
+      "attempt": 1,
+      "error": null
+    }
+  ]
+}
+--- stderr ---
+
+
+$ plane.py health --hours 1
+[exit 0]
+--- stdout ---
+
+🩺 Plane · últimas 1 h: 3 llamadas, 1 fallidas, 0 con reintento
+   • Latencia: p50 <N> ms · p95 <N> ms · máx <N> ms
+   • 1 × HTTP 503
+     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=50

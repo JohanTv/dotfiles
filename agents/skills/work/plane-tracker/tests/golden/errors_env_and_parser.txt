@@ -1,0 +1,109 @@
+$ plane.py list   [sin PLANE_BASE_URL]
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Variable de entorno 'PLANE_BASE_URL' (URL de Plane) no configurada.
+Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.
+
+$ plane.py list   [sin PLANE_API_KEY]
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Variable de entorno 'PLANE_API_KEY' (API Key de Plane) no configurada.
+Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.
+
+$ plane.py health   [sin PLANE_BASE_URL,PLANE_API_KEY]
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Variable de entorno 'PLANE_BASE_URL' (URL de Plane) no configurada.
+Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.
+
+$ plane.py bogus
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py [-h] [--json]
+                {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report} ...
+plane.py: error: argument command: invalid choice: 'bogus' (choose from comment, link, attach, attachments, health, handoff, focus, propose-duration, create, comment-delete, comment-edit, update, get, list, search, labels, projects, whoami, report)
+
+$ plane.py 
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py [-h] [--json]
+                {comment,link,attach,attachments,health,handoff,focus,propose-duration,create,comment-delete,comment-edit,update,get,list,search,labels,projects,whoami,report} ...
+plane.py: error: the following arguments are required: command
+
+$ plane.py get --last 0 OMNIFY-1
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py get [-h] [--json] [--no-comments] [--last N] [--full]
+                    [--no-description] [--history]
+                    [issue]
+plane.py get: error: argument --last: debe ser un entero >= 1
+
+$ plane.py health --hours x
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py health [-h] [--hours HOURS] [--json]
+plane.py health: error: argument --hours: invalid positive_int value: 'x'
+
+$ plane.py comment OMNIFY-1 --capacity nada
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py comment [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
+                        [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
+                        [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
+                        [--duration MIN] [--accept-proposal]
+                        [--agent {claude,opencode,agy}] [--session ID]
+                        [--json]
+                        [issue]
+plane.py comment: error: argument --capacity/--capacity-bucket: invalid choice: 'nada' (choose from deep_work, toil_support, coordination, tooling_dx, research_rd, tech_debt_paydown)
+
+$ plane.py report --today --week
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
+                       [--track TRACK] [--worker-type WORKER_TYPE] [--sync]
+                       [--check] [--flow] [--json]
+plane.py report: error: argument --week: not allowed with argument --today
+
+$ plane.py get X1
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Formato de ticket no reconocido: 'X1'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.
+
+$ plane.py get OTRO-5
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Prefijo de proyecto 'OTRO' no encontrado en el workspace 'ws'.
+Proyectos disponibles: OMNIFY, OPS
+
+$ plane.py list
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error de red/conexión con Plane (http://127.0.0.1:1/api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50): <urlopen error timed out>
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/
