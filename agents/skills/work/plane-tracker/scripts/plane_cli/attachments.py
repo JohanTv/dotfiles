@@ -116,3 +116,19 @@ def cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id
     for r in rows:
         print(f"   • {r['name']}  ({(r['size'] or 0) / 1024:.1f} KB)  {local_stamp(r['created_at'])}  {r['id']}")
     print("")
+
+
+def register_attach(sub):
+    p_attach = sub.add_parser("attach", help="Subir archivos al work item")
+    p_attach.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
+    p_attach.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
+    p_attach.add_argument("--replace", metavar="ID", help="Id de un adjunto a sustituir: sube el nuevo y, si salió bien, borra el anterior")
+    p_attach.set_defaults(handler=cmd_attach)
+
+
+def register_attachments(sub):
+    p_attachments = sub.add_parser("attachments", help="Listar los adjuntos del work item")
+    p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
+    p_attachments.add_argument("--json", action="store_true", help="Salida en JSON")
+    p_attachments.add_argument("--delete", metavar="ID", help="Eliminar el adjunto con ese id")
+    p_attachments.set_defaults(handler=cmd_attachments)
