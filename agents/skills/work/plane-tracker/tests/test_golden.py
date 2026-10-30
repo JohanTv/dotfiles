@@ -48,6 +48,14 @@ class Golden(unittest.TestCase):
             {"args": ["get", "X1"]},
             {"args": ["get", "OTRO-5"]},
             {"args": ["list"], "env_set": {"PLANE_BASE_URL": "http://127.0.0.1:1"}},
+            {"args": ["comment", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
+            {"args": ["comment-edit", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
+            {"args": ["--json", "attachments", "OMNIFY-1"], "env_drop": NO_ENV},
+            {"args": ["attach", "OMNIFY-1", "adj.txt", "--replace", "x"], "env_drop": NO_ENV},
+            {"args": ["focus", "--agent", "claude", "--off"], "env_drop": NO_ENV},
+            {"args": ["report", "--flow", "--sync"], "env_drop": NO_ENV},
+            {"args": ["comment", "rm", "OMNIFY-1"], "env_drop": NO_ENV},
+            {"args": ["atachment", "list", "OMNIFY-1"], "env_drop": NO_ENV},
         ]
         self.golden("errors_env_and_parser", steps)
 
