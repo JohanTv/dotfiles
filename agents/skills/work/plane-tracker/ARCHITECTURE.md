@@ -142,3 +142,7 @@ python3 -m unittest discover -s tests
 - **Formatos de salida**: textos, JSON y códigos de salida son contrato para agentes y scripts.
 - **Arranque rápido**: todo el código fuera de `plane.py` se cachea como `.pyc`; evita imports pesados o trabajo a nivel
   de módulo.
+
+## Propuestas pendientes
+
+Los diseños acordados que aún no están implementados (p. ej. el modo sin conexión con cola de salida) viven en `ROADMAP.md`; ahí se marca explícitamente qué no existe en el código.
