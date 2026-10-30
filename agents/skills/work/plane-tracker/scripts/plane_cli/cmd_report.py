@@ -218,18 +218,19 @@ def add_period_args(parser):
 
 
 def register_report(sub):
-    p_report = sub.add_parser("report", help="Reporte de actividad por día o semana", description="Reporte de actividad con Interval Merging; `report flow` muestra el flujo por ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).")
+    p_report = sub.add_parser("report", help="Reporte de actividad; report flow: flujo por ticket",
+                            description="Reporte de actividad con Interval Merging; `report flow` muestra el flujo por ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).")
     p_report.add_argument("view", nargs="?", choices=["flow"], help="Vista: flujo por ticket (por defecto, actividad)")
     add_period_args(p_report)
     p_report.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
     p_report.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
     p_report.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane (vista de actividad)")
-    add_json_flag(p_report, help="Salida en formato JSON")
+    add_json_flag(p_report)
     p_report.set_defaults(handler=cmd_report)
 
 
 def register_worklog_check(sub):
-    p_check = sub.add_parser("check", help="Comparar los worklogs locales con sus comentarios",
+    p_check = sub.add_parser("check", help="Comparar los worklogs locales con Plane",
                              description="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias). Sale con código 1 si hay inconsistencias.")
     add_period_args(p_check)
     add_json_flag(p_check)

@@ -215,14 +215,15 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def register_health(sub):
-    p_health = sub.add_parser("health", help="Latencia y errores recientes de la API de Plane")
+    p_health = sub.add_parser("health", help="Latencia y errores recientes de la API")
     p_health.add_argument("--hours", type=positive_int, default=24, help="Ventana en horas (por defecto 24)")
     add_json_flag(p_health)
     p_health.set_defaults(handler=cmd_health)
 
 
 def register_handoff(sub):
-    p_handoff = sub.add_parser("handoff", help="Imprimir el borrador del relevo (Handoff Snapshot) con los hechos de git del directorio actual")
+    p_handoff = sub.add_parser("handoff", help="Borrador del relevo con los hechos de git",
+                                  description="Imprime el borrador del relevo (Handoff Snapshot) con los hechos de git del directorio actual; no publica.")
     p_handoff.add_argument("issue", nargs="?", default=None, help="Ticket (solo para la sugerencia de publicación)")
     p_handoff.add_argument("--base", metavar="BRANCH", help="Rama base para contar 'N commits sobre origin/BRANCH' (nunca se asume)")
     p_handoff.set_defaults(handler=cmd_handoff)
@@ -234,20 +235,21 @@ def _add_session_args(parser):
 
 
 def register_focus_set(sub):
-    p_set = sub.add_parser("set", help="Marcar en qué ticket trabaja esta sesión (reparte el tiempo medido por ticket)")
+    p_set = sub.add_parser("set", help="Marcar el ticket en el que trabaja la sesión",
+                             description="Marca en qué ticket trabaja esta sesión; `worklog propose` reparte el tiempo medido entre los tickets marcados.")
     p_set.add_argument("issue", help="Ticket en el que empiezas a trabajar")
     _add_session_args(p_set)
     p_set.set_defaults(handler=cmd_focus_set)
 
 
 def register_focus_clear(sub):
-    p_clear = sub.add_parser("clear", help="Cerrar la marca de foco actual")
+    p_clear = sub.add_parser("clear", help="Cerrar la marca de foco abierta")
     _add_session_args(p_clear)
     p_clear.set_defaults(handler=cmd_focus_clear)
 
 
 def register_focus_status(sub):
-    p_status = sub.add_parser("status", help="Ver el tiempo atribuido hoy a cada ticket")
+    p_status = sub.add_parser("status", help="Ver el tiempo atribuido hoy por ticket")
     _add_session_args(p_status)
     add_json_flag(p_status)
     p_status.set_defaults(handler=cmd_focus_status)

@@ -69,8 +69,8 @@ def command_tree(parser):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3 SQLite3)")
-    add_json_flag(parser, help="Salida en formato JSON para agentes")
+    parser = argparse.ArgumentParser(description="CLI de Plane CE para agentes de IA")
+    add_json_flag(parser)
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="<comando>")
     for entry in COMMANDS:
         if callable(entry):

@@ -218,7 +218,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def register_comment_add(sub):
-    p_comment = sub.add_parser("add", help="Publicar comentario en un ticket")
+    p_comment = sub.add_parser("add", help="Publicar un comentario con su worklog")
     p_comment.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")

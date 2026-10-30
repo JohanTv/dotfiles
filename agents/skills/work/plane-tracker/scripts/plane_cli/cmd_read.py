@@ -359,7 +359,7 @@ def cmd_whoami(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def register_get(sub):
-    p_get = sub.add_parser("get", help="Obtener detalles de un ticket")
+    p_get = sub.add_parser("get", help="Ver un ticket con sus comentarios")
     p_get.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     add_json_flag(p_get)
     p_get.add_argument("--no-comments", action="store_true", help="No traer ni mostrar comentarios (ahorra tokens)")
@@ -371,14 +371,15 @@ def register_get(sub):
 
 
 def register_list(sub):
-    p_list = sub.add_parser("list", help="Listar tickets del proyecto")
+    p_list = sub.add_parser("list", help="Listar los tickets del proyecto")
     p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
 
 
 def register_search(sub):
-    p_search = sub.add_parser("search", help="Búsqueda ultra-rápida FTS5 (< 2ms) de tickets en Momento Cero")
+    p_search = sub.add_parser("search", help="Buscar tickets por texto (caché local)",
+                                description="Búsqueda FTS5 (< 2 ms) sobre la caché local de tickets; úsala antes de crear uno nuevo.")
     p_search.add_argument("query", help="Texto de búsqueda (ej: 'validaciones formulario', 'webhook sms')")
     p_search.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
     p_search.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane")
@@ -387,7 +388,8 @@ def register_search(sub):
 
 
 def register_labels(sub):
-    p_labels = sub.add_parser("labels", help="Listar etiquetas disponibles en un proyecto cacheadas en SQLite")
+    p_labels = sub.add_parser("labels", help="Listar las etiquetas del proyecto",
+                                 description="Etiquetas disponibles en un proyecto, desde la caché local (--refresh la actualiza).")
     p_labels.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
     p_labels.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
     add_json_flag(p_labels)
@@ -395,12 +397,14 @@ def register_labels(sub):
 
 
 def register_projects(sub):
-    p_proj = sub.add_parser("projects", help="Listar proyectos disponibles en Plane cacheados en SQLite")
+    p_proj = sub.add_parser("projects", help="Listar los proyectos de Plane",
+                               description="Proyectos disponibles en Plane, desde la caché local (--refresh la actualiza).")
     p_proj.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con la API de Plane")
     add_json_flag(p_proj)
     p_proj.set_defaults(handler=cmd_projects)
 
 
 def register_whoami(sub):
-    p_whoami = sub.add_parser("whoami", help="Verificar configuración activa: muestra workspace, usuario y UUID resuelto")
+    p_whoami = sub.add_parser("whoami", help="Mostrar workspace, usuario y UUID activos",
+                                description="Verifica la configuración activa: workspace, usuario y UUID resuelto.")
     p_whoami.set_defaults(handler=cmd_whoami)

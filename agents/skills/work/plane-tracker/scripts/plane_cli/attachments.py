@@ -142,28 +142,29 @@ def cmd_attachment_list(args, conn, base_url, api_key, workspace, default_projec
 
 
 def register_attachment_add(sub):
-    p_add = sub.add_parser("add", help="Subir archivos al work item")
+    p_add = sub.add_parser("add", help="Subir archivos al ticket")
     p_add.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_add.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
     p_add.set_defaults(handler=cmd_attachment_add)
 
 
 def register_attachment_list(sub):
-    p_list = sub.add_parser("list", help="Listar los adjuntos del work item")
+    p_list = sub.add_parser("list", help="Listar los adjuntos del ticket")
     p_list.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_attachment_list)
 
 
 def register_attachment_delete(sub):
-    p_delete = sub.add_parser("delete", help="Eliminar un adjunto del work item")
+    p_delete = sub.add_parser("delete", help="Eliminar un adjunto del ticket")
     p_delete.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_delete.add_argument("id", type=attachment_id, help="UUID del adjunto (ver `attachment list`)")
     p_delete.set_defaults(handler=cmd_attachment_delete)
 
 
 def register_attachment_replace(sub):
-    p_replace = sub.add_parser("replace", help="Sustituir un adjunto: sube el nuevo y borra el anterior")
+    p_replace = sub.add_parser("replace", help="Sustituir un adjunto por otro archivo",
+                                 description="Sube el archivo nuevo y, si salió bien, borra el adjunto anterior.")
     p_replace.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_replace.add_argument("id", type=attachment_id, help="UUID del adjunto a sustituir (ver `attachment list`)")
     p_replace.add_argument("file", help="Archivo nuevo (máx. 50 MB)")
