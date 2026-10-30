@@ -17,7 +17,7 @@ import flow_metrics
 import session_clock
 
 from plane_cli import config
-from plane_cli.config import positive_int
+from plane_cli.config import add_json_flag, positive_int
 from plane_cli.proposals import FOCUS_KEEP_DAYS, focus_intervals
 from plane_cli.resolve import detect_ticket_from_git, resolve_issue, resolve_project_and_seq
 from plane_cli.worklog import PLACEHOLDER
@@ -212,7 +212,7 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
 def register_health(sub):
     p_health = sub.add_parser("health", help="Latencia y errores recientes de la API de Plane")
     p_health.add_argument("--hours", type=positive_int, default=24, help="Ventana en horas (por defecto 24)")
-    p_health.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_health)
     p_health.set_defaults(handler=cmd_health)
 
 
@@ -230,5 +230,5 @@ def register_focus(sub):
     p_focus.add_argument("--status", action="store_true", help="Ver el tiempo atribuido hoy a cada ticket")
     p_focus.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente de la sesión (por defecto: según el entorno)")
     p_focus.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
-    p_focus.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_focus)
     p_focus.set_defaults(handler=cmd_focus)

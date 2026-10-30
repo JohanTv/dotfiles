@@ -10,7 +10,7 @@ import argparse
 import os
 
 from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_read, cmd_report, cmd_tickets_write
-from plane_cli.config import get_env_or_fail
+from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
 
 COMMAND_REGISTRARS = (
@@ -38,7 +38,7 @@ COMMAND_REGISTRARS = (
 
 def build_parser():
     parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3 SQLite3)")
-    parser.add_argument("--json", action="store_true", help="Salida en formato JSON para agentes")
+    add_json_flag(parser, help="Salida en formato JSON para agentes")
     subparsers = parser.add_subparsers(dest="command", required=True)
     for register in COMMAND_REGISTRARS:
         register(subparsers)

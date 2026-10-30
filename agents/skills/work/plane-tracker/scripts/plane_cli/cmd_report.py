@@ -11,6 +11,7 @@ import urllib.error
 from datetime import datetime, timedelta
 
 from plane_cli.api import api_request
+from plane_cli.config import add_json_flag
 from plane_cli.flow import cmd_report_flow
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
 from plane_cli.sync import sync_remote_worklogs
@@ -213,5 +214,5 @@ def register_report(sub):
     p_report.add_argument("--sync", action="store_true", help="Forzar sincronización remota con Plane")
     p_report.add_argument("--check", action="store_true", help="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias)")
     p_report.add_argument("--flow", action="store_true", help="Flujo por ticket del periodo: lead/cycle time, tiempo por estado y esfuerzo")
-    p_report.add_argument("--json", action="store_true", help="Salida en formato JSON")
+    add_json_flag(p_report, help="Salida en formato JSON")
     p_report.set_defaults(handler=cmd_report)
