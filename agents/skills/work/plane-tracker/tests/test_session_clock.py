@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import plane  # noqa: E402
+from plane_cli import worklog  # noqa: E402
 import session_clock as sc  # noqa: E402
 
 UTC = timezone.utc
@@ -138,15 +139,15 @@ class PlaneIntegration(unittest.TestCase):
     def test_derived_start_never_crosses_midnight(self):
         end = datetime(2026, 10, 29, 0, 20)
         with redirect_stderr(io.StringIO()) as err:
-            self.assertEqual(plane.derived_start(end, 60), "00:00")
+            self.assertEqual(worklog.derived_start(end, 60), "00:00")
         self.assertIn("medianoche", err.getvalue())
-        self.assertEqual(plane.derived_start(datetime(2026, 10, 29, 10, 0), 30), "09:30")
+        self.assertEqual(worklog.derived_start(datetime(2026, 10, 29, 10, 0), 30), "09:30")
 
     def test_worklog_metadata_block_roundtrip(self):
         meta = {"date": "2026-10-29", "start_time": "10:00", "notes": "a -- b --> c", "duration_minutes": 5}
-        block = plane.worklog_metadata_block(meta)
+        block = worklog.worklog_metadata_block(meta)
         self.assertEqual(block.count("-->"), 1)
-        self.assertEqual(plane.extract_metadata_from_comment("<p>x</p>" + block), meta)
+        self.assertEqual(worklog.extract_metadata_from_comment("<p>x</p>" + block), meta)
 
     def test_multipart_puts_file_last_and_keeps_fields(self):
         body, header = plane.build_multipart({"key": "k1", "policy": "p"}, 'a"b.txt', "text/plain", b"DATA")
