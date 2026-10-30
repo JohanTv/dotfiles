@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 import flow_metrics
 import session_clock
 
-from plane_cli import config
+from plane_cli import circuit, config
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.proposals import FOCUS_KEEP_DAYS, focus_intervals
 from plane_cli.resolve import detect_ticket_from_git, resolve_issue, resolve_project_and_seq
@@ -56,11 +56,16 @@ def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
         except OSError:
             continue
     summary = summarize_requests(records, datetime.now(timezone.utc) - timedelta(hours=args.hours))
+    state = circuit.describe()
     if getattr(args, "json", False):
-        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        print(json.dumps({**summary, "circuit": state}, indent=2, ensure_ascii=False))
         return
     print(f"\n🩺 Plane · últimas {args.hours} h: {summary['requests']} llamadas, {summary['failures']} fallidas, {summary['retried']} con reintento")
     print(f"   • Latencia: p50 {summary['p50_ms']} ms · p95 {summary['p95_ms']} ms · máx {summary['max_ms']} ms")
+    if state["state"] == "open":
+        print(f"   • Circuito: abierto desde las {state['since']} ({state['cause']}); próximo sondeo en {state['next_probe_in']} s")
+    else:
+        print("   • Circuito: cerrado")
     for key, count in sorted(summary["errors"].items(), key=lambda kv: -kv[1]):
         print(f"   • {count} × {key}")
     for f in summary["last_failures"]:

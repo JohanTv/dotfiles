@@ -4,16 +4,36 @@ Responsabilidad: servidor Plane falso (http.server en 127.0.0.1), ejecución ais
 (HOME temporal, TZ=UTC, sin credenciales reales) y comparación de la salida normalizada contra tests/golden/.
 Expone: FakePlane, Sandbox, run_scenario(). No toca el HOME real ni el Plane real.
 
+Inyección de fallos (FakePlane):
+  fake.add_fault(method, path_regex, kind, arg=None, n=None)   method "*" = cualquiera; n = nº de veces (None = siempre)
+    kind "status"      responde con el código `arg` y {"detail": "injected"}
+         "hang"        retiene la conexión `arg` segundos y la cierra sin responder (timeout de lectura del cliente)
+         "drop"        cierra la conexión sin responder
+         "commit_drop" aplica la escritura (comentarios) y corta la respuesta: el cliente no sabe si se guardó
+         "delay"       espera `arg` segundos y luego responde con normalidad
+         "flap"        alterna cíclicamente una lista de (kind, arg), p. ej. [("status", 502), ("ok", None)]; "ok" = respuesta normal
+         "raw"         `arg` = bytes enviados tal cual como respuesta (BadStatusLine, 200 con HTML, cuerpo truncado...)
+  fake.clear_faults()          fake.fail = [(método, regex, estado, cuerpo)] sigue disponible para errores simples.
+  fake.store_comments = True   los POST de comentarios se guardan (con external_id/external_source) y devuelven el comentario;
+                               fake.ext_id = False desactiva el 409 por external_id duplicado (el servidor lo ignora).
+  fake.committed               ids de los comentarios guardados; fake.requests, todas las peticiones recibidas.
+  fake.close() / fake.reopen() cierra el socket (conexión rechazada) y lo reabre en el mismo puerto.
+Sandbox(fake=FakePlane(...)) usa ese servidor; sb.dead_url es una URL de puerto cerrado; sb.write_circuit(...) y
+sb.circuit_state() fijan/leen <HOME>/.cache/plane/circuit.json; sb.run(..., timeout=s) y sb.last_elapsed miden el subproceso.
+
 La ruta del script bajo prueba sale de PLANE_PY (por defecto scripts/plane.py); GOLDEN_UPDATE=1 reescribe los golden.
 """
+import io
 import json
 import os
 import re
 import sqlite3
 import subprocess
 import sys
+import socket
 import tempfile
 import threading
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -121,6 +141,22 @@ def build_data():
             "members": members, "attachments": attachments, "links": []}
 
 
+class _NullHandler:
+    """Handler mudo: ejecuta la ruta de una escritura sin responder al cliente (commit_drop)."""
+
+    def __init__(self):
+        self.wfile = io.BytesIO()
+
+    def send_response(self, status):
+        pass
+
+    def send_header(self, *args):
+        pass
+
+    def end_headers(self):
+        pass
+
+
 class FakePlane:
     """Servidor Plane mínimo con datos enlatados; registra cada petición recibida."""
 
@@ -128,8 +164,13 @@ class FakePlane:
         self.data = build_data()
         self.requests = []
         self.fail = []  # [(método, regex de ruta, estado, cuerpo)]
+        self.faults = []
+        self.store_comments = False
+        self.ext_id = True
+        self.committed = []
         self.counter = 0
         self.lock = threading.Lock()
+        self.closed = False
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -143,14 +184,32 @@ class FakePlane:
 
             do_GET = do_POST = do_PATCH = do_DELETE = handle_any
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.handler_class = Handler
+        self.port = 0
+        self._listen()
+
+    def _listen(self):
+        self.server = ThreadingHTTPServer(("127.0.0.1", self.port), self.handler_class)
         self.port = self.server.server_port
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
+        self.closed = False
 
     def close(self):
-        self.server.shutdown()
-        self.server.server_close()
+        if not self.closed:
+            self.server.shutdown()
+            self.server.server_close()
+            self.closed = True
+
+    def reopen(self):
+        if self.closed:
+            self._listen()
+
+    def add_fault(self, method, path, kind, arg=None, n=None):
+        self.faults.append({"method": method, "path": path, "kind": kind, "arg": arg, "n": n, "hits": 0})
+
+    def clear_faults(self):
+        self.faults.clear()
 
     @property
     def base_url(self):
@@ -173,17 +232,56 @@ class FakePlane:
         text = "<multipart>" if is_upload else raw.decode("utf-8", "replace")
         with self.lock:
             self.requests.append((method, path, text))
+        if self._apply_fault(handler, method, bare, text):
+            return
         for f_method, f_regex, status, body in self.fail:
             if f_method == method and re.search(f_regex, bare):
                 return self.reply(handler, status, body)
         if is_upload:
             return self.reply(handler, 204, None)
         base = f"/api/v1/workspaces/{WS}/"
+        if bare == "/api/v1/users/me/":
+            return self.reply(handler, 200, {"id": ME})
         if not bare.startswith(base):
             return self.reply(handler, 404, {"detail": "no"})
         rest = bare[len(base):].strip("/").split("/")
         body = json.loads(text) if text and text.startswith("{") else {}
         return self.route(handler, method, rest, body)
+
+    def _apply_fault(self, handler, method, bare, text):
+        """True si una regla de fallo atendió la petición (el cliente ya recibió su respuesta o su corte)."""
+        for rule in self.faults:
+            if rule["method"] not in (method, "*") or not re.search(rule["path"], bare) or (rule["n"] is not None and rule["hits"] >= rule["n"]):
+                continue
+            rule["hits"] += 1
+            kind, arg = rule["kind"], rule["arg"]
+            if kind == "flap":
+                kind, arg = arg[(rule["hits"] - 1) % len(arg)]
+            if kind == "ok":
+                return False
+            if kind == "status":
+                self.reply(handler, arg, {"detail": "injected"})
+            elif kind == "raw":
+                handler.wfile.write(arg)
+                handler.close_connection = True
+            elif kind == "hang":
+                time.sleep(arg)
+                handler.close_connection = True
+            elif kind == "drop":
+                handler.close_connection = True
+                handler.connection.close()
+            elif kind == "commit_drop":
+                rest = bare[len(f"/api/v1/workspaces/{WS}/"):].strip("/").split("/")
+                self.route(_NullHandler(), method, rest, json.loads(text) if text.startswith("{") else {})
+                handler.close_connection = True
+                handler.connection.close()
+            elif kind == "delay":
+                time.sleep(arg)
+                return False
+            else:
+                raise ValueError(f"kind de fallo desconocido: {kind}")
+            return True
+        return False
 
     def route(self, handler, method, rest, body):
         d = self.data
@@ -215,12 +313,28 @@ class FakePlane:
             return self.issue_child(handler, method, iid, sub, body)
         return self.reply(handler, 404, {"detail": "no"})
 
+    def _post_comment(self, handler, iid, body):
+        stored = self.data["comments"].setdefault(iid, [])
+        ext = body.get("external_id")
+        if self.store_comments and self.ext_id and ext:
+            for c in stored:
+                if c.get("external_id") == ext and c.get("external_source") == body.get("external_source"):
+                    return self.reply(handler, 409, {"error": "same external id", "id": c["id"]})
+        self.counter += 1
+        new_id = f"c9000000-0000-4000-8000-{self.counter:012d}"
+        if not self.store_comments:
+            return self.reply(handler, 201, {"id": new_id})
+        comment = {"id": new_id, "actor": ME, "created_by": ME, "created_at": "2026-10-30T12:00:00Z", "comment_html": body.get("comment_html", ""),
+                   "external_id": ext, "external_source": body.get("external_source")}
+        stored.append(comment)
+        self.committed.append(new_id)
+        return self.reply(handler, 201, comment)
+
     def issue_child(self, handler, method, iid, sub, body):
         d = self.data
         if sub == ["comments"]:
             if method == "POST":
-                self.counter += 1
-                return self.reply(handler, 201, {"id": f"c9000000-0000-4000-8000-{self.counter:012d}"})
+                return self._post_comment(handler, iid, body)
             return self.reply(handler, 200, {"results": d["comments"].get(iid, [])})
         if len(sub) == 2 and sub[0] == "comments":
             if method == "DELETE":
@@ -254,13 +368,19 @@ class FakePlane:
 class Sandbox:
     """HOME temporal + repo git temporal + servidor falso: nada sale de /tmp ni toca el Plane real."""
 
-    def __init__(self, extra_env=None, with_repo=False, with_session=False):
+    def __init__(self, extra_env=None, with_repo=False, with_session=False, fake=None):
         self.tmp = tempfile.TemporaryDirectory(prefix="plane-golden-")
         self.home = os.path.join(self.tmp.name, "home")
         self.work = os.path.join(self.tmp.name, "work")
         os.makedirs(self.home)
         os.makedirs(self.work)
-        self.fake = FakePlane()
+        self.fake = fake or FakePlane()
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        self.dead_port = probe.getsockname()[1]
+        probe.close()
+        self.dead_url = f"http://127.0.0.1:{self.dead_port}"
+        self.last_elapsed = 0.0
         self.env = {"PATH": os.environ.get("PATH", ""), "HOME": self.home, "TZ": "UTC", "LC_ALL": "C.UTF-8", "PYTHONIOENCODING": "utf-8",
                     "PYTHONDONTWRITEBYTECODE": "1", "PLANE_BASE_URL": self.fake.base_url, "PLANE_API_KEY": "dummy",
                     "PLANE_WORKSPACE_SLUG": WS, "PLANE_PROJECT_ID": P1, "PLANE_ACTOR_UUID": ME,
@@ -294,12 +414,33 @@ class Sandbox:
             for stamp in stamps:
                 handle.write(json.dumps({"timestamp": stamp, "type": "x"}) + "\n")
 
-    def run(self, args, env_drop=(), env_set=None, stdin="", cwd=None):
+    def run(self, args, env_drop=(), env_set=None, stdin="", cwd=None, timeout=60):
         env = {k: v for k, v in self.env.items() if k not in env_drop}
-        env.update(env_set or {})
+        env.update({k: v.replace("{DEAD}", self.dead_url) for k, v in (env_set or {}).items()})
+        started = time.monotonic()
         proc = subprocess.run([sys.executable, PLANE_PY, *args], env=env, cwd=cwd or self.work, input=stdin, capture_output=True,
-                              text=True, timeout=60)
+                              text=True, timeout=timeout)
+        self.last_elapsed = time.monotonic() - started
         return proc.returncode, proc.stdout, proc.stderr
+
+    def circuit_path(self):
+        return os.path.join(self.home, ".cache", "plane", "circuit.json")
+
+    def write_circuit(self, opened_ago=5, level=0, last_error="refused", since_ago=60, consec=2, **extra):
+        """Deja el circuito abierto (opened_ago segundos atrás) o, con opened_ago=None, cerrado con `consec` fallos."""
+        now = time.time()
+        state = {"consec": consec, "opened_at": None if opened_ago is None else now - opened_ago, "level": level, "probing_until": 0,
+                 "last_error": last_error, "since": now - since_ago, "last_ok": None, "skipped": 0, **extra}
+        os.makedirs(os.path.dirname(self.circuit_path()), exist_ok=True)
+        with open(self.circuit_path(), "w", encoding="utf-8") as handle:
+            json.dump(state, handle)
+
+    def circuit_state(self):
+        try:
+            with open(self.circuit_path(), "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (OSError, ValueError):
+            return None
 
     def db_dump(self, query):
         path = os.path.join(self.home, ".cache", "plane", "worklogs.db")
@@ -355,7 +496,7 @@ def _scrub_body(text, keys):
 
 
 def normalize(text, sandbox, scrub=()):
-    text = text.replace(str(sandbox.fake.port), "PORT").replace(sandbox.tmp.name, "<TMP>")
+    text = text.replace(str(sandbox.fake.port), "PORT").replace(str(sandbox.dead_port), "DEADPORT").replace(sandbox.tmp.name, "<TMP>")
     text = re.sub(r"\b[0-9a-f]{40}\b", "<SHA>", text)
     text = re.sub(r"\b(group\W+|grupo |pendiente )[0-9a-f]{8}\b", r"\1<GRP>", text)
     if scrub:
@@ -364,6 +505,7 @@ def normalize(text, sandbox, scrub=()):
         text = re.sub(r"\b20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\b", "<TS>", text)
     now = datetime.now()
     text = text.replace(now.strftime("%Y-%m-%d"), "<HOY>").replace(now.strftime("%d/%m/%Y"), "<HOY>")
+    text = re.sub(r"desde las \d\d:\d\d", "desde las <HH:MM>", text)
     text = re.sub(r"abierto desde hace [\d.]+ (días|min|h)", "abierto desde hace <N> \\1", text)
     if scrub:
         text = re.sub(r'(\d+) ms\b', "<N> ms", text)
