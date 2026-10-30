@@ -15,13 +15,14 @@ TREE = {
     "comment": ("add", "edit", "delete"),
     "attachment": ("add", "list", "delete", "replace"),
     "link": ("add",),
+    "outbox": ("list", "flush", "drop"),
     "focus": ("set", "clear", "status"),
     "worklog": ("propose", "check"),
     "report": (), "handoff": (), "labels": (), "projects": (), "whoami": (), "health": (),
 }
 
 LEAF_ARGS = {
-    ("search",): ["q"], ("create",): ["t"], ("link", "add"): ["https://x.example"], ("focus", "set"): ["OMNIFY-1"],
+    ("search",): ["q"], ("create",): ["t"], ("link", "add"): ["https://x.example"], ("focus", "set"): ["OMNIFY-1"], ("outbox", "drop"): ["1"],
     ("attachment", "add"): ["OMNIFY-1", "f"], ("attachment", "delete"): ["OMNIFY-1", "d0000000-0000-4000-8000-000000000001"],
     ("attachment", "replace"): ["OMNIFY-1", "d0000000-0000-4000-8000-000000000001", "f"],
 }
@@ -97,7 +98,7 @@ class CommandTree(unittest.TestCase):
         walk(build_parser(), "")
         root = build_parser()
         root.prog = "plane.py"
-        self.assertLessEqual(len(root.format_help()) / 4, 260)
+        self.assertLessEqual(len(root.format_help()) / 4, 280)
 
     def test_retired_names_are_not_registered(self):
         names = set(command_tree(build_parser()))

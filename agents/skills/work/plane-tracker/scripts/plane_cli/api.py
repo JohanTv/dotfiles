@@ -153,7 +153,9 @@ def _probe_runner(url, api_key):
 
 
 def probe_plane(base_url, api_key, force=False):
-    """Sondeo explícito del circuito (ver circuit.probe): True/False, o None si no tocaba sondear."""
+    """Sondeo explícito del circuito (ver circuit.probe): True/False, o None si no tocaba sondear. PLANE_OFFLINE=1: siempre False, sin red."""
+    if os.environ.get("PLANE_OFFLINE") == "1":
+        return False
     return circuit.probe(_probe_runner(base_url.rstrip("/") + "/api/v1/", api_key), force=force)
 
 

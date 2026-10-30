@@ -1,0 +1,264 @@
+$ plane.py projects
+[exit 0]
+--- stdout ---
+
+📂 Proyectos en el workspace 'ws':
+  • OMNIFY         ➔  Omnify
+  • OPS            ➔  Operaciones
+
+💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').
+   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m <p>Primero</p><!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "n", "track": "mm"} -->
+[exit 0]
+--- stdout ---
+⏳ En cola (#1): comentario para OMNIFY-1, 20 min. Plane no responde; el tiempo ya cuenta como registrado. Publícalo con: plane-tracker outbox flush
+--- stderr ---
+⏳ Outbox: 1 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py comment add OMNIFY-1 -m <p>Segundo</p><!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "n", "track": "mm"} --> --json
+[exit 0]
+--- stdout ---
+{"status": "queued", "action": "comment", "outbox_id": 2, "client_id": "<VOLATIL>", "issue": "OMNIFY-1", "duration_minutes": 20, "reason": "offline"}
+--- stderr ---
+⏳ Outbox: 2 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py comment add OMNIFY-1 -m <p>Duplicado</p><!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "n", "track": "mm"} -->
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Ya hay un registro en cola con ese ticket/track/fecha/inicio (#1). Publícalo con 'outbox flush' o descártalo con 'outbox drop 1'.
+⏳ Outbox: 2 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py outbox list
+[exit 0]
+--- stdout ---
+#1 [pending] OMNIFY-1 · mm · 2026-10-21 08:00 · 20 min · 0 intento(s)
+   Primero
+   último error: modo sin conexión (PLANE_OFFLINE=1)
+#2 [pending] OMNIFY-1 · mm · 2026-10-21 08:30 · 20 min · 0 intento(s)
+   Segundo
+   último error: modo sin conexión (PLANE_OFFLINE=1)
+--- stderr ---
+
+
+$ plane.py outbox list --json
+[exit 0]
+--- stdout ---
+[
+  {
+    "id": 1,
+    "client_id": "<VOLATIL>",
+    "state": "pending",
+    "ticket": "OMNIFY-1",
+    "track": "mm",
+    "date": "<VOLATIL>",
+    "start_time": "<VOLATIL>",
+    "duration_minutes": 20,
+    "attempts": 0,
+    "maybe_delivered": false,
+    "last_error": "modo sin conexión (PLANE_OFFLINE=1)",
+    "plane_comment_id": null,
+    "created_at": "<VOLATIL>",
+    "preview": "Primero"
+  },
+  {
+    "id": 2,
+    "client_id": "<VOLATIL>",
+    "state": "pending",
+    "ticket": "OMNIFY-1",
+    "track": "mm",
+    "date": "<VOLATIL>",
+    "start_time": "<VOLATIL>",
+    "duration_minutes": 20,
+    "attempts": 0,
+    "maybe_delivered": false,
+    "last_error": "modo sin conexión (PLANE_OFFLINE=1)",
+    "plane_comment_id": null,
+    "created_at": "<VOLATIL>",
+    "preview": "Segundo"
+  }
+]
+--- stderr ---
+
+
+$ plane.py labels
+[exit 0]
+--- stdout ---
+
+🏷  Etiquetas disponibles para el proyecto OMNIFY (4):
+  • backend            (#111111)
+  • bug                (#d00000)
+  • frontend           (#00aa55)
+  • sms                
+
+💡 Úsalas en: plane-tracker create ... --labels 'backend,bug'
+--- stderr ---
+⏳ Outbox: 2 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py outbox drop 1
+[exit 0]
+--- stdout ---
+✔ Registro #1 descartado y su worklog provisional eliminado.
+--- stderr ---
+
+
+$ plane.py outbox drop 1
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: el registro #1 está en estado dropped; solo se descartan los pendientes, en envío o fallidos.
+
+$ plane.py outbox drop 42
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no existe el registro #42 en la cola.
+
+$ plane.py outbox flush
+[exit 3]
+--- stdout ---
+Resumen: 0 publicado(s), 0 fallido(s), 1 pendiente(s).
+--- stderr ---
+Modo sin conexión (PLANE_OFFLINE=1). No se envió nada.
+
+$ plane.py outbox flush --json
+[exit 3]
+--- stdout ---
+{
+  "sent": [],
+  "failed": [],
+  "skipped_old": 0,
+  "busy": 0,
+  "stopped": "unavailable",
+  "pending": 1,
+  "failed_total": 0,
+  "unavailable": "conexión cortada"
+}
+--- stderr ---
+Plane no responde desde las <HH:MM> (conexión cortada). Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.
+
+$ plane.py outbox drop 2
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: el registro #2 pudo haberse enviado. Puede que ya esté publicado en Plane; revisa el ticket OMNIFY-1 o descártalo igualmente con --force.
+
+$ plane.py outbox flush
+[exit 0]
+--- stdout ---
+✔ #2 OMNIFY-1 publicado (comentario c9000000-0000-4000-8000-000000000001) (ya estaba publicado; no se reenvió)
+Resumen: 1 publicado(s), 0 fallido(s), 0 pendiente(s).
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m <p>Tercero</p><!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "n", "track": "mm"} -->
+[exit 0]
+--- stdout ---
+⏳ En cola (#3): comentario para OMNIFY-1, 20 min. Plane no responde; el tiempo ya cuenta como registrado. Publícalo con: plane-tracker outbox flush
+--- stderr ---
+⏳ Outbox: 1 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py outbox drop 3 --keep-worklog --json
+[exit 0]
+--- stdout ---
+{"status": "ok", "action": "outbox drop", "outbox_id": 3, "client_id": "<VOLATIL>", "kept_worklog": true}
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m <p>Cuarto</p><!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "n", "track": "mm"} -->
+[exit 0]
+--- stdout ---
+⏳ En cola (#4): comentario para OMNIFY-1, 20 min. Plane no responde; el tiempo ya cuenta como registrado. Publícalo con: plane-tracker outbox flush
+--- stderr ---
+⏳ Outbox: 1 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
+
+$ plane.py outbox flush
+[exit 0]
+--- stdout ---
+✔ #4 OMNIFY-1 publicado (comentario c9000000-0000-4000-8000-000000000002)
+Resumen: 1 publicado(s), 0 fallido(s), 0 pendiente(s).
+--- stderr ---
+
+
+$ plane.py outbox list --all
+[exit 0]
+--- stdout ---
+#1 [dropped] OMNIFY-1 · mm · 2026-10-21 08:00 · 20 min · 0 intento(s)
+   Primero
+   último error: modo sin conexión (PLANE_OFFLINE=1)
+#2 [sent] OMNIFY-1 · mm · 2026-10-21 08:30 · 20 min · 2 intento(s)
+   Segundo
+#3 [dropped] OMNIFY-1 · mm · 2026-10-21 09:00 · 20 min · 0 intento(s)
+   Tercero
+   último error: modo sin conexión (PLANE_OFFLINE=1)
+#4 [sent] OMNIFY-1 · mm · 2026-10-21 09:30 · 20 min · 1 intento(s)
+   Cuarto
+--- stderr ---
+
+
+$ plane.py outbox flush
+[exit 0]
+--- stdout ---
+Resumen: 0 publicado(s), 0 fallido(s), 0 pendiente(s).
+--- stderr ---
+
+
+$ plane.py outbox drop
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py outbox drop [-h] [--force] [--keep-worklog] [--json] id
+plane.py outbox drop: error: the following arguments are required: id
+
+$ plane.py outbox
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+plane-tracker: error: falta el verbo (list|flush|drop); ej: plane-tracker outbox flush
+
+$ plane.py health
+[exit 0]
+--- stdout ---
+
+🩺 Plane · últimas 24 h: 12 llamadas, 1 fallidas, 0 con reintento
+   • Latencia: p50 <N> ms · p95 <N> ms · máx <N> ms
+   • Circuito: cerrado
+   • Cola de salida: 0 pendiente(s), 0 fallido(s)
+   • 1 × RemoteDisconnected: Remote end closed connection without response
+     <TS>  POST 111111/issues/10000000-0000-4000-8000-000000000001/comments/  → RemoteDisconnected: Remote end closed connection without response (<N> ms)
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
+GET /api/v1/users/me/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Segundo</p><!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"<VOLATIL>\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 20, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"n\", \"start_time\": \"<VOLATIL>\", \"track\": \"mm\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/users/me/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+GET /api/v1/users/me/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Cuarto</p><!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"<VOLATIL>\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 20, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"n\", \"start_time\": \"<VOLATIL>\", \"track\": \"mm\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/users/me/
+
+=== outbox ===
+{"attempts": 0, "client_id": "<VOLATIL>", "id": 1, "last_error": "modo sin conexión (PLANE_OFFLINE=1)", "maybe_delivered": 0, "plane_comment_id": null, "state": "dropped", "ticket_ref": "OMNIFY-1", "wl_date": "2026-10-21", "wl_start_time": "08:00", "wl_ticket_id": "OMNIFY-1", "wl_track": "mm"}
+{"attempts": 2, "client_id": "<VOLATIL>", "id": 2, "last_error": null, "maybe_delivered": 1, "plane_comment_id": "c9000000-0000-4000-8000-000000000001", "state": "sent", "ticket_ref": "OMNIFY-1", "wl_date": "2026-10-21", "wl_start_time": "08:30", "wl_ticket_id": "OMNIFY-1", "wl_track": "mm"}
+{"attempts": 0, "client_id": "<VOLATIL>", "id": 3, "last_error": "modo sin conexión (PLANE_OFFLINE=1)", "maybe_delivered": 0, "plane_comment_id": null, "state": "dropped", "ticket_ref": "OMNIFY-1", "wl_date": "2026-10-21", "wl_start_time": "09:00", "wl_ticket_id": "OMNIFY-1", "wl_track": "mm"}
+{"attempts": 1, "client_id": "<VOLATIL>", "id": 4, "last_error": null, "maybe_delivered": 1, "plane_comment_id": "c9000000-0000-4000-8000-000000000002", "state": "sent", "ticket_ref": "OMNIFY-1", "wl_date": "2026-10-21", "wl_start_time": "09:30", "wl_ticket_id": "OMNIFY-1", "wl_track": "mm"}
+
+=== worklogs ===
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "issue_name": "", "notes": "n", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000001", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "n", "start_time": "<VOLATIL>", "track": "mm", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "mm", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "issue_name": "", "notes": "n", "phase": "dev", "plane_comment_id": null, "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "n", "start_time": "<VOLATIL>", "track": "mm", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "mm", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "issue_name": "", "notes": "n", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000002", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "<VOLATIL>", "duration_minutes": 20, "end_time": "<VOLATIL>", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "n", "start_time": "<VOLATIL>", "track": "mm", "worker_type": "human"}, "role": "backend_engineer", "start_time": "<VOLATIL>", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "mm", "worker_type": "human"}

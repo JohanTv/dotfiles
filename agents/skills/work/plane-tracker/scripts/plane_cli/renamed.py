@@ -14,10 +14,11 @@ RETIRED = {"comment-edit": ("comment", "edit"), "comment-delete": ("comment", "d
 # Sinónimos habituales de cada verbo.
 SYNONYMS = {"create": "add", "new": "add", "post": "add", "rm": "delete", "remove": "delete", "del": "delete",
             "ls": "list", "show": "list", "update": "edit", "modify": "edit", "off": "clear", "stop": "clear", "unset": "clear",
-            "on": "set", "start": "set"}
+            "on": "set", "start": "set", "send": "flush", "publish": "flush", "sync": "flush", "push": "flush", "discard": "drop"}
 # Ejemplo de uso por grupo cuando no hay argumentos de los que partir.
 EXAMPLES = {"comment": "comment add OPS-13 -m x --duration 5", "attachment": "attachment list OPS-13",
-            "link": "link add OPS-13 https://example.com", "focus": "focus set OPS-13", "worklog": "worklog propose OPS-13"}
+            "link": "link add OPS-13 https://example.com", "focus": "focus set OPS-13", "worklog": "worklog propose OPS-13",
+            "outbox": "outbox flush"}
 EDIT_FLAGS = ("--comment-id", "--embed-metadata", "--force")
 HELP_FLAGS = ("-h", "--help")
 

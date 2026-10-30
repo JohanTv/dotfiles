@@ -56,12 +56,17 @@ ROWS = [
     ("atachment list OPS-1", "comando 'atachment' desconocido; ¿quisiste decir 'attachment'?"),
     ("attachment", "falta el verbo (add|list|delete|replace); ej: plane-tracker attachment list OPS-13"),
     ("worklog --week", "falta el verbo (propose|check); ej: plane-tracker worklog propose OPS-13"),
+    ("outbox", "falta el verbo (list|flush|drop); ej: plane-tracker outbox flush"),
+    ("outbox --json", "falta el verbo (list|flush|drop); ej: plane-tracker outbox flush"),
+    ("outbox sync --limit 5", "'outbox sync' no existe; usa: plane-tracker outbox flush --limit 5"),
+    ("outbox discard 3", "'outbox discard' no existe; usa: plane-tracker outbox drop 3"),
+    ("outbox flsh", "verbo 'flsh' desconocido en 'outbox'; ¿quisiste decir 'flush'?"),
 ]
 
 # Entradas válidas (o con error ajeno a la nomenclatura): no deben producir pista.
 SILENT = ["", "--json", "-h", "--help", "get OPS-13", "list --json", "report --week", "report flow --refresh", "comment add OPS-13 -m '--check'",
           "comment edit OPS-1 --force", "comment --json add OPS-1", "comment --help", "comment -h", "attachment list OPS-1", "attachment delete OPS-1 x",
-          "focus set OPS-1", "focus status --agent claude", "focus clear", "worklog check --week", "link add OPS-1 https://x.example",
+          "focus set OPS-1", "outbox flush --retry-failed", "outbox drop 3 --force", "focus status --agent claude", "focus clear", "worklog check --week", "link add OPS-1 https://x.example",
           "zzzzzz", "attachment list attachments", "comment add -m '--off'"]
 
 

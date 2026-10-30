@@ -2,7 +2,8 @@
 
 Expone: COMMANDS, add_group(), command_tree(), build_parser(), main().
 No hace: lógica de comandos (vive en cmd_*.py).
-Códigos de salida: 0 éxito; 1 error definitivo o de validación; 2 uso; 3 Plane no disponible (PlaneUnavailable).
+Códigos de salida: 0 éxito (o comentario encolado); 1 error definitivo o de validación; 2 uso; 3 Plane no disponible (PlaneUnavailable).
+Al terminar cualquier comando salvo `outbox *`, main() avisa por stderr si hay registros sin publicar.
 Antes de parsear, main() consulta renamed.suggestion(): un nombre retirado o un verbo ausente termina con código 2.
 COMMANDS define el árbol y el orden de `--help`: cada entrada es un registrador (comando raíz) o una tupla
 (nombre, ayuda, registradores) que declara un grupo `<sustantivo> <verbo>`. El arranque es: parsear argumentos,
@@ -11,12 +12,14 @@ validar el entorno y solo entonces abrir la base de datos (así `--help` funcion
 
 import argparse
 import os
+import sqlite3
 import sys
 
-from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_read, cmd_report, cmd_tickets_write, renamed
+from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_outbox, cmd_read, cmd_report, cmd_tickets_write, renamed
 from plane_cli.circuit import PlaneUnavailable, format_unavailable
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
+from plane_cli.outbox import pending_notice
 
 COMMANDS = (
     cmd_read.register_search,
@@ -30,6 +33,8 @@ COMMANDS = (
      (attachments.register_attachment_add, attachments.register_attachment_list, attachments.register_attachment_delete,
       attachments.register_attachment_replace)),
     ("link", "Enlaces: add", (cmd_tickets_write.register_link_add,)),
+    ("outbox", "Cola de salida: list | flush | drop",
+     (cmd_outbox.register_outbox_list, cmd_outbox.register_outbox_flush, cmd_outbox.register_outbox_drop)),
     ("focus", "Foco de la sesión: set | clear | status",
      (cmd_ops.register_focus_set, cmd_ops.register_focus_clear, cmd_ops.register_focus_status)),
     ("worklog", "Tiempos: propose | check", (cmd_comment_ops.register_worklog_propose, cmd_report.register_worklog_check)),
@@ -82,6 +87,18 @@ def build_parser():
     return parser
 
 
+def _warn_pending(args, conn):
+    """Aviso único por stderr de lo que sigue sin publicarse; los comandos `outbox` ya lo muestran."""
+    if args.command == "outbox":
+        return
+    try:
+        notice = pending_notice(conn)
+    except sqlite3.Error:
+        return
+    if notice:
+        sys.stderr.write(notice + "\n")
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     parser = build_parser()
@@ -105,4 +122,5 @@ def main(argv=None):
         sys.stderr.write(format_unavailable(exc))
         sys.exit(3)
     finally:
+        _warn_pending(args, conn)
         conn.close()
