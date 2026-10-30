@@ -155,10 +155,13 @@ Prefiere `link` para PRs y documentos (queda estructurado y no notifica como com
 ### C.4 Adjuntos y salud de la conexión
 ```bash
 plane-tracker attach OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
-plane-tracker attachments OMNIFY-205 [--json]             # lista los adjuntos
+plane-tracker attachments OMNIFY-205 [--json]             # lista los adjuntos (con su id)
+plane-tracker attachments OMNIFY-205 --delete <id>        # elimina un adjunto
+plane-tracker attach OMNIFY-205 nuevo.pdf --replace <id>  # "actualizar": sube el nuevo y, si salió bien, borra el anterior
+plane-tracker create "[FEAT] ..." --attach spec.pdf       # adjuntar al crear (se sube justo después; el ticket ya existe si falla)
 plane-tracker health [--hours 24] [--json]                # latencia (p50/p95) y errores recientes de la API
 ```
-Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro JSONL (sin cuerpos ni cabeceras) en `~/.cache/plane/requests.log` (rota a 1 MB) con método, ruta, estado, milisegundos, intento y error; `health` lo resume para distinguir caídas de lentitud.
+Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la propia creación del ticket: ambos son pasos aparte. Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro JSONL (sin cuerpos ni cabeceras) en `~/.cache/plane/requests.log` (rota a 1 MB) con método, ruta, estado, milisegundos, intento y error; `health` lo resume para distinguir caídas de lentitud.
 
 ---
 

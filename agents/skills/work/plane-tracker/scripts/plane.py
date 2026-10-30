@@ -1610,8 +1610,20 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         if label_ids:
             payload["labels"] = label_ids
 
+    attach_paths = getattr(args, "attach", None) or []
+    validate_attachment_paths(attach_paths)
+
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
     res = api_request(url, api_key, method="POST", data=payload)
+
+    # Plane no admite adjuntos en la creación: se suben justo después (el ticket ya existe si alguno falla).
+    attached, attach_errors = [], []
+    for path in attach_paths:
+        try:
+            name, _ = upload_attachment(base_url, api_key, workspace, project_id, res["id"], path)
+            attached.append(name)
+        except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, SystemExit) as exc:
+            attach_errors.append(f"{path}: {exc}")
 
     seq_id = res.get("sequence_id")
     ticket_ref = f"{project_ident}-{seq_id}" if seq_id else res.get("id")
@@ -1651,6 +1663,8 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
             "name": res.get("name"),
             "branch_suggestion": branch_sugg,
             "url": web_url,
+            "attachments": attached,
+            "attachment_errors": attach_errors,
             "raw": res
         }, indent=2))
     else:
@@ -1658,7 +1672,12 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"   • Título: {res.get('name')}")
         print(f"   • Prioridad: {res.get('priority', 'none').upper()}")
         print(f"   • Enlace: {web_url}")
-        print(f"   • Sugerencia de rama Git: {branch_sugg}\n")
+        print(f"   • Sugerencia de rama Git: {branch_sugg}")
+        if attached:
+            print(f"   • Adjuntos: {', '.join(attached)}")
+        for err in attach_errors:
+            sys.stderr.write(f"   ⚠ No se pudo adjuntar {err} (el ticket sí se creó; usa plane-tracker attach {ticket_ref} <archivo>)\n")
+        print("")
 
 def format_lifecycle(issue):
     """'completado' con su lead time, o 'abierto desde hace …' (calendario, UTC)."""
@@ -1881,17 +1900,28 @@ def local_stamp(value):
     moment = session_clock.parse_time(value)
     return moment.astimezone().strftime("%Y-%m-%d %H:%M") if moment else ""
 
-def cmd_attach(args, conn, base_url, api_key, workspace, default_project_id):
-    """Sube uno o varios archivos al work item."""
-    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-    for path in args.files:
+def validate_attachment_paths(paths):
+    """Valida antes de tocar Plane: así un ticket no queda creado a medias por un archivo inválido."""
+    for path in paths:
         if not os.path.isfile(path):
             sys.stderr.write(f"Error: '{path}' no es un archivo.\n")
             sys.exit(1)
         if os.path.getsize(path) > ATTACH_MAX_BYTES:
             sys.stderr.write(f"Error: '{path}' supera {ATTACH_MAX_BYTES // (1024 * 1024)} MB.\n")
             sys.exit(1)
+
+def delete_attachment(base_url, api_key, workspace, project_id, issue_id, attachment_id):
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_id}/issue-attachments/{attachment_id}/"
+    api_request(url, api_key, method="DELETE")
+
+def cmd_attach(args, conn, base_url, api_key, workspace, default_project_id):
+    """Sube archivos al work item; con --replace ID sustituye un adjunto (sube el nuevo y luego borra el viejo)."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    validate_attachment_paths(args.files)
+    if args.replace and len(args.files) != 1:
+        sys.stderr.write("Error: --replace admite exactamente un archivo.\n")
+        sys.exit(1)
     for path in args.files:
         try:
             name, size = upload_attachment(base_url, api_key, workspace, project_id, issue["id"], path)
@@ -1899,12 +1929,19 @@ def cmd_attach(args, conn, base_url, api_key, workspace, default_project_id):
             sys.stderr.write(f"Error subiendo '{path}': {exc}\n")
             sys.exit(1)
         print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
+        if args.replace:
+            delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.replace)
+            print(f"✔ Adjunto anterior {args.replace} eliminado (reemplazado)")
 
 def cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id):
     """Lista los adjuntos del work item."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/issue-attachments/"
+    if getattr(args, "delete", None):
+        delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.delete)
+        print(f"✔ Adjunto {args.delete} eliminado de {issue_ref}")
+        return
     data = api_request(url, api_key)
     items = data if isinstance(data, list) else data.get("results", [])
     rows = [{"id": a.get("id"), "name": (a.get("attributes") or {}).get("name"), "size": (a.get("attributes") or {}).get("size") or a.get("size"),
@@ -2516,9 +2553,11 @@ def main():
     p_attach = subparsers.add_parser("attach", help="Subir archivos al work item")
     p_attach.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_attach.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
+    p_attach.add_argument("--replace", metavar="ID", help="Id de un adjunto a sustituir: sube el nuevo y, si salió bien, borra el anterior")
     p_attachments = subparsers.add_parser("attachments", help="Listar los adjuntos del work item")
     p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
     p_attachments.add_argument("--json", action="store_true", help="Salida en JSON")
+    p_attachments.add_argument("--delete", metavar="ID", help="Eliminar el adjunto con ese id")
 
     # health
     p_health = subparsers.add_parser("health", help="Latencia y errores recientes de la API de Plane")
@@ -2546,6 +2585,7 @@ def main():
     p_create.add_argument("--labels", help="Etiquetas separadas por comas (ej: backend,bug,spike)")
     p_create.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
     p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
+    p_create.add_argument("--attach", nargs="+", metavar="FILE", help="Archivo(s) a adjuntar al crear el ticket (máx. 50 MB cada uno)")
     p_create.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # comment-delete / comment-edit
