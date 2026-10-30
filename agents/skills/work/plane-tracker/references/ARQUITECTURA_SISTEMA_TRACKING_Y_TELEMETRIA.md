@@ -244,6 +244,8 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`comment-edit` / `comment-delete`** | `plane-tracker comment-edit T --comment-id ID [--duration N] [--embed-metadata]` | Edita/vincula un comentario con su worklog, o lo elimina junto con su worklog local. |
 | **`link`** | `plane-tracker link OMNIFY-197 https://github.com/org/repo/pull/7 --title "PR #7"` | Adjunta un enlace al work item (idempotente). |
 | **`attach` / `attachments`** | `plane-tracker attach T archivo... [--replace ID]` · `attachments T [--delete ID]` · `create ... --attach F` | Sube, lista, reemplaza y elimina adjuntos (50 MB máx.). |
+| **`handoff`** | `plane-tracker handoff [TICKET] [--base dev]` | Borrador del Handoff Snapshot con hechos de git local (rama, SHA, repo, sin pushear → bloquea); no publica. `comment` rechaza `[COMPLETAR]`. |
+| **`report --check`** | `plane-tracker report --check [--week] [--json]` | Solo lectura: duplicados, huérfanos y diferencias entre `worklogs` y los bloques ocultos de los comentarios. |
 | **`health`** | `plane-tracker health [--hours 24]` | Latencia (p50/p95) y errores recientes de la API desde `requests.log`. |
 
 ---

@@ -198,6 +198,15 @@ Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la p
 
 ---
 
+### C.5 Relevo y consistencia
+```bash
+plane-tracker handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
+plane-tracker report --check [--week|--date D] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
+```
+`report --check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --sync`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible) y `unlinked`. Sale con código 1 si hay inconsistencias.
+
+---
+
 ### D. `plane-tracker update` (Transiciones de Estado)
 Permite mover tickets entre columnas del Kanban sin abrir el navegador.
 

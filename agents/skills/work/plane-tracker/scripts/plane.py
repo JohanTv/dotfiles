@@ -1513,6 +1513,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     if not content.strip():
         sys.stderr.write("Error: El comentario está vacío.\n")
         sys.exit(1)
+    reject_placeholders(content)
 
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
 
@@ -1745,6 +1746,8 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/"
 
     content = args.message
+    if content is not None:
+        reject_placeholders(content)
     row = conn.execute("SELECT raw_payload FROM worklogs WHERE plane_comment_id = ?", (cid,)).fetchone()
     local_meta = json.loads(row["raw_payload"]) if row else None
     if content is not None:
@@ -2403,6 +2406,176 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
     previous = f" (antes {current[0]['ticket']})" if current else ""
     print(f"✔ Foco en {ticket}{previous} · sesión {session_id} ({agent})")
 
+
+# ------------------------------------------------------------------------------
+# Relevo (Handoff Snapshot): la herramienta solo junta hechos de git local; el criterio lo pone quien trabajó
+# ------------------------------------------------------------------------------
+
+PLACEHOLDER = "[COMPLETAR]"
+
+class HandoffError(Exception):
+    pass
+
+def reject_placeholders(text):
+    """Un texto con marcadores sin completar (fuera del bloque oculto) nunca se publica."""
+    if PLACEHOLDER in re.sub(r"<!--[\s\S]*?-->", "", text or ""):
+        sys.stderr.write(f"Error: el texto aún tiene marcadores {PLACEHOLDER}; complétalos antes de publicar.\n")
+        sys.exit(1)
+
+def _git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True, timeout=15)
+
+def sanitize_remote(url):
+    """'owner/repo' de un remoto ssh o https de GitHub, sin credenciales; None si no se reconoce."""
+    url = (url or "").strip()
+    match = re.match(r"^(?:ssh://)?git@github\.com[:/]([\w.-]+)/([\w.-]+?)(?:\.git)?/?$", url)
+    if not match:
+        parsed = urllib.parse.urlparse(url)
+        match = re.match(r"^/([\w.-]+)/([\w.-]+?)(?:\.git)?/?$", parsed.path) if parsed.hostname == "github.com" else None
+    return f"{match.group(1)}/{match.group(2)}" if match else None
+
+def handoff_facts(base=None):
+    """Hechos del repo del directorio actual (solo git local, sin red). Lanza HandoffError si el relevo no sería útil."""
+    if _git("rev-parse", "--show-toplevel").returncode != 0:
+        raise HandoffError("No estás dentro de un repositorio git.")
+    branch = _git("symbolic-ref", "--short", "-q", "HEAD").stdout.strip()
+    if not branch:
+        raise HandoffError("HEAD desacoplado: cambia a una rama antes del relevo.")
+    sha = _git("rev-parse", "HEAD").stdout.strip()
+    remotes = _git("remote").stdout.split()
+    if not remotes:
+        raise HandoffError("El repositorio no tiene remoto: otra persona no podría retomar el trabajo.")
+    unpushed = int(_git("rev-list", "--count", "HEAD", "--not", "--remotes").stdout.strip() or 0)
+    if unpushed:
+        raise HandoffError(f"{unpushed} commit(s) sin pushear (según el último fetch local); haz push antes del relevo.")
+    containing = [r for r in _git("for-each-ref", "--contains", "HEAD", "refs/remotes", "--format=%(refname:short)").stdout.split() if not r.endswith("/HEAD")]
+    preferred = [r for r in containing if r.endswith("/" + branch)]
+    where = (preferred or containing or ["?"])[0]
+    remote_name = "origin" if "origin" in remotes else remotes[0]
+    repo = sanitize_remote(_git("remote", "get-url", remote_name).stdout)
+    dirty = len([line for line in _git("status", "--porcelain").stdout.splitlines() if line.strip()])
+    facts = {"branch": branch.replace("`", ""), "sha": sha, "where": where.replace("`", ""), "repo": repo, "dirty": dirty,
+             "base": None, "ahead_of_base": None}
+    if base:
+        if not re.match(r"^[A-Za-z0-9._/-]+$", base) or base.startswith("-"):
+            raise HandoffError(f"Nombre de base inválido: {base!r}.")
+        if _git("rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{base}").returncode != 0:
+            raise HandoffError(f"No existe origin/{base} localmente (¿falta un fetch?).")
+        facts["base"] = base
+        facts["ahead_of_base"] = int(_git("rev-list", "--count", f"origin/{base}..HEAD").stdout.strip() or 0)
+    return facts
+
+def format_handoff(facts):
+    lines = [
+        "### 🔄 Relevo de Tarea (Handoff Snapshot)",
+        f"- **Avance realizado:** {PLACEHOLDER}",
+        f"- **Rama Git / Commit:** `{facts['branch']}` @ `{facts['sha']}` (en {facts['where']}, según el último fetch local)",
+    ]
+    detail = [f"Repo: {facts['repo'] or 'remoto no reconocido'}"]
+    if facts["base"]:
+        detail.append(f"Base: {facts['base']} ({facts['ahead_of_base']} commit(s) sobre origin/{facts['base']})")
+    detail.append("working tree limpio" if not facts["dirty"] else f"⚠ {facts['dirty']} archivo(s) sin commitear")
+    lines.append("  " + " · ".join(detail))
+    lines += [f"- **Estado actual:** {PLACEHOLDER}", f"- **Stoppers / Próximo paso:** {PLACEHOLDER}"]
+    return "\n".join(lines)
+
+def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
+    """Imprime el borrador del relevo (no publica). Avance, estado y próximos pasos los completa quien trabajó."""
+    try:
+        facts = handoff_facts(getattr(args, "base", None))
+    except HandoffError as exc:
+        sys.stderr.write(f"ERROR: {exc}\n")
+        sys.exit(1)
+    print(format_handoff(facts))
+    ticket = args.issue or detect_ticket_from_git() or "<TICKET>"
+    sys.stderr.write(f"\nCompleta los {PLACEHOLDER}, guarda el texto en un archivo y publícalo con:\n"
+                     f"  plane-tracker comment {ticket} -f relevo.md --duration <min>   (o --accept-proposal)\n")
+
+# ------------------------------------------------------------------------------
+# Consistencia entre la caché local y los comentarios de Plane (report --check)
+# ------------------------------------------------------------------------------
+
+CHECK_FIELDS = ("date", "start_time", "end_time", "duration_minutes", "track", "capacity_bucket", "worker_type")
+CHECK_ERRORS = ("duplicate", "orphan", "mismatch", "missing_local")
+
+def check_worklogs(local_rows, comments, s_str, e_str):
+    """Compara filas locales con sus comentarios. comments: {id: {'meta': dict|None, 'has_block': bool}}."""
+    issues = []
+    by_cid = {}
+    for row in local_rows:
+        cid = row.get("plane_comment_id")
+        if not cid:
+            issues.append({"code": "unlinked", "ticket": row["ticket_id"], "comment_id": None, "detail": f"{row['date']} {row['start_time']} sin comentario asociado"})
+            continue
+        by_cid.setdefault(cid, []).append(row)
+    for cid, rows in by_cid.items():
+        ticket = rows[0]["ticket_id"]
+        if len(rows) > 1:
+            issues.append({"code": "duplicate", "ticket": ticket, "comment_id": cid, "detail": f"{len(rows)} filas locales para el mismo comentario"})
+        comment = comments.get(cid)
+        if comment is None:
+            issues.append({"code": "orphan", "ticket": ticket, "comment_id": cid, "detail": "el comentario ya no existe en Plane"})
+            continue
+        if not comment["has_block"]:
+            issues.append({"code": "no_block", "ticket": ticket, "comment_id": cid, "detail": "el comentario no lleva telemetría: no se reconstruiría con --sync"})
+            continue
+        for row in rows:
+            diffs = [f"{f}: local {row.get(f)!r} ≠ Plane {comment['meta'].get(f)!r}" for f in CHECK_FIELDS
+                     if comment["meta"].get(f) is not None and str(comment["meta"].get(f)) != str(row.get(f))]
+            if diffs:
+                issues.append({"code": "mismatch", "ticket": ticket, "comment_id": cid, "detail": "; ".join(diffs)})
+    tickets = {r["ticket_id"] for r in local_rows}
+    for cid, comment in comments.items():
+        meta = comment.get("meta") or {}
+        if comment["has_block"] and cid not in by_cid and meta.get("duration_minutes") and s_str <= str(meta.get("date", "")) <= e_str:
+            issues.append({"code": "missing_local", "ticket": next(iter(tickets), "?"), "comment_id": cid,
+                           "detail": f"comentario con telemetría ({meta.get('date')} {meta.get('start_time')}, {meta.get('duration_minutes')} min) sin fila local; usa report --sync"})
+    return issues
+
+def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str):
+    """Solo lectura: detecta duplicados, huérfanos, diferencias y filas sin telemetría en el periodo."""
+    proj = getattr(args, "project", None)
+    like = f"{proj.upper()}-%" if proj else "%"
+    rows = [dict(r) for r in conn.execute("SELECT * FROM worklogs WHERE date >= ? AND date <= ? AND ticket_id LIKE ? ORDER BY ticket_id, date, start_time",
+                                          (s_str, e_str, like))]
+    by_ticket = {}
+    for r in rows:
+        by_ticket.setdefault(r["ticket_id"], []).append(r)
+    results, issues = {}, []
+    for label, t_rows in sorted(by_ticket.items()):
+        try:
+            project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, label)
+            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+            c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+            raw = api_request(c_url, api_key, raise_on_error=True).get("results", [])
+        except (SystemExit, urllib.error.URLError, OSError):
+            issues.append({"code": "unreachable", "ticket": label, "comment_id": None, "detail": "no se pudo consultar el ticket en Plane"})
+            continue
+        comments = {}
+        for c in raw:
+            html = c.get("comment_html") or ""
+            has_block = bool(find_metadata_block(html))
+            comments[c["id"]] = {"has_block": has_block, "meta": extract_metadata_from_comment(html) if has_block else None}
+        found = check_worklogs(t_rows, comments, s_str, e_str)
+        results[label] = (len(t_rows), found)
+        issues += found
+    errors = [i for i in issues if i["code"] in CHECK_ERRORS]
+    if getattr(args, "json", False):
+        print(json.dumps({"period": [s_str, e_str], "issues": issues, "ok": not errors}, indent=2, ensure_ascii=False))
+    else:
+        print(f"\n🔎 Consistencia worklogs ↔ comentarios · {s_str} → {e_str}")
+        if not by_ticket:
+            print("   (no hay worklogs locales en el periodo)")
+        for label, (count, found) in results.items():
+            print(f"   {'✔' if not [i for i in found if i['code'] in CHECK_ERRORS] else '✖'} {label}: {count} worklog(s)")
+            for i in found:
+                print(f"      [{i['code']}] {i['detail']}" + (f"  ({i['comment_id'][:8]})" if i["comment_id"] else ""))
+        for i in issues:
+            if i["code"] == "unreachable":
+                print(f"   ? {i['ticket']}: {i['detail']}")
+        print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment-edit o report --sync.\n")
+    sys.exit(1 if errors else 0)
+
 def positive_int(value):
     n = int(value)
     if n < 1:
@@ -2779,6 +2952,8 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     s_str = start_date.strftime("%Y-%m-%d")
     e_str = end_date.strftime("%Y-%m-%d")
 
+    if getattr(args, "check", False):
+        return cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
     if getattr(args, "flow", False):
         return cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
 
@@ -2966,6 +3141,11 @@ def main():
     p_health.add_argument("--hours", type=positive_int, default=24, help="Ventana en horas (por defecto 24)")
     p_health.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # handoff
+    p_handoff = subparsers.add_parser("handoff", help="Imprimir el borrador del relevo (Handoff Snapshot) con los hechos de git del directorio actual")
+    p_handoff.add_argument("issue", nargs="?", default=None, help="Ticket (solo para la sugerencia de publicación)")
+    p_handoff.add_argument("--base", metavar="BRANCH", help="Rama base para contar 'N commits sobre origin/BRANCH' (nunca se asume)")
+
     # focus
     p_focus = subparsers.add_parser("focus", help="Marcar en qué ticket trabaja esta sesión (reparte el tiempo medido por ticket)")
     p_focus.add_argument("issue", nargs="?", default=None, help="Ticket en el que empiezas a trabajar")
@@ -3075,6 +3255,7 @@ def main():
     p_report.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
     p_report.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
     p_report.add_argument("--sync", action="store_true", help="Forzar sincronización remota con Plane")
+    p_report.add_argument("--check", action="store_true", help="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias)")
     p_report.add_argument("--flow", action="store_true", help="Flujo por ticket del periodo: lead/cycle time, tiempo por estado y esfuerzo")
     p_report.add_argument("--json", action="store_true", help="Salida en formato JSON")
 
@@ -3097,6 +3278,8 @@ def main():
             cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "health":
             cmd_health(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "handoff":
+            cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "focus":
             cmd_focus(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "link":
