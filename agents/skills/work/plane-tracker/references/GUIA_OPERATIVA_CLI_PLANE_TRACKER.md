@@ -130,9 +130,14 @@ plane-tracker comment OPS-13 -m "..." --accept-proposal             # en cualqui
 
 # Ventana explícita (un solo día local; lo ya registrado de la sesión se excluye)
 plane-tracker propose-duration OMNIFY-205 --since 09:30 --until 11:00
+
+# Sesión de un día anterior (p. ej. el id que mostró Ctrl+C al cerrarla; `find-session -r -j` también lista ids)
+plane-tracker propose-duration OMNIFY-205 --agent opencode --session ses_xxxx --date 2026-10-28
+plane-tracker comment OMNIFY-205 -m "..." --agent opencode --session ses_xxxx --accept-proposal
 ```
 - La medición usa **tramos de actividad** (huecos de más de 10 min excluidos). Un worklog medido guarda `segments` (los tramos reales) para que el reloj por ticket y el reporte diario no usen un rango envolvente que pise a otro ticket.
 - **Nada se cuenta dos veces:** de cada propuesta se restan los worklogs de la sesión (medidos o declarados, por su intervalo real) y las propuestas pendientes de otros tickets. Con foco activo, un ticket sin marcas hoy no recibe propuesta (usa `--duration`). Las marcas son locales (no se reconstruyen con `--sync`); los segmentos sí viajan en el bloque oculto del comentario.
+- **Varias terminales o agentes:** cada propuesta pendiente pertenece a su sesión (`--accept-proposal` usa la de tu terminal y no adivina si hay varias). Claude Code resuelve su sesión solo (`$CLAUDE_CODE_SESSION_ID`); con OpenCode/agy, si hay más de una sesión reciente en el mismo directorio, indica `--session`. El tiempo en paralelo suma en *cómputo* y se une en *reloj* (AI Leverage).
 - `measured_by` distingue `proposal`, `proposal_split` y `declared`, con `attribution` (`session`, `focus`, `split`) y `window_override` si se usó `--since/--until`.
 
 ---

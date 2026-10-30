@@ -1257,13 +1257,12 @@ def focus_intervals(conn, session_id, day_start, now):
             out.setdefault(row["ticket"], []).append((start, end))
     return out
 
-def _parse_clock(text, now):
-    """'HH:MM' (hoy, hora local) o ISO-8601 -> datetime UTC."""
+def _parse_clock(text, day_start):
+    """'HH:MM' (hora local del día pedido) o ISO-8601 -> datetime UTC."""
     text = text.strip()
     if re.match(r"^\d{1,2}:\d{2}$", text):
-        local_now = now.astimezone()
         hour, minute = (int(x) for x in text.split(":"))
-        return local_now.replace(hour=hour, minute=minute, second=0, microsecond=0).astimezone(timezone.utc)
+        return day_start.astimezone().replace(hour=hour, minute=minute, second=0, microsecond=0).astimezone(timezone.utc)
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError:
@@ -1271,24 +1270,37 @@ def _parse_clock(text, now):
     return (parsed.astimezone() if parsed.tzinfo is None else parsed).astimezone(timezone.utc)
 
 def _resolve_window(args, now):
-    """Ventana medida: hoy 00:00 → ahora, o la explícita (--since/--until) dentro de un único día local."""
-    midnight = _local_midnight_utc(now)
-    start, end, notes, override = midnight, now, [], None
+    """Día medido (hoy o --date) y ventana dentro de él: el día completo (hasta ahora si es hoy) o --since/--until."""
+    date_arg = getattr(args, "date", None)
+    if date_arg:
+        try:
+            day = datetime.strptime(date_arg, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("--date debe tener el formato YYYY-MM-DD.")
+        day_start = day.astimezone(timezone.utc)
+        day_str = date_arg
+    else:
+        day_start = _local_midnight_utc(now)
+        day_str = now.astimezone().strftime("%Y-%m-%d")
+    if day_start > now:
+        raise ValueError("--date no puede ser una fecha futura.")
+    day_end = min((day_start.astimezone() + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc), now)
+    start, end, notes, override = day_start, day_end, [], None
     since, until = getattr(args, "since", None), getattr(args, "until", None)
     if since or until:
         if since:
-            start = _parse_clock(since, now)
+            start = _parse_clock(since, day_start)
         if until:
-            end = _parse_clock(until, now)
-        if end > now:
-            end = now
-            notes.append("--until estaba en el futuro: se recorta a ahora.")
-        if start < midnight or end < midnight:
-            raise ValueError("La ventana debe estar dentro de hoy (cruzaría la medianoche): registra cada día por separado.")
+            end = _parse_clock(until, day_start)
+        if end > day_end:
+            end = day_end
+            notes.append("--until quedaba fuera del día o en el futuro: se recorta.")
+        if start < day_start or end < day_start:
+            raise ValueError("La ventana debe estar dentro de un único día (cruzaría la medianoche): registra cada día por separado.")
         if start >= end:
             raise ValueError("--since debe ser anterior a --until.")
         override = {"since": start.isoformat(), "until": end.isoformat()}
-    return midnight, start, end, notes, override
+    return {"day": day_str, "day_start": day_start, "day_end": day_end, "start": start, "end": end, "notes": notes, "override": override}
 
 def _runs_to_segments(runs, minutes):
     """Segmentos para guardar en el worklog: minutos enteros que suman exactamente `minutes`."""
@@ -1345,10 +1357,10 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
 
     now = _now()
     try:
-        midnight, w_start, w_end, notes, override = _resolve_window(args, now)
+        win = _resolve_window(args, now)
     except ValueError as exc:
         return {"ok": False, "agent": agent, "session_id": session_id, "reason": str(exc)}
-    today = now.astimezone().strftime("%Y-%m-%d")
+    w_start, w_end, notes, override = win["start"], win["end"], win["notes"], win["override"]
     inside = [t for t in stamps if w_start <= t <= w_end]
     if agent == "agy":
         runs = [(inside[0], inside[-1])] if len(inside) >= 2 else []
@@ -1356,8 +1368,8 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
         runs = session_clock.active_runs(stamps, w_start, w_end)
 
     extras = {"attribution": "session", "notes": notes, "override": override,
-              "window": f"{w_start.astimezone().strftime('%H:%M')}–{w_end.astimezone().strftime('%H:%M')}"}
-    marks = focus_intervals(conn, session_id, midnight, now) if use_focus else {}
+              "window": f"{w_start.astimezone().strftime('%H:%M')}–{'24:00' if w_end.astimezone().strftime('%H:%M') == '00:00' and w_end > w_start else w_end.astimezone().strftime('%H:%M')}"}
+    marks = focus_intervals(conn, session_id, win["day_start"], win["day_end"]) if use_focus else {}
     if marks:
         all_marked = [iv for ivs in marks.values() for iv in ivs]
         extras["unattributed"] = session_clock.total_minutes(session_clock.subtract(runs, all_marked))
@@ -1368,7 +1380,7 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
         runs = session_clock.intersect(runs, mine)
         extras["attribution"] = "focus"
 
-    covered = session_coverage(conn, session_id, today) + reserved_runs(session_id, exclude_tickets)
+    covered = session_coverage(conn, session_id, win["day"]) + reserved_runs(session_id, exclude_tickets)
     before = session_clock.total_minutes(runs)
     runs = session_clock.subtract(runs, covered)
     extras["excluded"] = before - session_clock.total_minutes(runs)
@@ -2928,8 +2940,9 @@ def main():
                         choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],
                         help="Balde de capacidad (toil_support y coordination no admiten propuesta)")
     p_prop.add_argument("--split", metavar="SPEC", help="Repartir lo medido entre tickets: 'A=60%%,B=rest' o 'A=40m,B=rest' (ignora las marcas de foco)")
-    p_prop.add_argument("--since", metavar="HH:MM|ISO", help="Inicio de la ventana medida (hoy, hora local)")
-    p_prop.add_argument("--until", metavar="HH:MM|ISO", help="Fin de la ventana medida (hoy, hora local)")
+    p_prop.add_argument("--date", metavar="YYYY-MM-DD", help="Día a medir (por defecto hoy): para sesiones de días anteriores")
+    p_prop.add_argument("--since", metavar="HH:MM|ISO", help="Inicio de la ventana medida (hora local del día medido)")
+    p_prop.add_argument("--until", metavar="HH:MM|ISO", help="Fin de la ventana medida (hora local del día medido)")
     p_prop.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # create
