@@ -2,6 +2,7 @@
 import argparse
 import io
 import os
+import re
 import sys
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -33,6 +34,25 @@ def parse(argv):
             return build_parser().parse_args(argv), 0, err.getvalue()
     except SystemExit as exc:
         return None, exc.code, err.getvalue()
+
+
+class SkillDocumentsEveryRoute(unittest.TestCase):
+    """SKILL.md es lo que lee el agente: cada ruta de comando existente debe aparecer con el prefijo `plane-tracker`."""
+
+    def test_every_route_is_cited(self):
+        skill_path = os.path.join(os.path.dirname(__file__), "..", "SKILL.md")
+        with open(skill_path, encoding="utf-8") as handle:
+            skill = handle.read()
+        # En las tablas Markdown las alternativas se escriben `a\\|b`: se normalizan antes de buscar.
+        flat = skill.replace("\\|", "|")
+        missing = []
+        for command, verbs in command_tree(build_parser()).items():
+            for route in ([f"{command} {verb}" for verb in verbs] or [command]):
+                grouped = verbs and f"plane-tracker {command} " in flat and any(
+                    re.search(rf"plane-tracker {command} [^`\n]*\b{verb}\b", flat) for verb in verbs if f"{command} {verb}" == route)
+                if f"plane-tracker {route}" not in flat and not grouped:
+                    missing.append(route)
+        self.assertEqual(missing, [], f"rutas sin citar en SKILL.md: {missing}")
 
 
 class CommandTree(unittest.TestCase):
