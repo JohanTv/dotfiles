@@ -513,8 +513,11 @@ def normalize(text, sandbox, scrub=()):
     return text
 
 
-def run_scenario(name, steps, *, sandbox_kwargs=None, scrub=(), sort_requests=False, db_queries=(), setup=None, files=None):
-    """steps: lista de dicts {args, env_drop, stdin, cwd}. Devuelve el texto golden normalizado."""
+def run_scenario(name, steps, *, sandbox_kwargs=None, scrub=(), sort_requests=False, db_queries=(), setup=None, files=None, drop=()):
+    """steps: lista de dicts {args, env_drop, stdin, cwd}. Devuelve el texto golden normalizado.
+
+    drop: regex (multilínea) de líneas que dependen del reloj de pared y se eliminan de la salida antes de comparar.
+    """
     sb = Sandbox(**(sandbox_kwargs or {}))
     try:
         for rel, content in (files or {}).items():
@@ -540,7 +543,10 @@ def run_scenario(name, steps, *, sandbox_kwargs=None, scrub=(), sort_requests=Fa
                 if "raw_payload" in row and row["raw_payload"]:
                     row["raw_payload"] = _scrub(json.loads(row["raw_payload"]), scrub)
                 out.append(json.dumps(_scrub(row, scrub), sort_keys=True, ensure_ascii=False))
-        return normalize("\n".join(out) + "\n", sb, scrub)
+        text = "\n".join(out) + "\n"
+        for pattern in drop:
+            text = re.sub(pattern, "", text, flags=re.M)
+        return normalize(text, sb, scrub)
     finally:
         sb.close()
 

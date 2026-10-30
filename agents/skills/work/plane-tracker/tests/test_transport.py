@@ -3,6 +3,7 @@ import http.client
 import io
 import os
 import socket
+import ssl
 import sys
 import tempfile
 import time
@@ -37,6 +38,13 @@ class Classify(unittest.TestCase):
             (http.client.IncompleteRead(b"a"), ("reset", "unknown")),
             (http.client.BadStatusLine("x"), ("bad_response", "unknown")),
             (ValueError("json"), ("bad_response", "unknown")),
+            (urllib.error.URLError(ssl.SSLError(1, "[SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error")), ("tls", "no")),
+            (urllib.error.URLError(ssl.SSLEOFError(8, "EOF occurred in violation of protocol")), ("reset", "unknown")),
+            (urllib.error.URLError(ssl.SSLZeroReturnError(6, "TLS/SSL connection has been closed")), ("reset", "unknown")),
+            (ssl.SSLEOFError(8, "EOF occurred in violation of protocol"), ("reset", "unknown")),
+            (ssl.SSLError(1, "decryption failed"), ("tls", "unknown")),
+            (urllib.error.URLError(ssl.SSLCertVerificationError(1, "certificate verify failed")), None),
+            (ssl.SSLCertVerificationError(1, "certificate verify failed"), None),
         ]
         for exc, expected in cases:
             self.assertEqual(api.classify(exc), expected, repr(exc))
@@ -46,7 +54,7 @@ class Classify(unittest.TestCase):
     def test_cause_messages(self):
         for kind, text in (("timeout", "tiempo de espera agotado"), ("read_timeout", "tiempo de espera agotado"), ("refused", "conexión rechazada"),
                            ("dns", "DNS no resuelve"), ("http_502", "HTTP 502"), ("reset", "conexión cortada"),
-                           ("bad_response", "respuesta no válida"), ("offline", "modo sin conexión (PLANE_OFFLINE=1)")):
+                           ("bad_response", "respuesta no válida"), ("offline", "modo sin conexión (PLANE_OFFLINE=1)"), ("tls", "error TLS")):
             self.assertEqual(circuit.PlaneUnavailable(kind, "no").cause, text)
         self.assertEqual(circuit.PlaneUnavailable("circuit_open", "no", cause_kind="dns").cause, "DNS no resuelve")
 
@@ -151,6 +159,36 @@ class Transport(unittest.TestCase):
                 self.fake.add_fault("*", "/projects/$", "raw", payload)
                 self.assertEqual(self.unavailable("POST").kind, kind)
 
+    def test_tls_handshake_failure_is_transient_and_counts(self):
+        failure = urllib.error.URLError(ssl.SSLError(1, "[SSL: TLSV1_ALERT_INTERNAL_ERROR] tlsv1 alert internal error"))
+        with mock.patch("urllib.request.urlopen", side_effect=failure):
+            exc = self.unavailable("POST")
+        self.assertEqual((exc.kind, exc.delivered, exc.cause), ("tls", "no", "error TLS"))
+        self.assertEqual(circuit.describe()["consec"], 1)
+
+    def test_tls_eof_after_sending_is_unknown(self):
+        with mock.patch("urllib.request.urlopen", side_effect=ssl.SSLEOFError(8, "EOF occurred in violation of protocol")):
+            exc = self.unavailable("POST")
+        self.assertEqual((exc.kind, exc.delivered), ("reset", "unknown"))
+
+    def test_certificate_error_is_definitive_and_does_not_count(self):
+        failure = urllib.error.URLError(ssl.SSLCertVerificationError(1, "certificate verify failed"))
+        err = io.StringIO()
+        with mock.patch("urllib.request.urlopen", side_effect=failure), redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+            self.call()
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn(f"Error TLS en {self.url}: ", err.getvalue())
+        self.assertEqual(circuit.describe()["consec"], 0)
+        self.assertEqual(self.sleeps, [])
+
+    def test_unavailable_carries_the_request_method(self):
+        self.fake.add_fault("*", "/projects/$", "status", 503)
+        self.assertEqual(self.unavailable("POST").method, "POST")
+        circuit.record(True)
+        self.assertEqual(self.unavailable("GET").method, "GET")
+        with mock.patch.dict(os.environ, {"PLANE_OFFLINE": "1"}):
+            self.assertEqual(self.unavailable("POST").method, "POST")
+
     def test_offline_makes_no_request(self):
         with mock.patch.dict(os.environ, {"PLANE_OFFLINE": "1"}):
             exc = self.unavailable()
@@ -232,6 +270,19 @@ class Cli(unittest.TestCase):
         code, out, err = self.sb.run(READ)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.sb.circuit_state()["opened_at"], None)
+
+    def test_unknown_write_does_not_claim_nothing_was_sent(self):
+        self.sb.fake.add_fault("DELETE", r"/comments/", "drop")
+        code, out, err = self.sb.run(["comment", "delete", "OMNIFY-1", "--comment-id", "c1000000-0000-4000-8000-000000000001"])
+        self.assertEqual(code, 3)
+        self.assertIn("Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.", err)
+        self.assertNotIn("No se envió nada", err)
+
+    def test_unknown_read_keeps_the_nothing_sent_message(self):
+        self.sb.fake.add_fault("GET", r"/issue-attachments/", "drop")
+        code, out, err = self.sb.run(READ)
+        self.assertEqual(code, 3)
+        self.assertIn("No se envió nada; reintenta en", err)
 
     def test_health_reports_open_circuit(self):
         self.sb.write_circuit(opened_ago=5, last_error="dns")
