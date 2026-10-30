@@ -8,6 +8,7 @@ from contextlib import redirect_stderr
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import plane  # noqa: E402
+from plane_cli import worklog  # noqa: E402
 
 ENV = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t",
            GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
@@ -71,7 +72,7 @@ class HandoffRepo(unittest.TestCase):
         self.assertEqual((facts["base"], facts["ahead_of_base"]), ("dev", 1))
         self.assertEqual(len(facts["sha"]), 40)
         text = plane.format_handoff(facts)
-        self.assertEqual(text.count(plane.PLACEHOLDER), 3)
+        self.assertEqual(text.count(worklog.PLACEHOLDER), 3)
         self.assertIn("working tree limpio", text)
         self.assertNotIn(self.work, text)  # nunca rutas absolutas
 
@@ -103,8 +104,8 @@ class HandoffRepo(unittest.TestCase):
 class Placeholders(unittest.TestCase):
     def test_visible_placeholder_is_rejected_hidden_block_is_not(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            plane.reject_placeholders("- **Avance realizado:** [COMPLETAR]")
-        plane.reject_placeholders("Todo listo <!-- PLANE_WORKLOG_METADATA {\"notes\": \"[COMPLETAR]\"} -->")
+            worklog.reject_placeholders("- **Avance realizado:** [COMPLETAR]")
+        worklog.reject_placeholders("Todo listo <!-- PLANE_WORKLOG_METADATA {\"notes\": \"[COMPLETAR]\"} -->")
 
 
 class Check(unittest.TestCase):
@@ -114,7 +115,7 @@ class Check(unittest.TestCase):
             "capacity_bucket": "deep_work", "worker_type": "human"}
 
     def run_check(self, rows, comments):
-        return plane.check_worklogs(rows, comments, "2026-10-29", "2026-10-29")
+        return worklog.check_worklogs(rows, comments, "2026-10-29", "2026-10-29")
 
     def test_consistent(self):
         self.assertEqual(self.run_check([self.ROW], {"c1": {"has_block": True, "meta": self.META}}), [])

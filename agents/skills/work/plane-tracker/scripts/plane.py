@@ -26,7 +26,6 @@ import uuid
 import fcntl
 import contextlib
 from datetime import datetime, timedelta, date, timezone
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import session_clock
@@ -47,6 +46,28 @@ from plane_cli.resolve import (
     resolve_issue,
     resolve_project_and_seq,
 )
+from plane_cli.sync import sync_remote_worklogs
+from plane_cli.timeutil import (
+    DIAS_SEMANA,
+    calculate_klee_union_minutes,
+    expand_segments,
+    format_minutes,
+    render_day_block,
+    time_to_minutes,
+)
+from plane_cli.worklog import (
+    CHECK_ERRORS,
+    PLACEHOLDER,
+    check_worklogs,
+    corrected_metadata,
+    derived_start,
+    extract_metadata_from_comment,
+    find_metadata_block,
+    reject_placeholders,
+    replace_metadata_block,
+    upsert_worklog,
+    worklog_metadata_block,
+)
 
 # ------------------------------------------------------------------------------
 # Conversor Markdown → HTML (stdlib, sin dependencias externas)
@@ -57,7 +78,6 @@ from plane_cli.resolve import (
 
 SYNC_COOLDOWN = 300   # 5 minutos
 
-DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 # ------------------------------------------------------------------------------
 # Conexión y Gestión de Base de Datos SQLite3 (WAL Mode)
@@ -78,394 +98,15 @@ DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", 
 # Telemetría y Metadata (v2.2)
 # ------------------------------------------------------------------------------
 
-def extract_metadata_from_comment(comment_html):
-    """Extrae metadata telemétrica oculta (<!-- PLANE_WORKLOG_METADATA ... -->) o deduce de tabla."""
-    if not comment_html:
-        return None
-
-    # 1. Bloque JSON telemétrico oficial v2.1 / v2.2
-    meta_match = re.search(r"<!--\s*PLANE_WORKLOG_METADATA\s*([\s\S]*?)\s*-->", comment_html)
-    if meta_match:
-        try:
-            data = json.loads(meta_match.group(1).strip())
-            if "date" in data and ("start_time" in data or "notes" in data):
-                return data
-        except Exception:
-            pass
-
-    # 2. Inferencia desde tabla markdown
-    date_match = re.search(r"\*\*Fecha\*\*\s*\|\s*(\d{4}-\d{2}-\d{2})", comment_html)
-    session_match = re.search(r"\*\*Sesión\*\*\s*\|\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})", comment_html)
-    notes_match = re.search(r"\*\*(?:Resumen|Notas|Detalle)\*\*\s*\|\s*([^|\n<]+)", comment_html)
-    bucket_match = re.search(r"\*\*Capacidad\*\*\s*\|\s*`?([a-z_]+)`?", comment_html)
-    track_match = re.search(r"\*\*Track\*\*\s*\|\s*`?([a-zA-Z0-9_-]+)`?", comment_html)
-
-    if session_match:
-        s_time = session_match.group(1)
-        e_time = session_match.group(2)
-        try:
-            t1 = datetime.strptime(s_time, "%H:%M")
-            t2 = datetime.strptime(e_time, "%H:%M")
-            dur = int((t2 - t1).total_seconds() / 60)
-            if dur < 0:
-                dur += 24 * 60
-        except Exception:
-            dur = 60
-
-        d_str = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
-        notes_str = notes_match.group(1).strip() if notes_match else ""
-        bucket_str = bucket_match.group(1).strip() if bucket_match else "deep_work"
-        track_str = track_match.group(1).strip() if track_match else "main"
-
-        return {
-            "schema_version": "2.2",
-            "date": d_str,
-            "start_time": s_time,
-            "end_time": e_time,
-            "duration_minutes": dur,
-            "track": track_str,
-            "worker_type": "human",
-            "capacity_bucket": bucket_str,
-            "notes": notes_str,
-            "stoppers": [],
-            "phase": "dev"
-        }
-
-    return None
-
-def upsert_worklog(conn, entry):
-    """Inserta o actualiza un registro de trabajo en SQLite3 de forma idempotente."""
-    now = time.time()
-    t_id = entry.get("ticket_id", "GENERAL")
-    track = entry.get("track", "main")
-    d_str = entry.get("date", datetime.now().strftime("%Y-%m-%d"))
-    s_time = entry.get("start_time", "09:00")
-    e_time = entry.get("end_time", "10:00")
-    dur = entry.get("duration_minutes", 60)
-    p_id = t_id.split("-")[0] if "-" in t_id else "GENERAL"
-    i_name = entry.get("issue_name", "")
-    w_type = entry.get("worker_type", "human")
-    bucket = entry.get("capacity_bucket", "deep_work")
-    phase = entry.get("phase", "dev")
-    role = entry.get("role", "backend_engineer")
-    notes = entry.get("notes", "")
-    stoppers = json.dumps(entry.get("stoppers", []), ensure_ascii=False)
-    comment_id = entry.get("plane_comment_id") or entry.get("id")
-    raw_payload = json.dumps(entry.get("raw_payload", entry), ensure_ascii=False)
-    created_at = entry.get("created_at", datetime.now().isoformat())
-
-    with conn:
-        conn.execute("""
-            INSERT INTO worklogs (
-                ticket_id, track, date, start_time, end_time, duration_minutes,
-                plane_comment_id, project_id, issue_name, worker_type,
-                capacity_bucket, phase, role, notes, stoppers_json, raw_payload,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ticket_id, track, date, start_time) DO UPDATE SET
-                end_time = excluded.end_time,
-                duration_minutes = excluded.duration_minutes,
-                plane_comment_id = COALESCE(excluded.plane_comment_id, worklogs.plane_comment_id),
-                issue_name = CASE WHEN excluded.issue_name != '' THEN excluded.issue_name ELSE worklogs.issue_name END,
-                worker_type = excluded.worker_type,
-                capacity_bucket = excluded.capacity_bucket,
-                phase = excluded.phase,
-                role = excluded.role,
-                notes = excluded.notes,
-                stoppers_json = excluded.stoppers_json,
-                raw_payload = excluded.raw_payload,
-                updated_at = excluded.updated_at;
-        """, (
-            t_id, track, d_str, s_time, e_time, dur,
-            comment_id, p_id, i_name, w_type,
-            bucket, phase, role, notes, stoppers, raw_payload,
-            created_at, now
-        ))
 
 # ------------------------------------------------------------------------------
 # Sincronización Remota con Plane API
 # ------------------------------------------------------------------------------
 
 
-def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
-    """Sincroniza comentarios de Plane para tickets actualizados y los persiste en SQLite con descargas paralelas."""
-    sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
-    projects_map = get_projects_map(conn, base_url, api_key, workspace)
-
-    # Filtro por autor: solo mis comentarios alimentan mi reporte (los tickets pueden ser compartidos)
-    actor_uuid = get_actor_uuid(base_url, api_key, workspace)
-    if not actor_uuid:
-        sys.stderr.write("⚠ Sin PLANE_USERNAME/PLANE_ACTOR_UUID: el sync mezclará horas de compañeros en tickets compartidos.\n")
-    
-    try:
-        d_from = datetime.strptime(date_from_str, "%Y-%m-%d").date() - timedelta(days=1)
-    except Exception:
-        d_from = datetime.now().date() - timedelta(days=7)
-
-    target_idents = []
-    if filter_project:
-        f_up = filter_project.upper()
-        if f_up in projects_map:
-            target_idents = [f_up]
-    else:
-        for pref in ["OMNIFY", "OPS", "OMNICANAL"]:
-            if pref in projects_map:
-                target_idents.append(pref)
-
-    candidate_tasks = []
-    for ident in target_idents:
-        proj = projects_map[ident]
-        proj_id = proj["id"]
-        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/?order_by=-updated_at&limit=15"
-        try:
-            data = api_request(url, api_key, raise_on_error=True)
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                continue
-            pass
-        except Exception:
-            continue
-
-        for iss in data.get("results", []):
-            up_str = iss.get("updated_at")
-            if not up_str:
-                continue
-            try:
-                iss_up = datetime.fromisoformat(up_str.replace("Z", "+00:00")).date()
-                if iss_up < d_from:
-                    continue
-            except Exception:
-                pass
-            candidate_tasks.append((ident, proj_id, iss))
-
-    def fetch_comments_for_issue(task):
-        ident, proj_id, iss = task
-        c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/{iss['id']}/comments/"
-        try:
-            c_data = api_request(c_url, api_key, raise_on_error=True)
-            return ident, iss, c_data.get("results", [])
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                return ident, iss, []
-            return ident, iss, []
-        except Exception:
-            return ident, iss, []
-
-    synced_count = 0
-    skipped_foreign = 0
-    skipped_no_duration = 0
-    if candidate_tasks:
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [executor.submit(fetch_comments_for_issue, t) for t in candidate_tasks]
-            for fut in as_completed(futures):
-                ident, iss, comments = fut.result()
-                for c in comments:
-                    # Filtro por autor: los tickets compartidos no deben contaminar mi reporte
-                    author = c.get("created_by") or c.get("actor")
-                    if actor_uuid and author and author != actor_uuid:
-                        skipped_foreign += 1
-                        continue
-
-                    html = c.get("comment_html", "")
-                    meta = extract_metadata_from_comment(html)
-                    if meta:
-                        # Duración explícita (nunca inventar 60 min): metadata o rango start/end
-                        dur = meta.get("duration_minutes") or meta.get("duration_net_minutes")
-                        if not dur and meta.get("start_time") and meta.get("end_time"):
-                            dur = time_to_minutes(meta["end_time"]) - time_to_minutes(meta["start_time"])
-                            if dur < 0:
-                                dur += 24 * 60
-                        if not dur or dur < 1:
-                            skipped_no_duration += 1
-                            continue
-
-                        ticket_label = f"{ident}-{iss.get('sequence_id')}"
-                        entry = {
-                            "ticket_id": ticket_label,
-                            "track": meta.get("track", "main"),
-                            "issue_name": iss.get("name", ""),
-                            "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
-                            "start_time": meta.get("start_time", (datetime.now() - timedelta(minutes=dur)).strftime("%H:%M")),
-                            "end_time": meta.get("end_time", datetime.now().strftime("%H:%M")),
-                            "duration_minutes": dur,
-                            "worker_type": meta.get("worker_type", "human"),
-                            "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
-                            "phase": meta.get("phase", "dev"),
-                            "role": meta.get("role", "backend_engineer"),
-                            "notes": meta.get("notes", iss.get("name", "")),
-                            "stoppers": meta.get("stoppers", []),
-                            "plane_comment_id": c.get("id"),
-                            "created_at": c.get("created_at"),
-                            "raw_payload": meta
-                        }
-                        upsert_worklog(conn, entry)
-                        synced_count += 1
-
-    # Actualizar watermark de sync
-    now = time.time()
-    with conn:
-        conn.execute("""
-            INSERT INTO sync_metadata (key, value, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-        """, (f"sync:{workspace}", datetime.now().isoformat(), now))
-
-    if synced_count > 0:
-        sys.stderr.write(f"✔ Se sincronizaron {synced_count} registros telemétricos en SQLite3.\n")
-    else:
-        sys.stderr.write("ℹ Sincronización completa: sin nuevos registros telemétricos.\n")
-
 # ------------------------------------------------------------------------------
 # Algoritmo de Fusión de Intervalos de Klee (Interval Merging)
 # ------------------------------------------------------------------------------
-
-def time_to_minutes(t_str):
-    try:
-        h, m = map(int, t_str.split(":"))
-        return h * 60 + m
-    except Exception:
-        return 0
-
-def minutes_to_time(m):
-    h = (m // 60) % 24
-    mins = m % 60
-    return f"{h:02d}:{mins:02d}"
-
-def calculate_klee_union_minutes(intervals):
-    """Calcula la longitud de la unión de intervalos sin duplicar solapamientos (Medida de Lebesgue en 1D)."""
-    if not intervals:
-        return 0
-    sorted_int = sorted(intervals, key=lambda x: x[0])
-    union_mins = 0
-    cur_start, cur_end = sorted_int[0]
-
-    for s, e in sorted_int[1:]:
-        if s <= cur_end:
-            cur_end = max(cur_end, e)
-        else:
-            union_mins += (cur_end - cur_start)
-            cur_start, cur_end = s, e
-    union_mins += (cur_end - cur_start)
-    return union_mins
-
-def expand_segments(rows):
-    """Un worklog con segmentos (actividad intercalada entre tickets) se reporta como un bloque por segmento."""
-    out = []
-    for row in rows:
-        entry = dict(row)
-        try:
-            segments = json.loads(entry.get("raw_payload") or "{}").get("segments")
-        except ValueError:
-            segments = None
-        if not segments:
-            out.append(entry)
-            continue
-        for idx, seg in enumerate(segments):
-            part = dict(entry, start_time=seg["start"], end_time=seg["end"], duration_minutes=seg["minutes"])
-            if idx:
-                part["notes"] = "(continuación)"
-            out.append(part)
-    return out
-
-def merge_daily_worklogs(rows):
-    """
-    Agrupa y fusiona registros para el formato ejecutivo:
-    titulo / inicio / fin / notas
-    
-    1. Registros del mismo ticket con solapamiento temporal se unifican en un único bloque continuo.
-    2. Registros de distintos tickets preservan su horario real.
-    3. El total día se calcula mediante la unión de Lebesgue (Klee's Measure) para tiempo reloj real.
-    """
-    if not rows:
-        return [], 0, 0
-
-    tickets_map = {}
-    for r in rows:
-        tid = r["ticket_id"]
-        tickets_map.setdefault(tid, []).append(r)
-
-    consolidated = []
-    all_raw_intervals = []
-    total_compute_minutes = 0
-
-    for tid, t_entries in tickets_map.items():
-        sorted_t = sorted(t_entries, key=lambda x: time_to_minutes(x["start_time"]))
-        merged_blocks = []
-
-        for e in sorted_t:
-            s_m = time_to_minutes(e["start_time"])
-            e_m = time_to_minutes(e["end_time"])
-            dur = e["duration_minutes"]
-            total_compute_minutes += dur
-            all_raw_intervals.append((s_m, e_m))
-
-            track_name = e["track"]
-            worker = e["worker_type"]
-            actor_tag = " [Subagente]" if "subagent" in worker.lower() else ""
-            track_tag = f"Track: {track_name}" if track_name != "main" else "General"
-            note_content = f"[{track_tag}{actor_tag} ({e['start_time']}-{e['end_time']})]: {e['notes']}"
-
-            try:
-                stoppers_list = json.loads(e["stoppers_json"])
-            except Exception:
-                stoppers_list = []
-
-            if not merged_blocks:
-                merged_blocks.append({
-                    "ticket_id": tid,
-                    "issue_name": e["issue_name"],
-                    "start_min": s_m,
-                    "end_min": e_m,
-                    "active_mins": dur,
-                    "notes_list": [note_content],
-                    "stoppers": stoppers_list,
-                    "workers": {worker}
-                })
-            else:
-                last = merged_blocks[-1]
-                # Solapamiento o contigüidad (<= 5 min)
-                if s_m <= last["end_min"] + 5:
-                    last["end_min"] = max(last["end_min"], e_m)
-                    last["active_mins"] += dur
-                    last["notes_list"].append(note_content)
-                    last["stoppers"].extend(stoppers_list)
-                    last["workers"].add(worker)
-                else:
-                    merged_blocks.append({
-                        "ticket_id": tid,
-                        "issue_name": e["issue_name"],
-                        "start_min": s_m,
-                        "end_min": e_m,
-                        "active_mins": dur,
-                        "notes_list": [note_content],
-                        "stoppers": stoppers_list,
-                        "workers": {worker}
-                    })
-
-        for b in merged_blocks:
-            wall_m = b["end_min"] - b["start_min"]
-            leverage = round(b["active_mins"] / wall_m, 2) if wall_m > 0 else 1.0
-            combined_notes = " | ".join(b["notes_list"])
-            if len(b["notes_list"]) > 1 or leverage > 1.0:
-                combined_notes += f" (Consolidado: {b['active_mins']}m esfuerzo en {wall_m}m reloj | AI Leverage: {leverage}x)"
-
-            consolidated.append({
-                "ticket_id": b["ticket_id"],
-                "issue_name": b["issue_name"],
-                "start_time": minutes_to_time(b["start_min"]),
-                "end_time": minutes_to_time(b["end_min"]),
-                "start_min": b["start_min"],
-                "wall_minutes": wall_m,
-                "active_minutes": b["active_mins"],
-                "notes": combined_notes,
-                "stoppers": list(set(b["stoppers"])),
-                "workers": list(b["workers"])
-            })
-
-    consolidated.sort(key=lambda x: x["start_min"])
-    day_wall_clock_minutes = calculate_klee_union_minutes(all_raw_intervals)
-
-    return consolidated, day_wall_clock_minutes, total_compute_minutes
 
 
 # ------------------------------------------------------------------------------
@@ -810,51 +451,6 @@ def print_split(result, stream):
     for w in first["warnings"]:
         stream.write(f"   ⚠ {w}\n")
 
-def worklog_metadata_block(meta):
-    """Comentario HTML oculto con la telemetría del worklog (los '--' se escapan para no cerrarlo)."""
-    payload = json.dumps(meta, ensure_ascii=False, sort_keys=True).replace("--", "\\u002d\\u002d")
-    return f"<!-- PLANE_WORKLOG_METADATA {payload} -->"
-
-_BLOCK_RE = re.compile(r"<!--\s*PLANE_WORKLOG_METADATA[\s\S]*?-->")
-
-def find_metadata_block(html):
-    match = _BLOCK_RE.search(html or "")
-    return match.group(0) if match else None
-
-def replace_metadata_block(html, meta):
-    """Sustituye el bloque oculto (o lo añade si no existe) sin tocar el texto visible."""
-    block = worklog_metadata_block(meta)
-    if _BLOCK_RE.search(html or ""):
-        return _BLOCK_RE.sub(lambda _m: block, html, count=1)
-    return (html or "") + "\n" + block
-
-def corrected_metadata(old, duration, track=None, capacity_bucket=None, worker_type=None, force=False, edited_at=None):
-    """Metadata corregida de un worklog existente: conserva sesión, tramos y demás, y deja rastro de la corrección."""
-    meta = dict(old)
-    segments = meta.get("segments")
-    if segments and duration != sum(seg.get("minutes", 0) for seg in segments):
-        if not force:
-            raise ValueError("El worklog tiene tramos medidos que suman otra duración; usa --force para descartar los tramos y fijar la duración.")
-        meta.pop("segments", None)
-    meta["previous_duration_minutes"] = old.get("duration_minutes")
-    meta["duration_minutes"] = duration
-    for key, value in (("track", track), ("capacity_bucket", capacity_bucket), ("worker_type", worker_type)):
-        if value:
-            meta[key] = value
-    measured_by = dict(meta.get("measured_by") or {})
-    measured_by["was"] = measured_by.get("kind")
-    measured_by["kind"] = "corrected"
-    meta["measured_by"] = measured_by
-    meta["edited_at"] = edited_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    return meta
-
-def derived_start(end_dt, duration):
-    """HH:MM de inicio derivado de la duración; nunca antes de las 00:00 del día del fin."""
-    start = end_dt - timedelta(minutes=duration)
-    if start.date() != end_dt.date():
-        sys.stderr.write("⚠ La duración cruza la medianoche: el inicio se limita a 00:00 del día del registro.\n")
-        return "00:00"
-    return start.strftime("%H:%M")
 
 # ------------------------------------------------------------------------------
 # Comandos CLI
@@ -1773,16 +1369,10 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
 # Relevo (Handoff Snapshot): la herramienta solo junta hechos de git local; el criterio lo pone quien trabajó
 # ------------------------------------------------------------------------------
 
-PLACEHOLDER = "[COMPLETAR]"
 
 class HandoffError(Exception):
     pass
 
-def reject_placeholders(text):
-    """Un texto con marcadores sin completar (fuera del bloque oculto) nunca se publica."""
-    if PLACEHOLDER in re.sub(r"<!--[\s\S]*?-->", "", text or ""):
-        sys.stderr.write(f"Error: el texto aún tiene marcadores {PLACEHOLDER}; complétalos antes de publicar.\n")
-        sys.exit(1)
 
 def _git(*args):
     return subprocess.run(["git", *args], capture_output=True, text=True, timeout=15)
@@ -1857,42 +1447,6 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
 # Consistencia entre la caché local y los comentarios de Plane (report --check)
 # ------------------------------------------------------------------------------
 
-CHECK_FIELDS = ("date", "start_time", "end_time", "duration_minutes", "track", "capacity_bucket", "worker_type")
-CHECK_ERRORS = ("duplicate", "orphan", "mismatch", "missing_local")
-
-def check_worklogs(local_rows, comments, s_str, e_str):
-    """Compara filas locales con sus comentarios. comments: {id: {'meta': dict|None, 'has_block': bool}}."""
-    issues = []
-    by_cid = {}
-    for row in local_rows:
-        cid = row.get("plane_comment_id")
-        if not cid:
-            issues.append({"code": "unlinked", "ticket": row["ticket_id"], "comment_id": None, "detail": f"{row['date']} {row['start_time']} sin comentario asociado"})
-            continue
-        by_cid.setdefault(cid, []).append(row)
-    for cid, rows in by_cid.items():
-        ticket = rows[0]["ticket_id"]
-        if len(rows) > 1:
-            issues.append({"code": "duplicate", "ticket": ticket, "comment_id": cid, "detail": f"{len(rows)} filas locales para el mismo comentario"})
-        comment = comments.get(cid)
-        if comment is None:
-            issues.append({"code": "orphan", "ticket": ticket, "comment_id": cid, "detail": "el comentario ya no existe en Plane"})
-            continue
-        if not comment["has_block"]:
-            issues.append({"code": "no_block", "ticket": ticket, "comment_id": cid, "detail": "el comentario no lleva telemetría: no se reconstruiría con --sync"})
-            continue
-        for row in rows:
-            diffs = [f"{f}: local {row.get(f)!r} ≠ Plane {comment['meta'].get(f)!r}" for f in CHECK_FIELDS
-                     if comment["meta"].get(f) is not None and str(comment["meta"].get(f)) != str(row.get(f))]
-            if diffs:
-                issues.append({"code": "mismatch", "ticket": ticket, "comment_id": cid, "detail": "; ".join(diffs)})
-    tickets = {r["ticket_id"] for r in local_rows}
-    for cid, comment in comments.items():
-        meta = comment.get("meta") or {}
-        if comment["has_block"] and cid not in by_cid and meta.get("duration_minutes") and s_str <= str(meta.get("date", "")) <= e_str:
-            issues.append({"code": "missing_local", "ticket": next(iter(tickets), "?"), "comment_id": cid,
-                           "detail": f"comentario con telemetría ({meta.get('date')} {meta.get('start_time')}, {meta.get('duration_minutes')} min) sin fila local; usa report --sync"})
-    return issues
 
 def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str):
     """Solo lectura: detecta duplicados, huérfanos, diferencias y filas sin telemetría en el periodo."""
@@ -2236,54 +1790,6 @@ def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
 # Generador de Reportes de Actividad en Formato Híbrido (cmd_report)
 # ------------------------------------------------------------------------------
 
-def format_minutes(m):
-    h = m // 60
-    mins = m % 60
-    return f"{h}h {mins:02d}m"
-
-def render_day_block(date_obj, rows):
-    """Renderiza el bloque de un día usando Interval Merging de Klee."""
-    dia_nombre = DIAS_SEMANA[date_obj.weekday()]
-    d_str = date_obj.strftime("%d/%m/%Y")
-    lines = []
-
-    if not rows:
-        return f"ℹ Sin registros de actividad para {dia_nombre} {d_str}.\n"
-
-    merged_entries, wall_clock_mins, total_compute_mins = merge_daily_worklogs(expand_segments(rows))
-
-    by_project = {}
-    all_stoppers = []
-
-    for e in merged_entries:
-        lines.append(f"titulo: [{e['ticket_id']}] {e['issue_name']}")
-        lines.append(f"inicio: {e['start_time']}")
-        lines.append(f"fin: {e['end_time']}")
-        lines.append(f"notas: {e['notes']}")
-        lines.append("")
-
-        pref = e["ticket_id"].split("-")[0] if "-" in e["ticket_id"] else "Otros"
-        by_project[pref] = by_project.get(pref, 0) + e["wall_minutes"]
-        for st in e["stoppers"]:
-            if st and st not in all_stoppers:
-                all_stoppers.append(st)
-
-    proj_parts = [f"{k}: {format_minutes(v)}" for k, v in by_project.items()]
-    proj_str = " | ".join(proj_parts) if proj_parts else "N/A"
-
-    lines.append("-" * 80)
-    lines.append(f"📊 Total día: {format_minutes(wall_clock_mins)} reloj activa ({proj_str})")
-    
-    if total_compute_mins > wall_clock_mins:
-        leverage = round(total_compute_mins / wall_clock_mins, 2) if wall_clock_mins > 0 else 1.0
-        lines.append(f"🚀 AI Leverage Multiplier: {leverage}x ({format_minutes(total_compute_mins)} de esfuerzo entregado en {format_minutes(wall_clock_mins)} reloj)")
-
-    if all_stoppers:
-        lines.append(f"⏸️ Standby externo: {', '.join(all_stoppers)}")
-    else:
-        lines.append("⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)")
-
-    return "\n".join(lines)
 
 def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     today = datetime.now().date()
