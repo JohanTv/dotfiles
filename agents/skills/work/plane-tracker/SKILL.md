@@ -113,6 +113,8 @@ plane-tracker comment-delete OPS-13 [--comment-id <uuid>]
 
 > ⚠️ **`--duration <minutos>` es obligatorio** cuando el contenido no lleva el bloque `PLANE_WORKLOG_METADATA` (en ese bloque puede ir en `duration_minutes` o `duration_net_minutes`). Sin él, el CLI aborta **antes** de publicar el comentario, porque la duración ya no se inventa (antes asumía 30 min por defecto y contaminaba el reporte).
 >
+> **Duración medida:** sin `--duration`, `plane-tracker comment` (o `plane-tracker propose-duration`) mide la sesión del agente leyendo solo timestamps (Claude Code por `$CLAUDE_CODE_SESSION_ID`; OpenCode y Antigravity CLI por `--session` o por directorio si no hay ambigüedad) y **propone** una duración con su desglose; no registra nada. Para aceptarla, repite con `--accept-proposal` (vale 30 min y una sola vez) o ajusta con `--duration N`. Si la sesión tocó varios tickets, reparte con `--duration`. Soporte y reuniones (`toil_support`, `coordination`) nunca llevan propuesta: se pregunta. Cada worklog guarda `measured_by` (`proposal` o `declared`).
+>
 > **Regla de duración honesta:** si el trabajo se hizo **fuera de la conversación** (ej. el usuario cambió su firma de correo por su cuenta y solo pide registrar el hecho en el workitem), el agente **pregunta** cuánto demoró antes de comentar. Nunca estimes un tiempo que no observaste; si el usuario no lo sabe, deja el registro pendiente.
 ```
 
@@ -300,7 +302,7 @@ Para evitar fricción y **nunca** pedirle al usuario que llene formularios manua
 3. **Detección de Bloqueos / Stoppers (`is_blocked`):**
    - Si se concluye en espera de respuesta de Meta, accesos o aprobación de Pierre, marcar `is_blocked: true`, identificar la entidad en `blocker_details`, y sugerir mover a `Pausado`.
 4. **Duración Honesta (`duration_minutes` / `--duration`):**
-   - El tiempo **no se estima**. Si el agente vio y midió la sesión, usa ese valor; si el trabajo ocurrió **fuera de la conversación** (ej. el usuario configuró su firma de correo por su cuenta y solo pide registrarlo en `OPS-13`), el agente **pregunta primero** cuánto demoró y usa ese número en `--duration`. Si el usuario no lo sabe, no se publica el comentario todavía.
+   - El tiempo **no se inventa**: se puede **proponer una medición calculada con evidencia** (`propose-duration`) y registrarla tras confirmarla. Si el agente vio y midió la sesión, usa ese valor; si el trabajo ocurrió **fuera de la conversación** (ej. el usuario configuró su firma de correo por su cuenta y solo pide registrarlo en `OPS-13`), el agente **pregunta primero** cuánto demoró y usa ese número en `--duration`. Si el usuario no lo sabe, no se publica el comentario todavía.
 5. **Cierre de Sesión:** Presentar la propuesta formateada y pedir confirmación con una sola frase (*"¿Deseas que publique la bitácora dual en Plane con `plane-tracker comment --duration N`?"*).
 
 ---
