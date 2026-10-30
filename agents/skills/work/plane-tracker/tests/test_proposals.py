@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import flow_metrics as fm  # noqa: E402
 import plane  # noqa: E402
+from plane_cli import db  # noqa: E402
 from plane_cli import config  # noqa: E402
 import session_clock as sc  # noqa: E402
 
@@ -48,7 +49,7 @@ class Base(unittest.TestCase):
         sc.resolve_session = lambda agent, cwd, explicit=None, env=None, **kw: (SID, "test", [])
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
-        plane.init_db(self.conn)
+        db.init_db(self.conn)
 
     def tearDown(self):
         config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session = self._saved
