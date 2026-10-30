@@ -1,5 +1,6 @@
 """markdown_to_html: un caso por construcción soportada, comparado contra el golden."""
 import os
+import signal
 import sys
 import unittest
 
@@ -25,6 +26,32 @@ class MarkdownHtml(unittest.TestCase):
         for name, source in CASES:
             out += [f"### {name}", repr(source), mdhtml.markdown_to_html(source), ""]
         gs.check_golden(self, "markdown_to_html", "\n".join(out))
+
+
+class NoHang(unittest.TestCase):
+    """Líneas que empiezan por tres de `|-*_` sin ser regla horizontal ni tabla deben terminar como párrafo."""
+
+    def convert(self, source):
+        def on_alarm(_signum, _frame):
+            raise TimeoutError(f"markdown_to_html no termina con {source!r}")
+
+        previous = signal.signal(signal.SIGALRM, on_alarm)
+        signal.alarm(3)
+        try:
+            return mdhtml.markdown_to_html(source)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, previous)
+
+    def test_paragraphs_starting_with_block_like_prefixes(self):
+        self.assertEqual(self.convert("***x*** texto"), "<p><strong><em>x</em></strong> texto</p>")
+        self.assertEqual(self.convert("---x"), "<p>---x</p>")
+        self.assertEqual(self.convert("|--"), "<p>|--</p>")
+        self.assertEqual(self.convert("___a"), "<p>___a</p>")
+
+    def test_following_lines_still_join_the_paragraph_or_start_a_block(self):
+        self.assertEqual(self.convert("***x*** uno\ndos"), "<p><strong><em>x</em></strong> uno<br>dos</p>")
+        self.assertEqual(self.convert("---x\n# T"), "<p>---x</p>\n<h1>T</h1>")
 
 
 if __name__ == "__main__":

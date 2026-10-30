@@ -137,14 +137,14 @@ def markdown_to_html(md: str) -> str:
             i += 1
             continue
 
-        # Paragraph: acumular líneas continuas
-        para_lines = []
+        # Paragraph: la primera línea siempre se consume (garantiza avance); luego las continuas
+        para_lines = [inline(escape(line))]
+        i += 1
         while i < len(lines) and lines[i].strip() and not re.match(
             r"^(#{1,6}\s|```|[-*]\s|>\s|\d+\.\s+|[|\-*_]{3})", lines[i]
         ):
             para_lines.append(inline(escape(lines[i])))
             i += 1
-        if para_lines:
-            html_parts.append("<p>" + "<br>".join(para_lines) + "</p>")
+        html_parts.append("<p>" + "<br>".join(para_lines) + "</p>")
 
     return "\n".join(html_parts) or "<p></p>"
