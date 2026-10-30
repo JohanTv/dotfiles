@@ -175,7 +175,12 @@ plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo
 ```bash
 plane-tracker link OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
 plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
+plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
+plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
+plane-tracker comment-delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
 ```
+*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report --sync` la reescribiría desde el bloque oculto del comentario. `comment-edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
+
 Prefiere `link` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
 
 ---
