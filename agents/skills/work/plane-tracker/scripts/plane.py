@@ -1148,41 +1148,65 @@ def proposal_store():
             json.dump(data, handle)
         os.replace(tmp, PROPOSAL_FILE)
 
-def _drop_ticket(data, tickets):
+def _entry_key(ticket, session_id):
+    return f"{ticket}|{session_id}"
+
+def _drop_ticket(data, tickets, session_id):
+    """Quita las propuestas pendientes de esos tickets SOLO en esa sesión (otras sesiones no se tocan)."""
     for t in tickets:
-        data["proposals"].pop(t, None)
+        data["proposals"].pop(_entry_key(t, session_id), None)
     for gid in list(data["groups"]):
+        group = data["groups"][gid]
+        if group.get("session") != session_id:
+            continue
         for t in tickets:
-            data["groups"][gid]["parts"].pop(t, None)
-        if not data["groups"][gid]["parts"]:
+            group["parts"].pop(t, None)
+        if not group["parts"]:
             del data["groups"][gid]
 
 def save_proposal(ticket, proposal):
     with proposal_store() as data:
-        _drop_ticket(data, [ticket])
-        data["proposals"][ticket] = {"ts": time.time(), "proposal": proposal}
+        _drop_ticket(data, [ticket], proposal["session_id"])
+        data["proposals"][_entry_key(ticket, proposal["session_id"])] = {"ts": time.time(), "ticket": ticket, "proposal": proposal}
 
 def save_group(group_id, parts):
-    """parts: {ticket: proposal}; reemplaza cualquier propuesta pendiente de esos tickets."""
+    """parts: {ticket: propuesta} de una misma sesión; reemplaza lo pendiente de esos tickets en ella."""
+    session_id = next(iter(parts.values()))["session_id"]
     with proposal_store() as data:
-        _drop_ticket(data, list(parts))
-        data["groups"][group_id] = {"ts": time.time(), "parts": parts}
+        _drop_ticket(data, list(parts), session_id)
+        data["groups"][group_id] = {"ts": time.time(), "session": session_id, "parts": parts}
 
-def load_recent_proposal(ticket):
-    """La propuesta vigente del ticket (suelta o parte de un reparto), la más reciente."""
+def load_recent_proposal(ticket, session_id=None):
+    """La propuesta vigente del ticket (suelta o parte de un reparto) de esa sesión, la más reciente.
+
+    Sin `session_id` solo se devuelve si hay una única sesión con propuesta para el ticket: con varias
+    terminales abiertas no se adivina cuál es la tuya.
+    """
     with proposal_store() as data:
         found = []
-        if ticket in data["proposals"]:
-            found.append((data["proposals"][ticket]["ts"], data["proposals"][ticket]["proposal"]))
+        for entry in data["proposals"].values():
+            if entry.get("ticket") == ticket:
+                found.append((entry["ts"], entry["proposal"]))
         for group in data["groups"].values():
             if ticket in group["parts"]:
                 found.append((group["ts"], group["parts"][ticket]))
-        return max(found, key=lambda x: x[0])[1] if found else None
+    if session_id:
+        found = [f for f in found if f[1].get("session_id") == session_id]
+    elif len({f[1].get("session_id") for f in found}) > 1:
+        return None
+    return max(found, key=lambda x: x[0])[1] if found else None
 
-def consume_proposal(ticket):
+def consume_proposal(ticket, session_id):
     """Una propuesta aceptada no puede volver a usarse (evita registrar dos veces lo mismo)."""
     with proposal_store() as data:
-        _drop_ticket(data, [ticket])
+        _drop_ticket(data, [ticket], session_id)
+
+def current_session_id(args, worker_type):
+    """Id de la sesión de ESTA terminal (env var, --session o directorio sin ambigüedad), o None."""
+    agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
+    if not agent:
+        return None
+    return session_clock.resolve_session(agent, os.getcwd(), getattr(args, "session", None))[0]
 
 def _proposal_runs(proposal):
     return [(session_clock.parse_time(seg["start_utc"]), session_clock.parse_time(seg["end_utc"])) for seg in proposal.get("segments", [])]
@@ -1191,7 +1215,7 @@ def reserved_runs(session_id, exclude_tickets):
     """Intervalos de propuestas pendientes de ESTA sesión para otros tickets (se reservan hasta aceptarse o caducar)."""
     out = []
     with proposal_store() as data:
-        pending = [(t, e["proposal"]) for t, e in data["proposals"].items()]
+        pending = [(e["ticket"], e["proposal"]) for e in data["proposals"].values()]
         for group in data["groups"].values():
             pending += list(group["parts"].items())
     for ticket, proposal in pending:
@@ -1465,13 +1489,13 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
             if capacity_hint in NO_PROPOSAL_BUCKETS:
                 sys.stderr.write(f"Error: el balde '{capacity_hint}' (soporte/reuniones) no admite propuesta medida; usa --duration.\n")
                 sys.exit(1)
-            proposal = load_recent_proposal(proposal_key)
+            proposal = load_recent_proposal(proposal_key, current_session_id(args, worker_hint))
             if not proposal:
-                sys.stderr.write(f"Error: no hay una propuesta reciente (<30 min) para {proposal_key}. Repite sin --accept-proposal para generarla.\n")
+                sys.stderr.write(f"Error: no hay una propuesta reciente (<30 min) de esta sesión para {proposal_key}. Repite sin --accept-proposal para generarla.\n")
                 sys.exit(1)
             duration = proposal["minutes"]
         else:
-            pending = load_recent_proposal(proposal_key)
+            pending = load_recent_proposal(proposal_key, current_session_id(args, worker_hint))
             result = pending if pending and pending.get("split") else build_proposal(conn, args, capacity_hint, worker_hint, proposal_key)
             print_proposal(result, proposal_key, sys.stderr)
             if result["ok"]:
@@ -1599,7 +1623,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
     upsert_worklog(conn, entry)
     if proposal:
-        consume_proposal(issue_ref.upper())
+        consume_proposal(issue_ref.upper(), proposal["session_id"])
 
     if getattr(args, "json", False):
         print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": res.get("id")}))
@@ -1628,7 +1652,7 @@ def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_proje
 
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     key = issue_ref.upper()
-    pending = load_recent_proposal(key)
+    pending = load_recent_proposal(key, current_session_id(args, worker_type))
     explicit_window = bool(getattr(args, "since", None) or getattr(args, "until", None))
     if pending and pending.get("split") and not explicit_window:
         result = pending  # reparto vigente: no se recalcula para no solaparlo

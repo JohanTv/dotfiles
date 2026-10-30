@@ -186,7 +186,7 @@ class Split(Base):
         result = plane.build_split(self.conn, self.args_(), "OMNIFY-1=25%,OMNIFY-2=rest", "agent:claude")
         plane.save_group(result["group"], result["parts"])
         self.register("OMNIFY-2", result["parts"]["OMNIFY-2"])  # B primero
-        plane.consume_proposal("OMNIFY-2")
+        plane.consume_proposal("OMNIFY-2", SID)
         self.assertEqual(plane.load_recent_proposal("OMNIFY-1")["minutes"], 20)  # A sigue disponible
         self.register("OMNIFY-1", plane.load_recent_proposal("OMNIFY-1"))
         self.assertFalse(self.propose("OMNIFY-3")["ok"])  # todo quedó asignado
@@ -204,15 +204,33 @@ class Split(Base):
     def test_store_consume_and_ttl(self):
         plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
         self.assertIsNotNone(plane.load_recent_proposal("OMNIFY-1"))
-        plane.consume_proposal("OMNIFY-1")
+        plane.consume_proposal("OMNIFY-1", SID)
         self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
         plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
         with open(plane.PROPOSAL_FILE) as f:
             data = json.load(f)
-        data["proposals"]["OMNIFY-1"]["ts"] -= plane.PROPOSAL_TTL_SECONDS + 5
+        for entry in data["proposals"].values():
+            entry["ts"] -= plane.PROPOSAL_TTL_SECONDS + 5
         with open(plane.PROPOSAL_FILE, "w") as f:
             json.dump(data, f)
         self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
+
+
+class Terminals(Base):
+    def test_two_sessions_do_not_clobber_each_other(self):
+        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-X", "minutes": 30, "segments": []})
+        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-Y", "minutes": 99, "segments": []})
+        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-X")["minutes"], 30)
+        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
+        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))  # sin saber quién eres no se adivina
+        plane.consume_proposal("OMNIFY-1", "SESSION-X")
+        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1", "SESSION-X"))
+        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
+
+    def test_pending_of_another_session_is_not_reserved(self):
+        other = dict(self.propose("OMNIFY-1"), session_id="SESSION-OTHER")
+        plane.save_proposal("OMNIFY-1", other)
+        self.assertTrue(self.propose("OMNIFY-2")["ok"])
 
 
 class Reporting(Base):
