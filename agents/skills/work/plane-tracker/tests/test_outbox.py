@@ -72,7 +72,7 @@ class Cli(unittest.TestCase):
         self.sb.write_circuit(opened_ago=5)
         self.cli(*ADD, "-m", html_with_block("A"))
         _, err = self.cli(*ADD, "-m", html_with_block("B"), code=1)
-        self.assertEqual(err.strip(), "Ya hay un registro en cola con ese ticket/track/fecha/inicio (#1). Publícalo con 'outbox flush' o descártalo con 'outbox drop 1'.")
+        self.assertEqual(err.splitlines()[0], "Ya hay un registro en cola con ese ticket/track/fecha/inicio (#1). Publícalo con 'outbox flush' o descártalo con 'outbox drop 1'.")
         first = json.loads(self.cli(*ADD, "-m", html_with_block("A"), "--json")[0])
         self.assertEqual((first["status"], first["outbox_id"]), ("queued", 1))
         self.assertEqual(len(self.rows()), 1)

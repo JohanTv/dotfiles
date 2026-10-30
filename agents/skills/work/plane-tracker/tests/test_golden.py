@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
 ROOT_COMMANDS = ["search", "get", "list", "create", "update", "report", "handoff", "labels", "projects", "whoami", "health"]
-GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",),
+GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
           "focus": ("set", "clear", "status"), "worklog": ("propose", "check")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
 NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJECT_ID", "PLANE_ACTOR_UUID")
@@ -22,6 +22,7 @@ SESS = ["--agent", "claude", "--session", gs.SESSION]
 CID1 = "c1000000-0000-4000-8000-000000000001"
 CID4 = "c1000000-0000-4000-8000-000000000004"
 ATT = "d0000000-0000-4000-8000-000000000001"
+OFFLINE = {"PLANE_OFFLINE": "1"}
 
 
 class Golden(unittest.TestCase):
@@ -58,6 +59,9 @@ class Golden(unittest.TestCase):
             {"args": ["report", "--flow", "--sync"], "env_drop": NO_ENV},
             {"args": ["comment", "rm", "OMNIFY-1"], "env_drop": NO_ENV},
             {"args": ["atachment", "list", "OMNIFY-1"], "env_drop": NO_ENV},
+            {"args": ["outbox"], "env_drop": NO_ENV},
+            {"args": ["outbox", "sync"], "env_drop": NO_ENV},
+            {"args": ["outbox", "drop", "x"], "env_drop": NO_ENV},
         ]
         self.golden("errors_env_and_parser", steps)
 
@@ -134,6 +138,24 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-999", "-m", "x", "--duration", "5"]]
         self.golden("comment", steps, files={"cuerpo.md": "# Título\n\nTexto con `código` y [enlace](https://x.example)\n"},
                     scrub=NOW_FIELDS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
+
+    def test_outbox(self):
+        def setup(sb):
+            sb.fake.store_comments = True
+            sb.fake.add_fault("POST", r"/comments/$", "commit_drop", n=1)
+        block = '<!-- PLANE_WORKLOG_METADATA {"date": "2026-10-21", "start_time": "%s", "duration_minutes": 20, "notes": "n", "track": "mm"} -->'
+        add = lambda text, start, *extra: {"args": ["comment", "add", "OMNIFY-1", "-m", f"<p>{text}</p>" + block % start, *extra], "env_set": OFFLINE}
+        steps = [["projects"], add("Primero", "08:00"), add("Segundo", "08:30", "--json"), add("Duplicado", "08:00"),
+                 ["outbox", "list"], ["outbox", "list", "--json"], ["labels"],
+                 ["outbox", "drop", "1"], ["outbox", "drop", "1"], ["outbox", "drop", "42"],
+                 {"args": ["outbox", "flush"], "env_set": OFFLINE},
+                 ["outbox", "flush", "--json"], ["outbox", "drop", "2"], ["outbox", "flush"],
+                 add("Tercero", "09:00"), ["outbox", "drop", "3", "--keep-worklog", "--json"], add("Cuarto", "09:30"), ["outbox", "flush"],
+                 ["outbox", "list", "--all"], ["outbox", "flush"],
+                 ["outbox", "drop"], ["outbox"], ["health"]]
+        queue = ("outbox", "SELECT * FROM outbox ORDER BY id", ("id", "client_id", "ticket_ref", "state", "attempts", "maybe_delivered", "last_error",
+                                                                   "plane_comment_id", "wl_ticket_id", "wl_track", "wl_date", "wl_start_time"))
+        self.golden("outbox", steps, setup=setup, scrub=NOW_FIELDS, db_queries=[queue, WORKLOGS])
 
     def test_proposals(self):
         steps = [["worklog", "propose", "OMNIFY-1", *SESS, "--date", "2026-10-20"],

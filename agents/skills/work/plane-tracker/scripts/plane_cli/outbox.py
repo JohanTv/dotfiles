@@ -1,7 +1,8 @@
 """Cola de salida de comentarios: guardado previo (write-ahead), reclamo atómico, entrega idempotente y consultas.
 
-Expone: Draft, Published, publish_comment(), deliver(), claim(), release(), mark_sent(), make_client_id(), comments_url(),
-search_remote(), discard_item(), fail(), constantes (LEASE_SECONDS, OPEN_STATES, EXTERNAL_SOURCE...).
+Expone: Draft, Published, Rejected, publish_comment(), deliver(), claim(), release(), mark_sent(), make_client_id(), comments_url(),
+search_remote(), discard_item(), owner_of(), list_items(), drop_item(), pending_counts(), pending_notice(), fail(), constantes
+(LEASE_SECONDS, OPEN_STATES, EXTERNAL_SOURCE...).
 No hace: imprimir resultados de negocio ni decidir el orden de un flush (outbox_flush.py).
 
 Solo `comment add` se encola. El comentario y su worklog provisional (fila de `worklogs` sin `plane_comment_id`, con la
@@ -14,7 +15,7 @@ en Plane mientras seguía en la cola con `maybe_delivered=1` puede recrearse una
 import hashlib
 import json
 import os
-import sqlite3
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -22,7 +23,7 @@ from dataclasses import dataclass, field
 
 from plane_cli import config
 from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
-from plane_cli.worklog import replace_metadata_block, strip_metadata_block, upsert_worklog
+from plane_cli.worklog import extract_metadata_from_comment, replace_metadata_block, strip_metadata_block, upsert_worklog
 
 EXTERNAL_SOURCE = "plane-tracker"
 LEASE_SECONDS = 180
@@ -114,7 +115,7 @@ def _settle(conn, item_id, state, error, maybe):
 def release(conn, item_id, prev, exc):
     """El intento no llegó a una respuesta: el item vuelve a `pending`; conserva la ambigüedad previa y suma la de este intento."""
     maybe = 1 if prev["maybe_delivered"] or exc.delivered == "unknown" else 0
-    _settle(conn, item_id, "pending", f"{exc.cause} ({exc.kind})", maybe)
+    _settle(conn, item_id, "pending", exc.cause, maybe)
 
 
 def mark_sent(conn, item, comment_id):
@@ -207,7 +208,7 @@ def _rejected(conn, item, prev, status, detail):
         exc = PlaneUnavailable("http_429", "no")
         release(conn, item["id"], prev, exc)
         raise exc
-    _settle(conn, item["id"], "pending" if status == 401 else "failed", f"HTTP {status}: {detail}", prev["maybe_delivered"])
+    _settle(conn, item["id"], "pending" if status == 401 else "failed", f"HTTP {status}: {detail}" if status else detail, prev["maybe_delivered"])
     return ("rejected", status, detail)
 
 
@@ -273,7 +274,7 @@ def publish_comment(conn, draft):
         item, previous = _enqueue(conn, draft, client_id)
     if draft.unavailable is not None:
         if not reused:
-            _settle(conn, item["id"], "pending", f"{draft.unavailable.cause} ({draft.unavailable.kind})", 0)
+            _settle(conn, item["id"], "pending", draft.unavailable.cause, 0)
         return _queued(item, draft.unavailable.kind)
     try:
         outcome = deliver(conn, item, lambda: (draft.project_id, draft.issue["id"]), draft.base_url, draft.api_key, draft.workspace)
@@ -290,3 +291,56 @@ def publish_comment(conn, draft):
     if not reused:
         discard_item(conn, item, previous)
     fail_http(comments_url(draft.base_url, draft.workspace, draft.project_id, draft.issue["id"]), outcome[1], outcome[2])
+
+
+def owner_of(conn, ticket, track, date, start_time):
+    """El item abierto (pending, sending o failed) cuya fila provisional de worklogs tiene esta clave; None si no hay."""
+    return conn.execute(f"SELECT * FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL}", (ticket, track, date, start_time)).fetchone()
+
+
+def pending_counts(conn):
+    """(pendientes de publicar, fallidos): los pendientes incluyen los que están en envío."""
+    row = conn.execute("SELECT SUM(state IN ('pending','sending')), SUM(state = 'failed') FROM outbox").fetchone()
+    return row[0] or 0, row[1] or 0
+
+
+def pending_notice(conn):
+    """Aviso de stderr con lo que queda por publicar; None si la cola está vacía."""
+    pending, failed = pending_counts(conn)
+    if failed:
+        return f"⏳ Outbox: {pending} pendiente(s) de publicar, {failed} fallido(s) (revisa: plane-tracker outbox list). Ejecuta: plane-tracker outbox flush"
+    return f"⏳ Outbox: {pending} pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush" if pending else None
+
+
+def _preview(html, width=80):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", strip_metadata_block(html))).strip()[:width]
+
+
+def list_items(conn, include_all=False):
+    """Items abiertos (o todos) en orden de creación, con una vista previa de 80 caracteres; nunca el payload completo."""
+    where = "" if include_all else f"WHERE {_OPEN_SQL}"
+    items = []
+    for row in conn.execute(f"SELECT * FROM outbox {where} ORDER BY id"):
+        html = json.loads(row["payload_json"]).get("comment_html", "")
+        meta = extract_metadata_from_comment(html) or {}
+        items.append({"id": row["id"], "client_id": row["client_id"], "state": row["state"], "ticket": row["ticket_ref"], "track": row["wl_track"],
+                      "date": row["wl_date"], "start_time": row["wl_start_time"], "duration_minutes": meta.get("duration_minutes"),
+                      "attempts": row["attempts"], "maybe_delivered": bool(row["maybe_delivered"]), "last_error": row["last_error"],
+                      "plane_comment_id": row["plane_comment_id"], "created_at": row["created_at"], "preview": _preview(html)})
+    return items
+
+
+def drop_item(conn, item_id, force=False, keep_worklog=False):
+    """Descarta un item abierto y borra su fila provisional de worklogs (salvo keep_worklog); termina con código 1 si no procede."""
+    item = conn.execute("SELECT * FROM outbox WHERE id = ?", (item_id,)).fetchone()
+    if item is None:
+        fail(f"no existe el registro #{item_id} en la cola.")
+    if item["state"] not in OPEN_STATES:
+        fail(f"el registro #{item_id} está en estado {item['state']}; solo se descartan los pendientes, en envío o fallidos.")
+    if item["maybe_delivered"] and not force:
+        fail(f"el registro #{item_id} pudo haberse enviado. Puede que ya esté publicado en Plane; revisa el ticket {item['ticket_ref']} o descártalo igualmente con --force.")
+    with conn:
+        conn.execute("UPDATE outbox SET state = 'dropped', lease_until = NULL, updated_at = ? WHERE id = ?", (stamp(), item_id))
+        if not keep_worklog:
+            conn.execute(f"DELETE FROM worklogs WHERE {_WORKLOG_KEY} AND plane_comment_id IS NULL", _wl_params(item))
+    return item

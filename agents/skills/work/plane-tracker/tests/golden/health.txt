@@ -36,6 +36,7 @@ $ plane.py health
 🩺 Plane · últimas 24 h: 4 llamadas, 2 fallidas, 1 con reintento
    • Latencia: p50 <N> ms · p95 <N> ms · máx <N> ms
    • Circuito: cerrado
+   • Cola de salida: 0 pendiente(s), 0 fallido(s)
    • 2 × HTTP 503
      <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
      <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
@@ -84,6 +85,10 @@ $ plane.py health --json
     "cause": null,
     "next_probe_in": null,
     "last_ok": "<VOLATIL>"
+  },
+  "outbox": {
+    "pending": 0,
+    "failed": 0
   }
 }
 --- stderr ---
@@ -96,6 +101,7 @@ $ plane.py health --hours 1
 🩺 Plane · últimas 1 h: 4 llamadas, 2 fallidas, 1 con reintento
    • Latencia: p50 <N> ms · p95 <N> ms · máx <N> ms
    • Circuito: cerrado
+   • Cola de salida: 0 pendiente(s), 0 fallido(s)
    • 2 × HTTP 503
      <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
      <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)

@@ -1,6 +1,6 @@
 """Circuito de fallo rápido hacia Plane: estado compartido entre procesos y excepción tipada.
 
-Expone: PlaneUnavailable, cause_text(), hhmm(), gate(), probe(), record(), describe(), retry_in(), format_unavailable().
+Expone: PlaneUnavailable, cause_text(), hhmm(), gate(), probe(), record(), describe(), last_failure(), retry_in(), format_unavailable().
 No hace: peticiones HTTP (la sonda la ejecuta quien llama, que pasa un callable `run_probe() -> (ok, kind)`).
 El estado vive en `<CACHE_DIR>/circuit.json`, protegido con flock y reemplazo atómico. El circuito se abre tras
 TRIP_AFTER llamadas fallidas consecutivas dentro de WINDOW segundos; abierto, las llamadas fallan sin tocar la red hasta
@@ -27,7 +27,7 @@ FRESH_OK = 60
 CAUSES = {
     "timeout": "tiempo de espera agotado", "read_timeout": "tiempo de espera agotado", "refused": "conexión rechazada",
     "dns": "DNS no resuelve", "http_502": "HTTP 502", "http_503": "HTTP 503", "http_504": "HTTP 504",
-    "reset": "conexión cortada", "tls": "error TLS", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)", "no_cache": "sin caché local",
+    "reset": "conexión cortada", "tls": "error TLS", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)", "no_cache": "sin caché local", "http_429": "límite de ritmo (HTTP 429)",
 }
 
 
@@ -190,6 +190,12 @@ def retry_in():
     if state["opened_at"] is None:
         return COOLDOWNS[0]
     return max(1, math.ceil(state["opened_at"] + _cooldown(state) - _now()))
+
+
+def last_failure():
+    """(clase del último fallo, hora HH:MM de su inicio); (None, None) si no hay fallos registrados."""
+    state = _read()
+    return state["last_error"], hhmm(state["since"])
 
 
 def describe():

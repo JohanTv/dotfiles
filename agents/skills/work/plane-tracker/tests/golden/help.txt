@@ -15,6 +15,7 @@ positional arguments:
     comment     Comentarios: add | edit | delete
     attachment  Adjuntos: add | list | delete | replace
     link        Enlaces: add
+    outbox      Cola de salida: list | flush | drop
     focus       Foco de la sesión: set | clear | status
     worklog     Tiempos: propose | check
     report      Reporte de actividad; report flow: flujo por ticket
@@ -303,6 +304,24 @@ options:
 --- stderr ---
 
 
+$ plane.py outbox --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py outbox [-h] {list,flush,drop} ...
+
+Cola de salida: list | flush | drop
+
+positional arguments:
+  {list,flush,drop}
+    list             Listar los registros pendientes de publicar
+    flush            Publicar en Plane los registros en cola
+    drop             Descartar un registro de la cola
+
+options:
+  -h, --help         show this help message and exit
+--- stderr ---
+
+
 $ plane.py focus --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
@@ -503,6 +522,58 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   --title TITLE  Texto visible del enlace (por defecto: la URL)
+--- stderr ---
+
+
+$ plane.py outbox list --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py outbox list [-h] [--all] [--json]
+
+Registros abiertos de la cola (pendientes, en envío y fallidos) con una vista
+previa; --all incluye los ya publicados y descartados.
+
+options:
+  -h, --help  show this help message and exit
+  --all       Incluir publicados y descartados
+  --json      Salida en JSON
+--- stderr ---
+
+
+$ plane.py outbox flush --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py outbox flush [-h] [--limit N] [--include-old] [--retry-failed]
+                             [--json]
+
+Publica la cola en orden de creación y se detiene ante el primer fallo de
+disponibilidad. Sondea Plane aunque el circuito esté en enfriamiento.
+
+options:
+  -h, --help      show this help message and exit
+  --limit N       Máximo de registros por ejecución (por defecto 25)
+  --include-old   Incluir los de más de 7 días (se omiten por defecto)
+  --retry-failed  Devolver los fallidos a pendientes antes de publicar
+  --json          Salida en JSON
+--- stderr ---
+
+
+$ plane.py outbox drop --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py outbox drop [-h] [--force] [--keep-worklog] [--json] id
+
+Descarta un registro abierto y borra su worklog provisional. Si pudo haberse
+enviado exige --force.
+
+positional arguments:
+  id              Número del registro (ver `outbox list`)
+
+options:
+  -h, --help      show this help message and exit
+  --force         Descartar aunque pueda estar ya publicado en Plane
+  --keep-worklog  Conservar la fila local de worklogs
+  --json          Salida en JSON
 --- stderr ---
 
 

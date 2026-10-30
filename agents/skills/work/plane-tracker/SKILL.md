@@ -107,6 +107,7 @@ El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `O
 | Borrar comentario | `plane-tracker comment delete T [--comment-id UUID]` |
 | Adjuntos | `plane-tracker attachment add\|list\|delete\|replace` |
 | Enlace | `plane-tracker link add T URL` |
+| Cola de salida (Plane caído) | `plane-tracker outbox list` · `plane-tracker outbox flush` · `plane-tracker outbox drop N` |
 | Marcar foco | `plane-tracker focus set T` · `plane-tracker focus clear` · `plane-tracker focus status` |
 | Proponer duración / auditar | `plane-tracker worklog propose [T]` · `plane-tracker worklog check` |
 | Reporte | `plane-tracker report [flow] [--today\|--week\|--date D]` |
@@ -115,9 +116,9 @@ El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `O
 ### Convenciones de nombrado
 
 1. En la raíz viven los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
-2. Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `focus`, `worklog`.
+2. Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `outbox`, `focus`, `worklog`.
 3. Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección.
-4. Verbos: `add`/`list`/`edit`/`delete`/`replace`; marcas `set`/`clear`/`status`; derivados `propose`/`check`.
+4. Verbos: `add`/`list`/`edit`/`delete`/`replace`/`flush`; marcas `set`/`clear`/`status`; derivados `propose`/`check`.
 5. El ID de un hijo que es obligatorio va posicional (`attachment delete ISSUE ID`); si es opcional (por defecto tu último comentario) va como `--comment-id`.
 6. `--json` es global: funciona antes o después del comando.
 7. Un nombre antiguo, un sinónimo o un verbo faltante termina con exit 2 y un mensaje que indica el comando correcto, antes de validar el entorno.
@@ -245,7 +246,16 @@ plane-tracker link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "P
 ```
 Prefiere `link add` para PRs y documentos: queda estructurado y no notifica como comentario.
 
-### K. Foco, Duración Medida y Auditoría
+### K. Plane caído: exit 3 y cola de salida
+Exit 3 = Plane no responde: no insistas, sigue trabajando. Las lecturas (`search`, `get`, `list`, `labels`, `projects`) responden con lo local y avisan su antigüedad; `comment add` guarda el comentario y el tiempo y lo encola (`⏳ En cola`, exit 0). Lo demás (`update`, `create`, `link add`, `attachment`, `comment edit|delete`) falla con exit 3: repítelo luego.
+```bash
+plane-tracker outbox list            # pendientes y fallidos
+plane-tracker outbox flush           # al terminar la sesión: publica la cola en orden (exit 3 si Plane sigue caído)
+plane-tracker outbox drop N          # descarta un registro (--force si pudo enviarse ya)
+```
+Inicio de sesión: si `search` devuelve el aviso de datos locales, continúa; si falla con exit 3 sin caché, trabaja sin ticket nuevo y créalo cuando Plane vuelva. Nunca hay envío automático: la cola solo se vacía con `outbox flush`.
+
+### L. Foco, Duración Medida y Auditoría
 ```bash
 plane-tracker focus set OMNIFY-205        # abre la marca de foco (cierra la anterior)
 plane-tracker focus status                # minutos atribuidos hoy por ticket y tiempo sin foco

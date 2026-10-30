@@ -172,6 +172,28 @@ $ plane.py atachment list OMNIFY-1   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WOR
 --- stderr ---
 plane-tracker: error: comando 'atachment' desconocido; ¿quisiste decir 'attachment'?
 
+$ plane.py outbox   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+plane-tracker: error: falta el verbo (list|flush|drop); ej: plane-tracker outbox flush
+
+$ plane.py outbox sync   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+plane-tracker: error: 'outbox sync' no existe; usa: plane-tracker outbox flush
+
+$ plane.py outbox drop x   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py outbox drop [-h] [--force] [--keep-worklog] [--json] id
+plane.py outbox drop: error: argument id: invalid positive_int value: 'x'
+
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/
 GET /api/v1/workspaces/ws/projects/
