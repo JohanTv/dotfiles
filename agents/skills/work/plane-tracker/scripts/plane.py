@@ -24,6 +24,8 @@ import time
 import argparse
 import mimetypes
 import uuid
+import fcntl
+import contextlib
 from datetime import datetime, timedelta, date, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -330,6 +332,18 @@ def init_db(conn):
                 issue_updated_at TEXT
             );
         """)
+        # Marcas de foco: en qué ticket trabaja cada sesión de agente (solo local)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS session_marks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                agent TEXT NOT NULL,
+                ticket TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT
+            );
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_marks_session ON session_marks(session_id, started_at);")
         # Fechas del ciclo de vida (cachés previas no las tienen): ALTER idempotente y tolerante a concurrencia.
         ensure_columns(conn, "issues_cache", {
             "created_at": "TEXT", "completed_at": "TEXT", "start_date": "TEXT",
@@ -966,6 +980,25 @@ def calculate_klee_union_minutes(intervals):
     union_mins += (cur_end - cur_start)
     return union_mins
 
+def expand_segments(rows):
+    """Un worklog con segmentos (actividad intercalada entre tickets) se reporta como un bloque por segmento."""
+    out = []
+    for row in rows:
+        entry = dict(row)
+        try:
+            segments = json.loads(entry.get("raw_payload") or "{}").get("segments")
+        except ValueError:
+            segments = None
+        if not segments:
+            out.append(entry)
+            continue
+        for idx, seg in enumerate(segments):
+            part = dict(entry, start_time=seg["start"], end_time=seg["end"], duration_minutes=seg["minutes"])
+            if idx:
+                part["notes"] = "(continuación)"
+            out.append(part)
+    return out
+
 def merge_daily_worklogs(rows):
     """
     Agrupa y fusiona registros para el formato ejecutivo:
@@ -1069,6 +1102,10 @@ def merge_daily_worklogs(rows):
 
 # ------------------------------------------------------------------------------
 # Propuesta de duración medida (nunca se registra sola)
+#   - Se mide con "tramos de actividad" de la sesión del agente (solo timestamps).
+#   - Lo ya registrado y lo reservado por otras propuestas pendientes se RESTA: nada se cuenta dos veces,
+#     sin importar el orden en que se acepten.
+#   - Con marcas `focus`, cada ticket recibe solo el tiempo de sus propios intervalos.
 # ------------------------------------------------------------------------------
 
 PROPOSAL_FILE = os.path.join(CACHE_DIR, "last_proposal.json")
@@ -1076,78 +1113,279 @@ PROPOSAL_TTL_SECONDS = 30 * 60
 # Reuniones y soporte no dejan huella en un transcript: ahí siempre se pregunta.
 NO_PROPOSAL_BUCKETS = ("toil_support", "coordination")
 MAX_PROPOSAL_WARN_MINUTES = 8 * 60
+FOCUS_KEEP_DAYS = 3
+
+def _now():
+    return datetime.now(timezone.utc)
 
 def _local_midnight_utc(moment_utc):
     local = moment_utc.astimezone()
     return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
-def _session_anchor(conn, session_id, today):
-    """Fin (UTC) del último worklog de hoy ya registrado para esta sesión, o None."""
-    row = conn.execute(
-        "SELECT MAX(end_time) AS e FROM worklogs WHERE date = ? AND raw_payload LIKE ?",
-        (today, f"%{session_id}%"),
-    ).fetchone()
-    if not row or not row["e"]:
-        return None
+def _hhmm_utc(day, hhmm):
+    return datetime.strptime(f"{day} {hhmm}", "%Y-%m-%d %H:%M").astimezone(timezone.utc)
+
+@contextlib.contextmanager
+def proposal_store():
+    """last_proposal.json con lectura-modificación-escritura atómica y exclusión entre procesos."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(PROPOSAL_FILE + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, ValueError):
+            data = {}
+        if not isinstance(data.get("proposals"), dict) or not isinstance(data.get("groups"), dict):
+            data = {"proposals": {}, "groups": {}}
+        cutoff = time.time() - PROPOSAL_TTL_SECONDS
+        data["proposals"] = {k: v for k, v in data["proposals"].items() if v.get("ts", 0) > cutoff}
+        data["groups"] = {k: v for k, v in data["groups"].items() if v.get("ts", 0) > cutoff}
+        yield data
+        tmp = PROPOSAL_FILE + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        os.replace(tmp, PROPOSAL_FILE)
+
+def _drop_ticket(data, tickets):
+    for t in tickets:
+        data["proposals"].pop(t, None)
+    for gid in list(data["groups"]):
+        for t in tickets:
+            data["groups"][gid]["parts"].pop(t, None)
+        if not data["groups"][gid]["parts"]:
+            del data["groups"][gid]
+
+def save_proposal(ticket, proposal):
+    with proposal_store() as data:
+        _drop_ticket(data, [ticket])
+        data["proposals"][ticket] = {"ts": time.time(), "proposal": proposal}
+
+def save_group(group_id, parts):
+    """parts: {ticket: proposal}; reemplaza cualquier propuesta pendiente de esos tickets."""
+    with proposal_store() as data:
+        _drop_ticket(data, list(parts))
+        data["groups"][group_id] = {"ts": time.time(), "parts": parts}
+
+def load_recent_proposal(ticket):
+    """La propuesta vigente del ticket (suelta o parte de un reparto), la más reciente."""
+    with proposal_store() as data:
+        found = []
+        if ticket in data["proposals"]:
+            found.append((data["proposals"][ticket]["ts"], data["proposals"][ticket]["proposal"]))
+        for group in data["groups"].values():
+            if ticket in group["parts"]:
+                found.append((group["ts"], group["parts"][ticket]))
+        return max(found, key=lambda x: x[0])[1] if found else None
+
+def consume_proposal(ticket):
+    """Una propuesta aceptada no puede volver a usarse (evita registrar dos veces lo mismo)."""
+    with proposal_store() as data:
+        _drop_ticket(data, [ticket])
+
+def _proposal_runs(proposal):
+    return [(session_clock.parse_time(seg["start_utc"]), session_clock.parse_time(seg["end_utc"])) for seg in proposal.get("segments", [])]
+
+def reserved_runs(session_id, exclude_tickets):
+    """Intervalos de propuestas pendientes de ESTA sesión para otros tickets (se reservan hasta aceptarse o caducar)."""
+    out = []
+    with proposal_store() as data:
+        pending = [(t, e["proposal"]) for t, e in data["proposals"].items()]
+        for group in data["groups"].values():
+            pending += list(group["parts"].items())
+    for ticket, proposal in pending:
+        if ticket not in exclude_tickets and proposal.get("session_id") == session_id:
+            out += _proposal_runs(proposal)
+    return out
+
+def session_coverage(conn, session_id, today):
+    """Intervalos de hoy ya registrados como worklog de esta sesión (propuestos o declarados)."""
+    out = []
+    rows = conn.execute("SELECT start_time, end_time, raw_payload FROM worklogs WHERE date = ? AND raw_payload LIKE ?", (today, f"%{session_id}%")).fetchall()
+    for row in rows:
+        try:
+            meta = json.loads(row["raw_payload"])
+        except ValueError:
+            continue
+        if (meta.get("measured_by") or {}).get("session") != session_id:
+            continue
+        try:
+            if meta.get("segments"):
+                for seg in meta["segments"]:
+                    start = session_clock.parse_time(seg.get("start_utc")) or _hhmm_utc(today, seg["start"])
+                    end = session_clock.parse_time(seg.get("end_utc")) or _hhmm_utc(today, seg["end"])
+                    out.append((start, end))
+            else:
+                out.append((_hhmm_utc(today, row["start_time"]), _hhmm_utc(today, row["end_time"])))
+        except (KeyError, ValueError):
+            continue
+    return out
+
+def focus_intervals(conn, session_id, day_start, now):
+    """{ticket: [(inicio, fin)]} de las marcas de foco de la sesión recortadas a [day_start, now]."""
+    out = {}
+    rows = conn.execute("SELECT ticket, started_at, ended_at FROM session_marks WHERE session_id = ? ORDER BY started_at", (session_id,)).fetchall()
+    for row in rows:
+        start = max(session_clock.parse_time(row["started_at"]), day_start)
+        end = min(session_clock.parse_time(row["ended_at"]) if row["ended_at"] else now, now)
+        if end > start:
+            out.setdefault(row["ticket"], []).append((start, end))
+    return out
+
+def _parse_clock(text, now):
+    """'HH:MM' (hoy, hora local) o ISO-8601 -> datetime UTC."""
+    text = text.strip()
+    if re.match(r"^\d{1,2}:\d{2}$", text):
+        local_now = now.astimezone()
+        hour, minute = (int(x) for x in text.split(":"))
+        return local_now.replace(hour=hour, minute=minute, second=0, microsecond=0).astimezone(timezone.utc)
     try:
-        local = datetime.strptime(f"{today} {row['e']}", "%Y-%m-%d %H:%M")
+        parsed = datetime.fromisoformat(text)
     except ValueError:
-        return None
-    return local.astimezone(timezone.utc)
+        raise ValueError(f"Hora inválida '{text}': usa HH:MM o ISO-8601.")
+    return (parsed.astimezone() if parsed.tzinfo is None else parsed).astimezone(timezone.utc)
 
-def build_proposal(conn, args, capacity_bucket, worker_type):
-    """Mide la sesión (solo tiempos) y devuelve un dict; 'ok' False significa preguntar."""
-    if capacity_bucket in NO_PROPOSAL_BUCKETS:
-        return {"ok": False, "reason": f"El balde '{capacity_bucket}' (soporte/reuniones) no deja huella en un transcript: pregunta la duración."}
+def _resolve_window(args, now):
+    """Ventana medida: hoy 00:00 → ahora, o la explícita (--since/--until) dentro de un único día local."""
+    midnight = _local_midnight_utc(now)
+    start, end, notes, override = midnight, now, [], None
+    since, until = getattr(args, "since", None), getattr(args, "until", None)
+    if since or until:
+        if since:
+            start = _parse_clock(since, now)
+        if until:
+            end = _parse_clock(until, now)
+        if end > now:
+            end = now
+            notes.append("--until estaba en el futuro: se recorta a ahora.")
+        if start < midnight or end < midnight:
+            raise ValueError("La ventana debe estar dentro de hoy (cruzaría la medianoche): registra cada día por separado.")
+        if start >= end:
+            raise ValueError("--since debe ser anterior a --until.")
+        override = {"since": start.isoformat(), "until": end.isoformat()}
+    return midnight, start, end, notes, override
 
+def _runs_to_segments(runs, minutes):
+    """Segmentos para guardar en el worklog: minutos enteros que suman exactamente `minutes`."""
+    weights = [max((e - s).total_seconds(), 1.0) for s, e in runs]
+    shares = session_clock.largest_remainder(minutes, weights)
+    segs = []
+    for (start, end), share in zip(runs, shares):
+        if share < 1:
+            continue
+        segs.append({"start": start.astimezone().strftime("%H:%M"), "end": end.astimezone().strftime("%H:%M"), "minutes": share,
+                     "start_utc": start.isoformat(), "end_utc": end.isoformat()})
+    return segs
+
+def _proposal_from_runs(ctx, runs, extras):
+    minutes = int(round(session_clock.total_minutes(runs)))
+    segs = _runs_to_segments(runs, minutes)
+    first, last = runs[0][0].astimezone(), runs[-1][1].astimezone()
+    gross = (runs[-1][1] - runs[0][0]).total_seconds() / 60.0
+    warnings = list(extras.get("notes", []))
+    if minutes > MAX_PROPOSAL_WARN_MINUTES:
+        warnings.append(f"La propuesta supera {MAX_PROPOSAL_WARN_MINUTES // 60} h: revisa si la sesión cubre varios tickets.")
+    if len(runs) > 1:
+        warnings.append(f"Hay {len(runs) - 1} pausa(s) de más de 10 min descontadas (pueden ser lectura humana, no inactividad).")
+    if ctx["agent"] == "agy":
+        warnings.append("agy solo expone hitos de la conversación: la medición es aproximada.")
+    if extras.get("excluded", 0) >= 1:
+        warnings.append(f"Se excluyeron {extras['excluded']:.0f} min ya registrados o reservados para esta sesión.")
+    if extras.get("unattributed", 0) >= 1:
+        warnings.append(f"{extras['unattributed']:.0f} min de la sesión no tienen foco asignado (no se reparten solos).")
+    return {
+        "ok": True, "agent": ctx["agent"], "session_id": ctx["session_id"], "origin": ctx["origin"],
+        "confidence": session_clock.CONFIDENCE[ctx["agent"]], "attribution": extras["attribution"],
+        "minutes": minutes, "net_minutes": round(session_clock.total_minutes(runs), 1), "gross_minutes": round(gross, 1),
+        "pauses": max(len(runs) - 1, 0), "events": ctx["events"],
+        "date": first.strftime("%Y-%m-%d"), "start_time": first.strftime("%H:%M"), "end_time": last.strftime("%H:%M"),
+        "segments": segs, "window": extras["window"], "window_override": extras.get("override"),
+        "excluded_minutes": round(extras.get("excluded", 0), 1), "unattributed_minutes": round(extras.get("unattributed", 0), 1),
+        "warnings": warnings,
+    }
+
+def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
+    """Tramos de actividad medibles (ya restados los registrados/reservados). Devuelve (ctx, runs, extras) o un dict de error."""
     agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
     if not agent:
         return {"ok": False, "reason": "No se pudo determinar el agente (usa --agent claude|opencode|agy o --worker-type agent:<x>)."}
-
     session_id, origin, cands = session_clock.resolve_session(agent, os.getcwd(), getattr(args, "session", None))
     if not session_id:
         listed = [{"id": sid, "last_activity": ts.astimezone().strftime("%Y-%m-%d %H:%M")} for sid, ts in cands]
         return {"ok": False, "agent": agent, "candidates": listed,
                 "reason": f"No se pudo determinar la sesión de {agent}: {origin}. Indica --session <id>."}
-
     stamps = session_clock.timestamps(agent, session_id)
     if not stamps:
-        return {"ok": False, "agent": agent, "session_id": session_id,
-                "reason": f"Sin evidencia de tiempos para la sesión {session_id} ({agent})."}
+        return {"ok": False, "agent": agent, "session_id": session_id, "reason": f"Sin evidencia de tiempos para la sesión {session_id} ({agent})."}
 
-    now = datetime.now(timezone.utc)
+    now = _now()
+    try:
+        midnight, w_start, w_end, notes, override = _resolve_window(args, now)
+    except ValueError as exc:
+        return {"ok": False, "agent": agent, "session_id": session_id, "reason": str(exc)}
     today = now.astimezone().strftime("%Y-%m-%d")
-    window_start = _local_midnight_utc(now)
-    anchor = _session_anchor(conn, session_id, today)
-    if anchor:
-        window_start = max(window_start, anchor + timedelta(minutes=1))
-
-    m = session_clock.measure(stamps, window_start, now)
-    minutes = int(round(m["gross_minutes"] if agent == "agy" else m["net_minutes"]))
-    if m["events"] < 2 or minutes < 1:
-        return {"ok": False, "agent": agent, "session_id": session_id,
-                "reason": "No hay actividad medible en la ventana (desde el último registro de esta sesión o desde las 00:00)."}
-
-    start_local, end_local = m["start"].astimezone(), m["end"].astimezone()
-    warnings = []
-    if minutes > MAX_PROPOSAL_WARN_MINUTES:
-        warnings.append(f"La propuesta supera {MAX_PROPOSAL_WARN_MINUTES // 60} h: revisa si la sesión cubre varios tickets.")
-    if m["pauses"]:
-        warnings.append(f"Se descontaron {m['pauses']} pausa(s) de más de 10 min (pueden ser lectura humana, no inactividad).")
+    inside = [t for t in stamps if w_start <= t <= w_end]
     if agent == "agy":
-        warnings.append("agy solo expone hitos de la conversación: la medición es aproximada.")
-    warnings.append("Si la sesión tocó varios tickets, reparte el tiempo con --duration en cada uno.")
+        runs = [(inside[0], inside[-1])] if len(inside) >= 2 else []
+    else:
+        runs = session_clock.active_runs(stamps, w_start, w_end)
 
-    return {
-        "ok": True, "agent": agent, "session_id": session_id, "origin": origin,
-        "confidence": session_clock.CONFIDENCE[agent],
-        "minutes": minutes, "net_minutes": round(m["net_minutes"], 1), "gross_minutes": round(m["gross_minutes"], 1),
-        "pauses": m["pauses"], "events": m["events"],
-        "date": start_local.strftime("%Y-%m-%d"),
-        "start_time": start_local.strftime("%H:%M"), "end_time": end_local.strftime("%H:%M"),
-        "anchor": "último registro de la sesión" if anchor else "inicio del día (00:00)",
-        "warnings": warnings,
-    }
+    extras = {"attribution": "session", "notes": notes, "override": override,
+              "window": f"{w_start.astimezone().strftime('%H:%M')}–{w_end.astimezone().strftime('%H:%M')}"}
+    marks = focus_intervals(conn, session_id, midnight, now) if use_focus else {}
+    if marks:
+        all_marked = [iv for ivs in marks.values() for iv in ivs]
+        extras["unattributed"] = session_clock.total_minutes(session_clock.subtract(runs, all_marked))
+        mine = marks.get(ticket)
+        if not mine:
+            return {"ok": False, "agent": agent, "session_id": session_id,
+                    "reason": f"Hay marcas de foco hoy ({', '.join(sorted(marks))}) pero ninguna para {ticket}: usa `plane-tracker focus {ticket}` o registra con --duration."}
+        runs = session_clock.intersect(runs, mine)
+        extras["attribution"] = "focus"
+
+    covered = session_coverage(conn, session_id, today) + reserved_runs(session_id, exclude_tickets)
+    before = session_clock.total_minutes(runs)
+    runs = session_clock.subtract(runs, covered)
+    extras["excluded"] = before - session_clock.total_minutes(runs)
+    ctx = {"agent": agent, "session_id": session_id, "origin": origin, "events": len(inside)}
+    return ctx, runs, extras
+
+def build_proposal(conn, args, capacity_bucket, worker_type, ticket):
+    """Mide la sesión (solo tiempos) y devuelve un dict; 'ok' False significa preguntar."""
+    if capacity_bucket in NO_PROPOSAL_BUCKETS:
+        return {"ok": False, "reason": f"El balde '{capacity_bucket}' (soporte/reuniones) no deja huella en un transcript: pregunta la duración."}
+    measured = _measure(conn, args, worker_type, {ticket}, ticket, use_focus=True)
+    if isinstance(measured, dict):
+        return measured
+    ctx, runs, extras = measured
+    if int(round(session_clock.total_minutes(runs))) < 1:
+        return {"ok": False, "agent": ctx["agent"], "session_id": ctx["session_id"],
+                "reason": "No hay actividad medible en la ventana (o ya está registrada/reservada para esta sesión)."}
+    return _proposal_from_runs(ctx, runs, extras)
+
+def build_split(conn, args, spec, worker_type):
+    """Reparte la actividad medible entre varios tickets: {ticket: propuesta} contiguas y sin solape."""
+    tickets = [part.split("=")[0].strip().upper() for part in spec.split(",") if "=" in part]
+    measured = _measure(conn, args, worker_type, set(tickets), None, use_focus=False)
+    if isinstance(measured, dict):
+        return measured
+    ctx, runs, extras = measured
+    total = int(round(session_clock.total_minutes(runs)))
+    try:
+        shares = session_clock.parse_split(spec, total)
+    except ValueError as exc:
+        return {"ok": False, "agent": ctx["agent"], "session_id": ctx["session_id"], "reason": str(exc)}
+    pieces = session_clock.cut_runs(runs, [m for _, m in shares])
+    group = uuid.uuid4().hex[:8]
+    parts = {}
+    for (ticket, minutes), piece in zip(shares, pieces):
+        if not piece:
+            return {"ok": False, "agent": ctx["agent"], "session_id": ctx["session_id"], "reason": f"{ticket} se queda sin actividad con ese reparto."}
+        proposal = _proposal_from_runs(ctx, piece, dict(extras, attribution="split"))
+        proposal["split"] = {"group": group, "of": total, "share": minutes}
+        parts[ticket] = proposal
+    return {"ok": True, "group": group, "total": total, "parts": parts}
 
 def print_proposal(proposal, ticket, stream):
     if not proposal["ok"]:
@@ -1158,43 +1396,21 @@ def print_proposal(proposal, ticket, stream):
         return
     stream.write(f"⏱  Propuesta para {ticket}: {proposal['minutes']} min ({proposal['start_time']}–{proposal['end_time']}, {proposal['date']})\n")
     stream.write(f"   • Fuente   : {proposal['agent']} · sesión {proposal['session_id']} ({proposal['origin']}) · confianza {proposal['confidence']}\n")
-    stream.write(f"   • Medición : neta {proposal['net_minutes']} min · bruta {proposal['gross_minutes']} min · {proposal['events']} eventos\n")
-    stream.write(f"   • Ventana  : desde {proposal['anchor']}\n")
+    stream.write(f"   • Medición : neta {proposal['net_minutes']} min · bruta {proposal['gross_minutes']} min · {len(proposal['segments'])} tramo(s) · atribución {proposal['attribution']}\n")
+    stream.write(f"   • Ventana  : {proposal['window']}\n")
+    if proposal.get("split"):
+        stream.write(f"   • Reparto  : parte de {proposal['split']['of']} min medidos (grupo {proposal['split']['group']}); no se recalcula mientras esté vigente\n")
     for w in proposal["warnings"]:
         stream.write(f"   ⚠ {w}\n")
 
-def save_proposal(ticket, proposal):
-    try:
-        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError):
-        data = {}
-    data[ticket] = {"ts": time.time(), "proposal": proposal}
-    data = {k: v for k, v in data.items() if time.time() - v.get("ts", 0) < PROPOSAL_TTL_SECONDS}
-    fd = os.open(PROPOSAL_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        json.dump(data, handle)
-
-def consume_proposal(ticket):
-    """Una propuesta aceptada no puede volver a usarse (evita registrar dos veces lo mismo)."""
-    try:
-        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        if data.pop(ticket, None) is not None:
-            with open(PROPOSAL_FILE, "w", encoding="utf-8") as handle:
-                json.dump(data, handle)
-    except (OSError, ValueError):
-        pass
-
-def load_recent_proposal(ticket):
-    try:
-        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
-            entry = json.load(handle).get(ticket)
-    except (OSError, ValueError):
-        return None
-    if not entry or time.time() - entry.get("ts", 0) > PROPOSAL_TTL_SECONDS:
-        return None
-    return entry.get("proposal")
+def print_split(result, stream):
+    stream.write(f"⏱  Reparto de {result['total']} min medidos (grupo {result['group']}):\n")
+    for ticket, proposal in result["parts"].items():
+        stream.write(f"   • {ticket:<10} {proposal['minutes']:>4} min  ({proposal['start_time']}–{proposal['end_time']})\n")
+    first = next(iter(result["parts"].values()))
+    stream.write(f"   • Fuente: {first['agent']} · sesión {first['session_id']} · confianza {first['confidence']} · ventana {first['window']}\n")
+    for w in first["warnings"]:
+        stream.write(f"   ⚠ {w}\n")
 
 def worklog_metadata_block(meta):
     """Comentario HTML oculto con la telemetría del worklog (los '--' se escapan para no cerrarlo)."""
@@ -1246,16 +1462,23 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         worker_hint = getattr(args, "worker_type", None) or (meta.get("worker_type") if meta else None)
         proposal_key = issue_ref.upper()
         if getattr(args, "accept_proposal", False):
+            if capacity_hint in NO_PROPOSAL_BUCKETS:
+                sys.stderr.write(f"Error: el balde '{capacity_hint}' (soporte/reuniones) no admite propuesta medida; usa --duration.\n")
+                sys.exit(1)
             proposal = load_recent_proposal(proposal_key)
             if not proposal:
                 sys.stderr.write(f"Error: no hay una propuesta reciente (<30 min) para {proposal_key}. Repite sin --accept-proposal para generarla.\n")
                 sys.exit(1)
             duration = proposal["minutes"]
         else:
-            result = build_proposal(conn, args, capacity_hint, worker_hint)
+            pending = load_recent_proposal(proposal_key)
+            result = pending if pending and pending.get("split") else build_proposal(conn, args, capacity_hint, worker_hint, proposal_key)
             print_proposal(result, proposal_key, sys.stderr)
             if result["ok"]:
-                save_proposal(proposal_key, result)
+                if result.get("split"):
+                    sys.stderr.write(f"   (parte del reparto pendiente {result['split']['group']})\n")
+                else:
+                    save_proposal(proposal_key, result)
                 sys.stderr.write("   Para registrarla tal cual: repite el comando con --accept-proposal; para ajustarla usa --duration N.\n")
             else:
                 sys.stderr.write("Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.\n")
@@ -1323,16 +1546,24 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta["date"] = proposal["date"]
         meta["start_time"] = proposal["start_time"]
         meta["end_time"] = proposal["end_time"]
+        meta["segments"] = proposal["segments"]
         meta["measured_by"] = {
-            "kind": "proposal", "adapter": proposal["agent"], "confidence": proposal["confidence"],
-            "session": proposal["session_id"], "gross_minutes": proposal["gross_minutes"],
+            "kind": "proposal_split" if proposal.get("split") else "proposal", "adapter": proposal["agent"],
+            "confidence": proposal["confidence"], "session": proposal["session_id"], "gross_minutes": proposal["gross_minutes"],
+            "attribution": proposal["attribution"],
         }
+        if proposal.get("split"):
+            meta["measured_by"]["split"] = proposal["split"]
+        if proposal.get("window_override"):
+            meta["measured_by"]["window_override"] = proposal["window_override"]
     else:
-        # Duración declarada (no medida): se audita aparte; la sesión (si se conoce) evita doble conteo.
+        # Duración declarada (no medida): se audita aparte; la sesión (si se resuelve sin ambigüedad) evita doble conteo.
         declared = {"kind": "declared", "worker_type": worker_type}
-        env_agent = session_clock.detect_agent()
-        if env_agent:
-            declared["session"] = os.environ.get(session_clock.SESSION_ENV[env_agent])
+        declared_agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
+        if declared_agent:
+            declared_session = session_clock.resolve_session(declared_agent, os.getcwd(), getattr(args, "session", None))[0]
+            if declared_session:
+                declared["session"] = declared_session
         meta["measured_by"] = declared
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
@@ -1376,13 +1607,35 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
 def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_project_id):
-    """Solo lectura: mide la sesión y muestra la propuesta de duración sin registrar nada."""
+    """Solo lectura: mide la sesión y muestra la propuesta (o el reparto --split) sin registrar nada."""
+    capacity = getattr(args, "capacity_bucket", None) or "deep_work"
+    worker_type = getattr(args, "worker_type", None)
+    if getattr(args, "split", None):
+        result = build_split(conn, args, args.split, worker_type)
+        if result["ok"]:
+            # Validar que cada ticket exista antes de reservar el reparto.
+            for ticket in result["parts"]:
+                resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, ticket)
+            save_group(result["group"], result["parts"])
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        elif result["ok"]:
+            print_split(result, sys.stdout)
+            print("   Registra cada parte con: plane-tracker comment <TICKET> -m \"...\" --accept-proposal")
+        else:
+            print_proposal(result, "reparto", sys.stdout)
+        sys.exit(0 if result["ok"] else 1)
+
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     key = issue_ref.upper()
-    capacity = getattr(args, "capacity_bucket", None) or "deep_work"
-    result = build_proposal(conn, args, capacity, getattr(args, "worker_type", None))
-    if result["ok"]:
-        save_proposal(key, result)
+    pending = load_recent_proposal(key)
+    explicit_window = bool(getattr(args, "since", None) or getattr(args, "until", None))
+    if pending and pending.get("split") and not explicit_window:
+        result = pending  # reparto vigente: no se recalcula para no solaparlo
+    else:
+        result = build_proposal(conn, args, capacity, worker_type, key)
+        if result["ok"]:
+            save_proposal(key, result)
     if getattr(args, "json", False):
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
@@ -1762,7 +2015,8 @@ def worklogs_from_comments(comments):
         if not dur or dur < 1:
             continue
         out.append({"date": meta.get("date"), "start_time": meta.get("start_time"), "end_time": meta.get("end_time"),
-                    "duration_minutes": dur, "worker_type": meta.get("worker_type", "human"), "plane_comment_id": c.get("id")})
+                    "duration_minutes": dur, "worker_type": meta.get("worker_type", "human"), "plane_comment_id": c.get("id"),
+                    "segments": meta.get("segments")})
     return out
 
 def build_ticket_flow(conn, base_url, api_key, workspace, project_id, issue, ticket_label):
@@ -1771,7 +2025,12 @@ def build_ticket_flow(conn, base_url, api_key, workspace, project_id, issue, tic
     # Esfuerzo = worklogs locales (los registrados con --duration no viajan en el comentario) ∪ los que
     # traen metadata en los comentarios de Plane, sin duplicar por id de comentario.
     wls = [dict(r) for r in conn.execute(
-        "SELECT date, start_time, end_time, duration_minutes, worker_type, plane_comment_id FROM worklogs WHERE ticket_id = ?", (ticket_label,))]
+        "SELECT date, start_time, end_time, duration_minutes, worker_type, plane_comment_id, raw_payload FROM worklogs WHERE ticket_id = ?", (ticket_label,))]
+    for w in wls:
+        try:
+            w["segments"] = json.loads(w.pop("raw_payload") or "{}").get("segments")
+        except ValueError:
+            w["segments"] = None
     known = {w["plane_comment_id"] for w in wls if w["plane_comment_id"]}
     try:
         c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
@@ -2000,6 +2259,68 @@ def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
     for f in summary["last_failures"]:
         print(f"     {f['ts']}  {f['method']} {f['path'][-60:]}  → {f.get('error') or 'HTTP ' + str(f.get('status'))} ({f['ms']} ms)")
     print("")
+
+def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
+    """Marca en qué ticket trabaja esta sesión; `propose-duration` atribuye a cada ticket solo sus intervalos."""
+    agent = getattr(args, "agent", None) or session_clock.detect_agent()
+    if not agent:
+        sys.stderr.write("Error: no se pudo determinar el agente (usa --agent claude|opencode|agy).\n")
+        sys.exit(1)
+    session_id, origin, cands = session_clock.resolve_session(agent, os.getcwd(), getattr(args, "session", None))
+    if not session_id:
+        sys.stderr.write(f"Error: no se pudo determinar la sesión de {agent}: {origin}. Indica --session <id>.\n")
+        for sid, ts in cands:
+            sys.stderr.write(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})\n")
+        sys.exit(1)
+
+    now = _now()
+    iso = now.isoformat(timespec="seconds")
+    with conn:  # las marcas son útiles solo el día en curso: se purgan las antiguas
+        conn.execute("DELETE FROM session_marks WHERE COALESCE(ended_at, started_at) < ?", ((now - timedelta(days=FOCUS_KEEP_DAYS)).isoformat(timespec="seconds"),))
+    current = conn.execute("SELECT id, ticket FROM session_marks WHERE session_id = ? AND ended_at IS NULL", (session_id,)).fetchall()
+
+    if getattr(args, "status", False):
+        stamps = session_clock.timestamps(agent, session_id)
+        midnight = _local_midnight_utc(now)
+        runs = session_clock.active_runs(stamps, midnight, now)
+        marks = focus_intervals(conn, session_id, midnight, now)
+        per_ticket = {t: session_clock.total_minutes(session_clock.intersect(runs, ivs)) for t, ivs in marks.items()}
+        unattributed = session_clock.total_minutes(session_clock.subtract(runs, [iv for ivs in marks.values() for iv in ivs]))
+        result = {"session": session_id, "agent": agent, "current": current[0]["ticket"] if current else None,
+                  "tickets": {t: round(m, 1) for t, m in per_ticket.items()}, "unattributed_minutes": round(unattributed, 1)}
+        if getattr(args, "json", False):
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+            return
+        print(f"\n🎯 Foco de la sesión {session_id} ({agent}) · hoy")
+        print(f"   • Ahora: {result['current'] or '— (sin foco)'}")
+        for t, m in sorted(result["tickets"].items(), key=lambda kv: -kv[1]):
+            print(f"   • {t:<10} {m:.0f} min atribuidos")
+        print(f"   • Sin foco : {unattributed:.0f} min (no se atribuyen solos)\n")
+        return
+
+    if getattr(args, "off", False):
+        with conn:
+            conn.execute("UPDATE session_marks SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL", (iso, session_id))
+        print("✔ Foco cerrado" + (f" (era {current[0]['ticket']})" if current else " (no había foco abierto)"))
+        return
+
+    if not args.issue:
+        sys.stderr.write("Error: indica el ticket (plane-tracker focus OMNIFY-205), o usa --off / --status.\n")
+        sys.exit(1)
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    ticket = issue_ref.upper()
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    state = conn.execute("SELECT group_name FROM states WHERE id = ?", (issue.get("state"),)).fetchone()
+    if state and state["group_name"] in flow_metrics.TERMINAL_GROUPS:
+        sys.stderr.write(f"⚠ {ticket} está en un estado terminal ({state['group_name']}); la marca se crea igual.\n")
+    if any(row["ticket"] == ticket for row in current):
+        print(f"✔ El foco ya está en {ticket}")
+        return
+    with conn:
+        conn.execute("UPDATE session_marks SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL", (iso, session_id))
+        conn.execute("INSERT INTO session_marks (session_id, agent, ticket, started_at) VALUES (?,?,?,?)", (session_id, agent, ticket, iso))
+    previous = f" (antes {current[0]['ticket']})" if current else ""
+    print(f"✔ Foco en {ticket}{previous} · sesión {session_id} ({agent})")
 
 def positive_int(value):
     n = int(value)
@@ -2318,7 +2639,7 @@ def render_day_block(date_obj, rows):
     if not rows:
         return f"ℹ Sin registros de actividad para {dia_nombre} {d_str}.\n"
 
-    merged_entries, wall_clock_mins, total_compute_mins = merge_daily_worklogs(rows)
+    merged_entries, wall_clock_mins, total_compute_mins = merge_daily_worklogs(expand_segments(rows))
 
     by_project = {}
     all_stoppers = []
@@ -2439,7 +2760,7 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
             print(render_day_block(cur, day_rows))
             print("")
 
-            for r in day_rows:
+            for r in expand_segments(day_rows):
                 s_m = time_to_minutes(r["start_time"])
                 e_m = time_to_minutes(r["end_time"])
                 dur = r["duration_minutes"]
@@ -2564,6 +2885,15 @@ def main():
     p_health.add_argument("--hours", type=positive_int, default=24, help="Ventana en horas (por defecto 24)")
     p_health.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # focus
+    p_focus = subparsers.add_parser("focus", help="Marcar en qué ticket trabaja esta sesión (reparte el tiempo medido por ticket)")
+    p_focus.add_argument("issue", nargs="?", default=None, help="Ticket en el que empiezas a trabajar")
+    p_focus.add_argument("--off", action="store_true", help="Cerrar la marca de foco actual")
+    p_focus.add_argument("--status", action="store_true", help="Ver el tiempo atribuido hoy a cada ticket")
+    p_focus.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente de la sesión (por defecto: según el entorno)")
+    p_focus.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
+    p_focus.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # propose-duration
     p_prop = subparsers.add_parser("propose-duration", help="Medir la sesión del agente y proponer una duración (no registra nada)")
     p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
@@ -2573,6 +2903,9 @@ def main():
     p_prop.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
                         choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],
                         help="Balde de capacidad (toil_support y coordination no admiten propuesta)")
+    p_prop.add_argument("--split", metavar="SPEC", help="Repartir lo medido entre tickets: 'A=60%%,B=rest' o 'A=40m,B=rest' (ignora las marcas de foco)")
+    p_prop.add_argument("--since", metavar="HH:MM|ISO", help="Inicio de la ventana medida (hoy, hora local)")
+    p_prop.add_argument("--until", metavar="HH:MM|ISO", help="Fin de la ventana medida (hoy, hora local)")
     p_prop.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # create
@@ -2681,6 +3014,8 @@ def main():
             cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "health":
             cmd_health(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "focus":
+            cmd_focus(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "link":
             cmd_link(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "propose-duration":

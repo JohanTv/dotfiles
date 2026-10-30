@@ -32,6 +32,12 @@ def _worklog_interval(entry):
     return start, end
 
 
+def _segment_interval(entry, seg):
+    start = datetime.strptime(f"{entry['date']} {seg['start']}", "%Y-%m-%d %H:%M").astimezone(timezone.utc)
+    end = datetime.strptime(f"{entry['date']} {seg['end']}", "%Y-%m-%d %H:%M").astimezone(timezone.utc)
+    return start, (end + timedelta(days=1) if end < start else end)
+
+
 def union_minutes(intervals):
     """Longitud de la unión de intervalos (sin contar dos veces el solape)."""
     if not intervals:
@@ -110,13 +116,14 @@ def compute_flow(issue, transitions, states, worklogs, now):
     for entry in worklogs:
         compute += int(entry.get("duration_minutes") or 0)
         try:
-            start, end = _worklog_interval(entry)
+            # Con segmentos (actividad intercalada entre tickets) el reloj es la unión de sus tramos, no el rango envolvente.
+            spans = [_segment_interval(entry, seg) for seg in entry["segments"]] if entry.get("segments") else [_worklog_interval(entry)]
         except (KeyError, ValueError):
             continue
-        intervals.append((start, end))
-        if start < created:
+        intervals.extend(spans)
+        if spans[0][0] < created:
             out_before += 1
-        if closed and start > closed:
+        if closed and spans[0][0] > closed:
             out_after += 1
     clock = union_minutes(intervals)
     cycle_active = _minutes(active) if has_started else None
