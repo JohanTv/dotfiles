@@ -1,7 +1,8 @@
 """Sincronización de los worklogs registrados en los comentarios de Plane hacia SQLite.
 
 Expone: sync_remote_worklogs().
-No hace: imprimir reportes. Si Plane deja de responder a mitad del sync lo termina con un aviso y sin marcar la marca de agua.
+No hace: imprimir reportes. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo
+client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina con un aviso y sin marcar la marca de agua.
 """
 
 import sys
@@ -11,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
 from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.outbox import mark_sent, owner_of
 from plane_cli.resolve import get_actor_uuid, get_projects_map
 from plane_cli.timeutil import time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment, upsert_worklog
@@ -90,6 +92,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     synced_count = 0
     skipped_foreign = 0
     skipped_no_duration = 0
+    skipped_pending = 0
     if candidate_tasks:
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(fetch_comments_for_issue, t) for t in candidate_tasks]
@@ -134,9 +137,17 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                             "created_at": c.get("created_at"),
                             "raw_payload": meta
                         }
+                        owner = owner_of(conn, ticket_label, entry["track"], entry["date"], entry["start_time"])
+                        if owner and meta.get("client_id") == owner["client_id"]:
+                            mark_sent(conn, owner, c.get("id"))
+                        elif owner:
+                            skipped_pending += 1
+                            continue
                         upsert_worklog(conn, entry)
                         synced_count += 1
 
+    if skipped_pending:
+        sys.stderr.write(f"⚠ {skipped_pending} comentario(s) de Plane no se sincronizaron: coinciden con un registro en cola (outbox list).\n")
     if unavailable:
         sys.stderr.write(f"⚠ Sincronización incompleta: Plane no responde ({unavailable[0].cause}); se usan los datos locales.\n")
         return

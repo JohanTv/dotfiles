@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag
 from plane_cli.flow import cmd_report_flow
+from plane_cli.outbox import count_open, open_keys
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
 from plane_cli.sync import sync_remote_worklogs
 from plane_cli.timeutil import (
@@ -39,6 +40,7 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
     for r in rows:
         by_ticket.setdefault(r["ticket_id"], []).append(r)
     results, issues = {}, []
+    pending_keys = open_keys(conn)
     for label, t_rows in sorted(by_ticket.items()):
         try:
             project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, label)
@@ -53,7 +55,7 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
             html = c.get("comment_html") or ""
             has_block = bool(find_metadata_block(html))
             comments[c["id"]] = {"has_block": has_block, "meta": extract_metadata_from_comment(html) if has_block else None}
-        found = check_worklogs(t_rows, comments, s_str, e_str)
+        found = check_worklogs(t_rows, comments, s_str, e_str, pending_keys)
         results[label] = (len(t_rows), found)
         issues += found
     errors = [i for i in issues if i["code"] in CHECK_ERRORS]
@@ -99,6 +101,13 @@ def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_
                             start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
 
+def _warn_unpublished(args, conn, s_str, e_str):
+    """Los registros en cola ya cuentan en el reporte (están en `worklogs`); se avisa de que siguen sin publicarse."""
+    count = count_open(conn, s_str, e_str, getattr(args, "project", None), getattr(args, "track", None))
+    if count:
+        sys.stderr.write(f"⏳ {count} registro(s) de este periodo siguen sin publicarse (outbox list).\n")
+
+
 def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     today = datetime.now().date()
     is_week = getattr(args, "week", False)
@@ -110,6 +119,7 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     e_str = end_date.strftime("%Y-%m-%d")
 
     if getattr(args, "view", None) == "flow":
+        _warn_unpublished(args, conn, s_str, e_str)
         return cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
 
     # Verificar si necesitamos sincronizar remotamente
@@ -127,6 +137,8 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
             sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=getattr(args, "project", None))
         except PlaneUnavailable as exc:
             sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); se omite la sincronización y se usan los datos locales.\n")
+
+    _warn_unpublished(args, conn, s_str, e_str)
 
     # Construir query SQL indexada con filtros opcionales
     query = "SELECT * FROM worklogs WHERE date >= ? AND date <= ?"

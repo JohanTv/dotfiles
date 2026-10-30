@@ -191,14 +191,20 @@ CHECK_FIELDS = ("date", "start_time", "end_time", "duration_minutes", "track", "
 CHECK_ERRORS = ("duplicate", "orphan", "mismatch", "missing_local")
 
 
-def check_worklogs(local_rows, comments, s_str, e_str):
-    """Compara filas locales con sus comentarios. comments: {id: {'meta': dict|None, 'has_block': bool}}."""
+def check_worklogs(local_rows, comments, s_str, e_str, pending_keys=frozenset()):
+    """Compara filas locales con sus comentarios. comments: {id: {'meta': dict|None, 'has_block': bool}}.
+
+    pending_keys: claves (ticket, track, fecha, inicio) de los registros en cola de publicación; sus filas sin comentario
+    son un aviso `pending`, no `unlinked`.
+    """
     issues = []
     by_cid = {}
     for row in local_rows:
         cid = row.get("plane_comment_id")
         if not cid:
-            issues.append({"code": "unlinked", "ticket": row["ticket_id"], "comment_id": None, "detail": f"{row['date']} {row['start_time']} sin comentario asociado"})
+            queued = (row["ticket_id"], row["track"], row["date"], row["start_time"]) in pending_keys
+            detail = f"{row['date']} {row['start_time']} " + ("en cola de publicación (outbox list)" if queued else "sin comentario asociado")
+            issues.append({"code": "pending" if queued else "unlinked", "ticket": row["ticket_id"], "comment_id": None, "detail": detail})
             continue
         by_cid.setdefault(cid, []).append(row)
     for cid, rows in by_cid.items():

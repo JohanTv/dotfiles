@@ -1,7 +1,7 @@
 """Cola de salida de comentarios: guardado previo (write-ahead), reclamo atómico, entrega idempotente y consultas.
 
 Expone: Draft, Published, Rejected, publish_comment(), deliver(), claim(), release(), mark_sent(), make_client_id(), comments_url(),
-search_remote(), discard_item(), owner_of(), list_items(), drop_item(), pending_counts(), pending_notice(), fail(), constantes
+search_remote(), discard_item(), owner_of(), open_keys(), count_open(), list_items(), drop_item(), pending_counts(), pending_notice(), fail(), constantes
 (LEASE_SECONDS, OPEN_STATES, EXTERNAL_SOURCE...).
 No hace: imprimir resultados de negocio ni decidir el orden de un flush (outbox_flush.py).
 
@@ -296,6 +296,21 @@ def publish_comment(conn, draft):
 def owner_of(conn, ticket, track, date, start_time):
     """El item abierto (pending, sending o failed) cuya fila provisional de worklogs tiene esta clave; None si no hay."""
     return conn.execute(f"SELECT * FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL}", (ticket, track, date, start_time)).fetchone()
+
+
+def open_keys(conn):
+    """{(ticket, track, fecha, inicio)} de las filas provisionales de los items abiertos."""
+    return {tuple(r) for r in conn.execute(f"SELECT wl_ticket_id, wl_track, wl_date, wl_start_time FROM outbox WHERE {_OPEN_SQL}")}
+
+
+def count_open(conn, date_from, date_to, project=None, track=None):
+    """Items abiertos cuya fecha de worklog cae en el periodo (filtrables por proyecto y track)."""
+    query, params = f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL} AND wl_date >= ? AND wl_date <= ?", [date_from, date_to]
+    if project:
+        query, params = query + " AND wl_ticket_id LIKE ?", params + [f"{project.upper()}-%"]
+    if track:
+        query, params = query + " AND wl_track = ?", params + [track]
+    return conn.execute(query, params).fetchone()[0]
 
 
 def pending_counts(conn):
