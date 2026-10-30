@@ -127,7 +127,7 @@ Permite que un ticket sea iniciado por Pierre, transferido a Johan y viceversa, 
      * *¿Cuál es el siguiente paso inmediato?*
 2. **Aislamiento de Telemetría:**
    - Johan trabaja en su propia rama Git.
-   - Johan imputa sus horas efectivas exclusivamente bajo su propio usuario y track mediante `plane-tracker comment`. Las horas de Pierre quedan asociadas a su usuario.
+   - Johan imputa sus horas efectivas exclusivamente bajo su propio usuario y track mediante `plane-tracker comment add`. Las horas de Pierre quedan asociadas a su usuario.
 3. **Entrega del Relevo (Si se deja a medias):**
    - Si Johan debe suspender la tarea o devolverla a Pierre, publica un comentario estructurado de relevo (*Handoff Snapshot*):
      ```markdown
@@ -217,7 +217,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | `last_proposal.json` (+ `.lock`) | Propuestas de duración y repartos pendientes (30 min), por ticket **y sesión**; escritura atómica con `flock`. | No (efímero). |
 | `requests.log` (+ `.1`) | JSONL con método, ruta, estado, ms, intento y error de cada llamada a la API (sin cuerpos ni cabeceras); rota a 1 MB; lo resume `health`. | No (diagnóstico). |
 
-**La telemetría viaja con el comentario.** Cada `comment` añade al HTML el bloque oculto `<!-- PLANE_WORKLOG_METADATA {json} -->` (Plane lo conserva) con fecha, horas, duración, track, capacidad, `segments[]` y `measured_by` (`proposal` | `proposal_split` | `declared`, sesión, adaptador, confianza, atribución, `window_override`). Así `report --sync` reconstruye `worklogs` aunque se pierda la caché. Comentarios anteriores a este cambio no traen el bloque.
+**La telemetría viaja con el comentario.** Cada `comment add` añade al HTML el bloque oculto `<!-- PLANE_WORKLOG_METADATA {json} -->` (Plane lo conserva) con fecha, horas, duración, track, capacidad, `segments[]` y `measured_by` (`proposal` | `proposal_split` | `declared`, sesión, adaptador, confianza, atribución, `window_override`). Así `report --refresh` reconstruye `worklogs` aunque se pierda la caché. Comentarios anteriores a este cambio no traen el bloque.
 
 **Medición por sesión de agente (`scripts/session_clock.py`).** Lee solo timestamps/ids de Claude Code (`~/.claude/projects`), OpenCode (`opencode.db`) y Antigravity CLI (`conversation_summaries.db`), nunca contenido. La sesión se resuelve por variable de entorno (`CLAUDE_CODE_SESSION_ID`), `--session`, o el directorio de trabajo si no hay ambigüedad; no se adivina entre varias. La actividad se mide en *tramos* (huecos > 10 min excluidos); de cada propuesta se restan los worklogs de la sesión (por su intervalo real) y las propuestas pendientes de otros tickets, de modo que nada se cuenta dos veces. Un día pasado se mide con `--date`.
 
@@ -233,19 +233,19 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`create`** | `plane-tracker create "[FIX] Titulo" -p OMNIFY -d "..."` | Crea issue en Plane y autogenera rama Git según la fase. |
 | **`get`** | `plane-tracker get OMNIFY-197` | Muestra metadata, descripción y **contexto de comentarios / handoff**. |
 | **`update`** | `plane-tracker update OMNIFY-162 --state "Progreso"` | Actualiza estado, prioridad o etiquetas en Plane. |
-| **`comment`**| `plane-tracker comment OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica bitácora dual-layer con telemetría v2.2. |
+| **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica bitácora dual-layer con telemetría v2.2. |
 | **`labels`** | `plane-tracker labels [-p OMNIFY] [--refresh]` | Lista etiquetas indexadas desde caché local (**< 2ms**). |
 | **`projects`**| `plane-tracker projects [--refresh]` | Lista proyectos dinámicos del workspace (`teamprogra`). |
-| **`report`** | `plane-tracker report --today [--week] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |
-| **`report --flow`** | `plane-tracker report --flow --week [-p OMNIFY] [--json]` | Flujo por ticket del periodo: lead/cycle time, tiempo por estado, esfuerzo y medianas. |
+| **`report`** | `plane-tracker report --today [--week] [--refresh] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |
+| **`report flow`** | `plane-tracker report flow --week [-p OMNIFY] [--json]` | Flujo por ticket del periodo: lead/cycle time, tiempo por estado, esfuerzo y medianas (no sincroniza). |
 | **`get --history`** | `plane-tracker get OMNIFY-197 --history [--no-comments] [--last N] [--full]` | Ciclo de vida, estado, flujo y transiciones; flags para ahorrar tokens. |
-| **`propose-duration`** | `plane-tracker propose-duration OMNIFY-197 [--split A=60%,B=rest] [--since H --until H] [--date D]` | Mide la sesión del agente y propone la duración (solo lectura). `comment --accept-proposal` la registra. |
-| **`focus`** | `plane-tracker focus OMNIFY-197` · `--off` · `--status` | Marca en qué ticket trabaja la sesión para atribuir el tiempo medido por ticket. |
-| **`comment-edit` / `comment-delete`** | `plane-tracker comment-edit T --comment-id ID [--duration N] [--embed-metadata]` | Edita/vincula un comentario con su worklog, o lo elimina junto con su worklog local. |
-| **`link`** | `plane-tracker link OMNIFY-197 https://github.com/org/repo/pull/7 --title "PR #7"` | Adjunta un enlace al work item (idempotente). |
-| **`attach` / `attachments`** | `plane-tracker attach T archivo... [--replace ID]` · `attachments T [--delete ID]` · `create ... --attach F` | Sube, lista, reemplaza y elimina adjuntos (50 MB máx.). |
-| **`handoff`** | `plane-tracker handoff [TICKET] [--base dev]` | Borrador del Handoff Snapshot con hechos de git local (rama, SHA, repo, sin pushear → bloquea); no publica. `comment` rechaza `[COMPLETAR]`. |
-| **`report --check`** | `plane-tracker report --check [--week] [--json]` | Solo lectura: duplicados, huérfanos y diferencias entre `worklogs` y los bloques ocultos de los comentarios. |
+| **`worklog propose`** | `plane-tracker worklog propose OMNIFY-197 [--split A=60%,B=rest] [--since H --until H] [--date D]` | Mide la sesión del agente y propone la duración (solo lectura). `comment add --accept-proposal` la registra. |
+| **`focus set` / `focus clear` / `focus status`** | `plane-tracker focus set OMNIFY-197` · `plane-tracker focus clear` · `plane-tracker focus status` | Marca en qué ticket trabaja la sesión para atribuir el tiempo medido por ticket. |
+| **`comment edit` / `comment delete`** | `plane-tracker comment edit T --comment-id ID [--duration N] [--embed-metadata]` · `plane-tracker comment delete T --comment-id ID` | Edita/vincula un comentario con su worklog, o lo elimina junto con su worklog local. |
+| **`link add`** | `plane-tracker link add OMNIFY-197 https://github.com/org/repo/pull/7 --title "PR #7"` | Adjunta un enlace al work item (idempotente). |
+| **`attachment add` / `list` / `delete` / `replace`** | `plane-tracker attachment add T archivo...` · `plane-tracker attachment list T` · `plane-tracker attachment delete T ID` · `plane-tracker attachment replace T ID archivo` · `create ... --attach F` | Sube, lista, reemplaza y elimina adjuntos (50 MB máx.). |
+| **`handoff`** | `plane-tracker handoff [TICKET] [--base dev]` | Borrador del Handoff Snapshot con hechos de git local (rama, SHA, repo, sin pushear → bloquea); no publica. `comment add` rechaza `[COMPLETAR]`. |
+| **`worklog check`** | `plane-tracker worklog check [--today\|--week\|--date D] [-p OMNIFY] [--json]` | Solo lectura (exit 1 si hay inconsistencias): duplicados, huérfanos y diferencias entre `worklogs` y los bloques ocultos de los comentarios. |
 | **`health`** | `plane-tracker health [--hours 24]` | Latencia (p50/p95) y errores recientes de la API desde `requests.log`. |
 
 ---

@@ -24,7 +24,7 @@ plane-tracker get <TICKET-ID>
 plane-tracker update <TICKET-ID> --state "Progreso" --priority "urgent"
 
 # 5. Publicación de bitácora dual-layer (humano + telemetría v2.2)
-plane-tracker comment <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
+plane-tracker comment add <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
 
 # 6. Inspección de taxonomía de etiquetas del proyecto (< 2ms)
 plane-tracker labels [-p OMNIFY]
@@ -36,6 +36,16 @@ plane-tracker projects
 plane-tracker report --today
 plane-tracker report --week
 ```
+
+### Convenciones de nombrado
+
+* En la raíz viven los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
+* Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `focus`, `worklog`.
+* Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección (p. ej. `get --history`, `report --refresh`).
+* Verbos: `add` / `list` / `edit` / `delete` / `replace`; marcas `set` / `clear` / `status`; derivados `propose` / `check`.
+* El ID de un hijo que es obligatorio va posicional (`attachment delete ISSUE ID`); si es opcional (por defecto, tu último comentario) va como `--comment-id`.
+* `--json` es global: funciona antes o después del comando.
+* Un nombre antiguo, un sinónimo o un verbo faltante termina con exit 2 y un mensaje que indica el comando correcto, antes de validar el entorno.
 
 ---
 
@@ -117,38 +127,38 @@ plane-tracker get OMNIFY-197 --full                          # sin truncar descr
 ### C.1b Varios tickets en una misma sesión
 ```bash
 # Atribución automática por foco: avisa en qué ticket trabajas al cambiar de uno a otro
-plane-tracker focus OMNIFY-205            # abre la marca (cierra la anterior)
-plane-tracker focus OPS-13                # cambio de ticket
-plane-tracker focus --status              # minutos atribuidos hoy por ticket y tiempo sin foco
-plane-tracker focus --off
-plane-tracker propose-duration OMNIFY-205 # solo cuenta los intervalos con foco en ese ticket
+plane-tracker focus set OMNIFY-205        # abre la marca (cierra la anterior)
+plane-tracker focus set OPS-13            # cambio de ticket
+plane-tracker focus status                # minutos atribuidos hoy por ticket y tiempo sin foco
+plane-tracker focus clear
+plane-tracker worklog propose OMNIFY-205  # solo cuenta los intervalos con foco en ese ticket
 
 # Reparto manual de lo medido (en un paso; cada parte se registra luego con su texto)
-plane-tracker propose-duration --split OMNIFY-205=60%,OPS-13=rest   # o 40m; suma exacta (mayor resto)
-plane-tracker comment OMNIFY-205 -m "..." --accept-proposal
-plane-tracker comment OPS-13 -m "..." --accept-proposal             # en cualquier orden
+plane-tracker worklog propose --split OMNIFY-205=60%,OPS-13=rest   # o 40m; suma exacta (mayor resto)
+plane-tracker comment add OMNIFY-205 -m "..." --accept-proposal
+plane-tracker comment add OPS-13 -m "..." --accept-proposal             # en cualquier orden
 
 # Ventana explícita (un solo día local; lo ya registrado de la sesión se excluye)
-plane-tracker propose-duration OMNIFY-205 --since 09:30 --until 11:00
+plane-tracker worklog propose OMNIFY-205 --since 09:30 --until 11:00
 
 # Sesión de un día anterior (p. ej. el id que mostró Ctrl+C al cerrarla; `find-session -r -j` también lista ids)
-plane-tracker propose-duration OMNIFY-205 --agent opencode --session ses_xxxx --date 2026-10-28
-plane-tracker comment OMNIFY-205 -m "..." --agent opencode --session ses_xxxx --accept-proposal
+plane-tracker worklog propose OMNIFY-205 --agent opencode --session ses_xxxx --date 2026-10-28
+plane-tracker comment add OMNIFY-205 -m "..." --agent opencode --session ses_xxxx --accept-proposal
 ```
 - La medición usa **tramos de actividad** (huecos de más de 10 min excluidos). Un worklog medido guarda `segments` (los tramos reales) para que el reloj por ticket y el reporte diario no usen un rango envolvente que pise a otro ticket.
-- **Nada se cuenta dos veces:** de cada propuesta se restan los worklogs de la sesión (medidos o declarados, por su intervalo real) y las propuestas pendientes de otros tickets. Con foco activo, un ticket sin marcas hoy no recibe propuesta (usa `--duration`). Las marcas son locales (no se reconstruyen con `--sync`); los segmentos sí viajan en el bloque oculto del comentario.
+- **Nada se cuenta dos veces:** de cada propuesta se restan los worklogs de la sesión (medidos o declarados, por su intervalo real) y las propuestas pendientes de otros tickets. Con foco activo, un ticket sin marcas hoy no recibe propuesta (usa `--duration`). Las marcas son locales (no se reconstruyen con `report --refresh`); los segmentos sí viajan en el bloque oculto del comentario.
 - **Varias terminales o agentes:** cada propuesta pendiente pertenece a su sesión (`--accept-proposal` usa la de tu terminal y no adivina si hay varias). Claude Code resuelve su sesión solo (`$CLAUDE_CODE_SESSION_ID`); con OpenCode/agy, si hay más de una sesión reciente en el mismo directorio, indica `--session`. El tiempo en paralelo suma en *cómputo* y se une en *reloj* (AI Leverage).
 - `measured_by` distingue `proposal`, `proposal_split` y `declared`, con `attribution` (`session`, `focus`, `split`) y `window_override` si se usó `--since/--until`.
 
 ---
 
-### C.1 `plane-tracker propose-duration` (Duración medida)
+### C.1 `plane-tracker worklog propose` (Duración medida)
 Mide la sesión del agente (solo timestamps, nunca contenido) y propone una duración sin registrar nada.
 
 ```bash
-plane-tracker propose-duration OMNIFY-197 --worker-type agent:claude
-plane-tracker propose-duration OMNIFY-197 --agent opencode --session ses_xxxxxxxx   # sesión ambigua en el directorio
-plane-tracker comment OMNIFY-197 -m "..." --accept-proposal                         # registra lo propuesto (30 min, un solo uso)
+plane-tracker worklog propose OMNIFY-197 --worker-type agent:claude
+plane-tracker worklog propose OMNIFY-197 --agent opencode --session ses_xxxxxxxx   # sesión ambigua en el directorio
+plane-tracker comment add OMNIFY-197 -m "..." --accept-proposal                         # registra lo propuesto (30 min, un solo uso)
 ```
 *Fuentes:* Claude Code (transcript, `$CLAUDE_CODE_SESSION_ID`), OpenCode (`opencode.db`, solo `time_created`), Antigravity CLI (`conversation_summaries.db`, solo hitos; confianza baja). Las pausas de más de 10 min se descuentan de la medición neta.
 
@@ -157,7 +167,7 @@ plane-tracker comment OMNIFY-197 -m "..." --accept-proposal                     
 ### C.2 Flujo del work item: tiempo abierto vs esfuerzo efectivo
 ```bash
 plane-tracker get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
-plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo + medianas
+plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas
 ```
 - **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.
 - **Cycle time** = suma del tiempo en estados del grupo *started* (Progreso, Revisión, Pruebas); **Pausado se excluye del activo** y se muestra en el bruto. Reaperturas suman cada tramo.
@@ -167,32 +177,32 @@ plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo
 
 ---
 
-> **Telemetry travels with the comment:** `comment` always appends the hidden `<!-- PLANE_WORKLOG_METADATA {...} -->` block to the HTML (Plane preserves it, verified), so hours survive losing the local cache and can be rebuilt with `report --sync`. Comments published before this change have no block.
+> **Telemetry travels with the comment:** `comment add` always appends the hidden `<!-- PLANE_WORKLOG_METADATA {...} -->` block to the HTML (Plane preserves it, verified), so hours survive losing the local cache and can be rebuilt with `report --refresh`. Comments published before this change have no block.
 
 ---
 
-### C.3 `plane-tracker link` y `comment-edit --embed-metadata`
+### C.3 `plane-tracker link add` y `comment edit --embed-metadata`
 ```bash
-plane-tracker link OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
-plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
-plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
-plane-tracker comment-edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
-plane-tracker comment-delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
+plane-tracker link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
+plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
+plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
+plane-tracker comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
+plane-tracker comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
 ```
-*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report --sync` la reescribiría desde el bloque oculto del comentario. `comment-edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
+*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
 
-Prefiere `link` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
+Prefiere `link add` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
 
 ---
 
 ### C.4 Adjuntos y salud de la conexión
 ```bash
-plane-tracker attach OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
-plane-tracker attachments OMNIFY-205 [--json]             # lista los adjuntos (con su id)
-plane-tracker attachments OMNIFY-205 --delete <id>        # elimina un adjunto
-plane-tracker attach OMNIFY-205 nuevo.pdf --replace <id>  # "actualizar": sube el nuevo y, si salió bien, borra el anterior
-plane-tracker create "[FEAT] ..." --attach spec.pdf       # adjuntar al crear (se sube justo después; el ticket ya existe si falla)
-plane-tracker health [--hours 24] [--json]                # latencia (p50/p95) y errores recientes de la API
+plane-tracker attachment add OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
+plane-tracker attachment list OMNIFY-205 [--json]                 # lista los adjuntos (con su id)
+plane-tracker attachment delete OMNIFY-205 <id>                   # elimina un adjunto
+plane-tracker attachment replace OMNIFY-205 <id> nuevo.pdf        # "actualizar": sube el nuevo y, si salió bien, borra el anterior
+plane-tracker create "[FEAT] ..." --attach spec.pdf               # adjuntar al crear (se sube justo después; el ticket ya existe si falla)
+plane-tracker health [--hours 24] [--json]                        # latencia (p50/p95) y errores recientes de la API
 ```
 Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la propia creación del ticket: ambos son pasos aparte. Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro JSONL (sin cuerpos ni cabeceras) en `~/.cache/plane/requests.log` (rota a 1 MB) con método, ruta, estado, milisegundos, intento y error; `health` lo resume para distinguir caídas de lentitud.
 
@@ -201,9 +211,9 @@ Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la p
 ### C.5 Relevo y consistencia
 ```bash
 plane-tracker handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
-plane-tracker report --check [--week|--date D] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
+plane-tracker worklog check [--today|--week|--date D] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
 ```
-`report --check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --sync`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible) y `unlinked`. Sale con código 1 si hay inconsistencias.
+`worklog check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --refresh`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible) y `unlinked`. Sale con código 1 si hay inconsistencias.
 
 ---
 
@@ -227,20 +237,20 @@ plane-tracker update OMNIFY-175 --state "Completado"
 
 ---
 
-### E. `plane-tracker comment` (Bitácora Dual-Layer)
+### E. `plane-tracker comment add` (Bitácora Dual-Layer)
 Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite local para los reportes diarios.
 
 > ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale a Johan cuánto demoró antes de comentar.
 
 ```bash
 # Publicar archivo de bitácora
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --duration 95
+plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --duration 95
 
 # Con track y tipo de trabajador especificado
-plane-tracker comment OMNIFY-162 -f /tmp/worklog.md --track "form-validations" --worker-type "subagent" --duration 45
+plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --track "form-validations" --worker-type "subagent" --duration 45
 
 # Comentario rápido con mensaje en línea (ticket paraguas de OPS)
-plane-tracker comment OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 35 -m "Atención a comercial sobre campaña #842."
+plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 35 -m "Atención a comercial sobre campaña #842."
 ```
 
 ---
@@ -259,7 +269,10 @@ plane-tracker report --week
 plane-tracker report --today -p OMNIFY
 
 # Forzar sincronización remota previa
-plane-tracker report --today --sync
+plane-tracker report --today --refresh
+
+# Vista de flujo (lead/cycle time y esfuerzo por ticket; no sincroniza, ignora --refresh)
+plane-tracker report flow --week
 
 # Salida en JSON para paneles o visualizaciones
 plane-tracker report --today --json

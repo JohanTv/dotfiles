@@ -33,7 +33,7 @@ En un equipo ágil de ingeniería:
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 3. Ejecución & Telemetría Aislada:                                     │
 │    git checkout -b {tipo}/{TICKET-ID}-{kebab}                          │
-│    Johan trabaja y registra sus horas con plane-tracker comment        │
+│    Johan trabaja y registra sus horas con plane-tracker comment add    │
 │    (Las horas se imputan a Johan; el historial de Pierre no se toca)   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
@@ -96,7 +96,7 @@ El asistente debe destilar la información ignorando logs crudos extensos y resp
 Si Johan no concluye la tarea durante su turno y debe suspenderla o devolvérsela a Pierre, debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión:
 
 ```bash
-plane-tracker comment OMNIFY-197 --duration 10 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)
+plane-tracker comment add OMNIFY-197 --duration 10 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)
 - **Avance realizado:** Se configuró el usuario bot en Plane y se validó la petición HTTP con curl.
 - **Rama Git / Commit:** infra/OMNIFY-197-claude-mcp-connector (commit a81f3e en origin).
 - **Estado actual:** El servidor responde 200 OK localmente con el bot token.
@@ -132,7 +132,7 @@ plane-tracker handoff OMNIFY-205 --base dev # imprime el borrador; no publica
 ```
 - **Guardas (se niega a imprimir):** commits sin pushear (`git rev-list HEAD --not --remotes`, sin red: "según el último fetch local"), HEAD desacoplado, repo sin remoto. Un relevo que apunta a commits que nadie más puede ver es inútil.
 - **Base:** solo con `--base B`, y siempre contra `origin/B` (un `dev` local desfasado inflaría el conteo). Sin `--base` no se escribe.
-- **Publicación:** guarda el texto completado en un archivo y usa `plane-tracker comment TICKET -f relevo.md --duration N`. `comment` (y `comment-edit -m`) rechazan cualquier texto que conserve `[COMPLETAR]`.
+- **Publicación:** guarda el texto completado en un archivo y usa `plane-tracker comment add TICKET -f relevo.md --duration N`. `comment add` (y `comment edit -m`) rechazan cualquier texto que conserve `[COMPLETAR]`.
 - **Privacidad:** solo rama, SHA, `owner/repo` (credenciales del remoto descartadas), conteos; nunca rutas absolutas ni contenido de la sesión.
 
 ### Quien retoma
