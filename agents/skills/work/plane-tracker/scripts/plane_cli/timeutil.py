@@ -1,7 +1,7 @@
 """Aritmética de horarios y fusión de intervalos (medida de Klee) para los reportes de actividad.
 
-Expone: time_to_minutes(), minutes_to_time(), calculate_klee_union_minutes(), expand_segments(), merge_daily_worklogs(),
-format_minutes(), render_day_block(), DIAS_SEMANA.
+Expone: time_to_minutes(), minutes_to_time(), calculate_klee_union_minutes(), expand_segments(),
+merge_daily_worklogs(), format_minutes(), render_day_block(), DIAS_SEMANA.
 No hace: red ni acceso a la base de datos.
 """
 

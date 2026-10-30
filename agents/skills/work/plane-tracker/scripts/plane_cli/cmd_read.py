@@ -1,6 +1,7 @@
 """Comandos de lectura: `get`, `list`, `search`, `labels`, `projects` y `whoami`.
 
-Expone: register(), cmd_get(), cmd_list(), cmd_search(), cmd_labels(), cmd_projects(), cmd_whoami().
+Expone: register_get(), register_list(), register_search(), register_labels(), register_projects(), register_whoami(),
+y los cmd_* correspondientes.
 No hace: escribir en Plane.
 """
 

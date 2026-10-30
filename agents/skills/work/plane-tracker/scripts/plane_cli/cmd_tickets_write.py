@@ -1,6 +1,6 @@
 """Comandos que escriben en el work item: `create`, `update` y `link`.
 
-Expone: register(), cmd_create(), cmd_update(), cmd_link().
+Expone: register_create(), register_update(), register_link(), cmd_create(), cmd_update(), cmd_link().
 No hace: comentarios ni adjuntos sueltos.
 """
 

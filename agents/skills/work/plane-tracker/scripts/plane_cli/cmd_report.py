@@ -1,6 +1,6 @@
 """Comando `report`: reporte de actividad (día/semana) y comprobación de consistencia (`--check`).
 
-Expone: register(), cmd_report(), cmd_report_check().
+Expone: register_report(), cmd_report(), cmd_report_check().
 No hace: el reporte de flujo (vive en flow.py).
 """
 
