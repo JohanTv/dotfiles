@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import plane  # noqa: E402
+from plane_cli import proposals  # noqa: E402
 from plane_cli import worklog  # noqa: E402
 import session_clock as sc  # noqa: E402
 
@@ -176,7 +177,7 @@ class PlaneIntegration(unittest.TestCase):
             agent = "claude"
             session = None
 
-        result = plane.build_proposal(None, Args, "toil_support", "agent:claude", "OPS-1")
+        result = proposals.build_proposal(None, Args, "toil_support", "agent:claude", "OPS-1")
         self.assertFalse(result["ok"])
 
 

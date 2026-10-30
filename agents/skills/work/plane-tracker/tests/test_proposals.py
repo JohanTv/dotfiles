@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import flow_metrics as fm  # noqa: E402
-import plane  # noqa: E402
+from plane_cli import proposal_store  # noqa: E402
+from plane_cli import proposals  # noqa: E402
 from plane_cli import timeutil  # noqa: E402
 from plane_cli import worklog  # noqa: E402
 from plane_cli import db  # noqa: E402
@@ -66,7 +67,7 @@ class Base(unittest.TestCase):
         return Namespace(**{"agent": "claude", "session": None, "since": None, "until": None, **kw})
 
     def propose(self, ticket="OMNIFY-1", **kw):
-        return plane.build_proposal(self.conn, self.args(**kw), "deep_work", "agent:claude", ticket)
+        return proposals.build_proposal(self.conn, self.args(**kw), "deep_work", "agent:claude", ticket)
 
     def mark(self, ticket, start, end=None):
         self.conn.execute("INSERT INTO session_marks (session_id, agent, ticket, started_at, ended_at) VALUES (?,?,?,?,?)",
@@ -102,11 +103,11 @@ class Measurement(Base):
         self.assertEqual(p["minutes"], 50)  # 80 - 30, no "hasta ahora"
 
     def test_pending_proposal_of_another_ticket_is_reserved(self):
-        plane.save_proposal("OMNIFY-1", self.propose("OMNIFY-1"))
+        proposal_store.save_proposal("OMNIFY-1", self.propose("OMNIFY-1"))
         self.assertFalse(self.propose("OMNIFY-2")["ok"])
 
     def test_buckets_without_footprint_never_get_a_proposal(self):
-        p = plane.build_proposal(self.conn, self.args(), "coordination", "agent:claude", "OPS-1")
+        p = proposals.build_proposal(self.conn, self.args(), "coordination", "agent:claude", "OPS-1")
         self.assertFalse(p["ok"])
 
 
@@ -210,62 +211,62 @@ class Split(Base):
         return self.args()
 
     def test_split_is_exact_contiguous_and_disjoint(self):
-        result = plane.build_split(self.conn, self.args_(), "OMNIFY-1=50%,OMNIFY-2=rest", "agent:claude")
+        result = proposals.build_split(self.conn, self.args_(), "OMNIFY-1=50%,OMNIFY-2=rest", "agent:claude")
         self.assertTrue(result["ok"])
         a, b = result["parts"]["OMNIFY-1"], result["parts"]["OMNIFY-2"]
         self.assertEqual((a["minutes"], b["minutes"]), (40, 40))
-        runs_a, runs_b = plane._proposal_runs(a), plane._proposal_runs(b)
+        runs_a, runs_b = proposals._proposal_runs(a), proposals._proposal_runs(b)
         self.assertEqual(sc.intersect(runs_a, runs_b), [])
         self.assertEqual(runs_a[-1][1], runs_b[0][0])
 
     def test_any_acceptance_order_does_not_double_count(self):
-        result = plane.build_split(self.conn, self.args_(), "OMNIFY-1=25%,OMNIFY-2=rest", "agent:claude")
-        plane.save_group(result["group"], result["parts"])
+        result = proposals.build_split(self.conn, self.args_(), "OMNIFY-1=25%,OMNIFY-2=rest", "agent:claude")
+        proposal_store.save_group(result["group"], result["parts"])
         self.register("OMNIFY-2", result["parts"]["OMNIFY-2"])  # B primero
-        plane.consume_proposal("OMNIFY-2", SID)
-        self.assertEqual(plane.load_recent_proposal("OMNIFY-1")["minutes"], 20)  # A sigue disponible
-        self.register("OMNIFY-1", plane.load_recent_proposal("OMNIFY-1"))
+        proposal_store.consume_proposal("OMNIFY-2", SID)
+        self.assertEqual(proposal_store.load_recent_proposal("OMNIFY-1")["minutes"], 20)  # A sigue disponible
+        self.register("OMNIFY-1", proposal_store.load_recent_proposal("OMNIFY-1"))
         self.assertFalse(self.propose("OMNIFY-3")["ok"])  # todo quedó asignado
 
     def test_split_errors(self):
         for spec in ("OMNIFY-1=70%,OMNIFY-2=50%", "OMNIFY-1=100%,OMNIFY-2=rest", "OMNIFY-1=10m,OMNIFY-1=rest"):
-            self.assertFalse(plane.build_split(self.conn, self.args_(), spec, "agent:claude")["ok"], spec)
+            self.assertFalse(proposals.build_split(self.conn, self.args_(), spec, "agent:claude")["ok"], spec)
 
     def test_new_proposal_for_a_pending_split_ticket_is_not_recomputed(self):
-        result = plane.build_split(self.conn, self.args_(), "OMNIFY-1=50%,OMNIFY-2=rest", "agent:claude")
-        plane.save_group(result["group"], result["parts"])
-        pending = plane.load_recent_proposal("OMNIFY-1")
+        result = proposals.build_split(self.conn, self.args_(), "OMNIFY-1=50%,OMNIFY-2=rest", "agent:claude")
+        proposal_store.save_group(result["group"], result["parts"])
+        pending = proposal_store.load_recent_proposal("OMNIFY-1")
         self.assertEqual(pending["split"]["group"], result["group"])
 
     def test_store_consume_and_ttl(self):
-        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
-        self.assertIsNotNone(plane.load_recent_proposal("OMNIFY-1"))
-        plane.consume_proposal("OMNIFY-1", SID)
-        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
-        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
+        proposal_store.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
+        self.assertIsNotNone(proposal_store.load_recent_proposal("OMNIFY-1"))
+        proposal_store.consume_proposal("OMNIFY-1", SID)
+        self.assertIsNone(proposal_store.load_recent_proposal("OMNIFY-1"))
+        proposal_store.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
         with open(config.proposal_file()) as f:
             data = json.load(f)
         for entry in data["proposals"].values():
-            entry["ts"] -= plane.PROPOSAL_TTL_SECONDS + 5
+            entry["ts"] -= proposal_store.PROPOSAL_TTL_SECONDS + 5
         with open(config.proposal_file(), "w") as f:
             json.dump(data, f)
-        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
+        self.assertIsNone(proposal_store.load_recent_proposal("OMNIFY-1"))
 
 
 class Terminals(Base):
     def test_two_sessions_do_not_clobber_each_other(self):
-        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-X", "minutes": 30, "segments": []})
-        plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-Y", "minutes": 99, "segments": []})
-        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-X")["minutes"], 30)
-        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
-        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))  # sin saber quién eres no se adivina
-        plane.consume_proposal("OMNIFY-1", "SESSION-X")
-        self.assertIsNone(plane.load_recent_proposal("OMNIFY-1", "SESSION-X"))
-        self.assertEqual(plane.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
+        proposal_store.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-X", "minutes": 30, "segments": []})
+        proposal_store.save_proposal("OMNIFY-1", {"ok": True, "session_id": "SESSION-Y", "minutes": 99, "segments": []})
+        self.assertEqual(proposal_store.load_recent_proposal("OMNIFY-1", "SESSION-X")["minutes"], 30)
+        self.assertEqual(proposal_store.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
+        self.assertIsNone(proposal_store.load_recent_proposal("OMNIFY-1"))  # sin saber quién eres no se adivina
+        proposal_store.consume_proposal("OMNIFY-1", "SESSION-X")
+        self.assertIsNone(proposal_store.load_recent_proposal("OMNIFY-1", "SESSION-X"))
+        self.assertEqual(proposal_store.load_recent_proposal("OMNIFY-1", "SESSION-Y")["minutes"], 99)
 
     def test_pending_of_another_session_is_not_reserved(self):
         other = dict(self.propose("OMNIFY-1"), session_id="SESSION-OTHER")
-        plane.save_proposal("OMNIFY-1", other)
+        proposal_store.save_proposal("OMNIFY-1", other)
         self.assertTrue(self.propose("OMNIFY-2")["ok"])
 
 
