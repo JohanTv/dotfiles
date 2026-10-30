@@ -24,9 +24,9 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import session_clock
 import flow_metrics
 
-from plane_cli import cmd_ops, cmd_read, cmd_report, worklog
+from plane_cli import attachments, cmd_ops, cmd_read, cmd_report, worklog
 from plane_cli.api import api_request
-from plane_cli.attachments import cmd_attach, cmd_attachments, upload_attachment, validate_attachment_paths
+from plane_cli.attachments import upload_attachment, validate_attachment_paths
 from plane_cli.config import get_env_or_fail
 from plane_cli.db import get_db, init_db
 from plane_cli.mdhtml import markdown_to_html
@@ -696,15 +696,8 @@ def main():
     p_link.add_argument("url", help="URL del enlace (https://...)")
     p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")
 
-    # attach / attachments
-    p_attach = subparsers.add_parser("attach", help="Subir archivos al work item")
-    p_attach.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
-    p_attach.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
-    p_attach.add_argument("--replace", metavar="ID", help="Id de un adjunto a sustituir: sube el nuevo y, si salió bien, borra el anterior")
-    p_attachments = subparsers.add_parser("attachments", help="Listar los adjuntos del work item")
-    p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
-    p_attachments.add_argument("--json", action="store_true", help="Salida en JSON")
-    p_attachments.add_argument("--delete", metavar="ID", help="Eliminar el adjunto con ese id")
+    attachments.register_attach(subparsers)
+    attachments.register_attachments(subparsers)
 
     cmd_ops.register_health(subparsers)
 
@@ -795,10 +788,6 @@ def main():
             args.handler(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
-        elif args.command == "attach":
-            cmd_attach(args, conn, base_url, api_key, workspace, default_project_id)
-        elif args.command == "attachments":
-            cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "link":
             cmd_link(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "propose-duration":
