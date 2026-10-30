@@ -93,6 +93,74 @@ $ plane.py report --date 2026-10-20 --json
 --- stderr ---
 
 
+$ plane.py --json report --date 2026-10-20
+[exit 0]
+--- stdout ---
+[
+  {
+    "ticket_id": "OPS-13",
+    "track": "support",
+    "date": "2026-10-20",
+    "start_time": "09:30",
+    "end_time": "10:15",
+    "duration_minutes": 45,
+    "plane_comment_id": "c3000000-0000-4000-8000-000000000006",
+    "project_id": "OPS",
+    "issue_name": "Tareas Rápidas y Soporte - W43",
+    "worker_type": "human",
+    "capacity_bucket": "toil_support",
+    "phase": "dev",
+    "role": "backend_engineer",
+    "notes": "Soporte a usuarios",
+    "stoppers_json": "[]",
+    "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
+    "created_at": "2026-10-20T10:20:00Z",
+    "updated_at": "<VOLATIL>"
+  },
+  {
+    "ticket_id": "OMNIFY-1",
+    "track": "main",
+    "date": "2026-10-20",
+    "start_time": "10:00",
+    "end_time": "11:00",
+    "duration_minutes": 60,
+    "plane_comment_id": "c1000000-0000-4000-8000-000000000001",
+    "project_id": "OMNIFY",
+    "issue_name": "Validaciones de formulario SMS",
+    "worker_type": "human",
+    "capacity_bucket": "deep_work",
+    "phase": "dev",
+    "role": "backend_engineer",
+    "notes": "Avance del formulario",
+    "stoppers_json": "[]",
+    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"}",
+    "created_at": "2026-10-20T11:05:00Z",
+    "updated_at": "<VOLATIL>"
+  },
+  {
+    "ticket_id": "OMNIFY-1",
+    "track": "subagent",
+    "date": "2026-10-20",
+    "start_time": "10:30",
+    "end_time": "11:30",
+    "duration_minutes": 60,
+    "plane_comment_id": "c1000000-0000-4000-8000-000000000002",
+    "project_id": "OMNIFY",
+    "issue_name": "Validaciones de formulario SMS",
+    "worker_type": "agent:claude",
+    "capacity_bucket": "deep_work",
+    "phase": "dev",
+    "role": "backend_engineer",
+    "notes": "Revisión",
+    "stoppers_json": "[\"Esperando credenciales\"]",
+    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:30\", \"notes\": \"Revisión\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [\"Esperando credenciales\"], \"track\": \"subagent\", \"worker_type\": \"agent:claude\"}",
+    "created_at": "2026-10-20T11:35:00Z",
+    "updated_at": "<VOLATIL>"
+  }
+]
+--- stderr ---
+
+
 $ plane.py report --date 2026-10-20 --track subagent
 [exit 0]
 --- stdout ---

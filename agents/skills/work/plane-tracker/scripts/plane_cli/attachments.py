@@ -16,6 +16,7 @@ import uuid
 import session_clock
 
 from plane_cli.api import api_request
+from plane_cli.config import add_json_flag
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
 
 
@@ -130,6 +131,6 @@ def register_attach(sub):
 def register_attachments(sub):
     p_attachments = sub.add_parser("attachments", help="Listar los adjuntos del work item")
     p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
-    p_attachments.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_attachments)
     p_attachments.add_argument("--delete", metavar="ID", help="Eliminar el adjunto con ese id")
     p_attachments.set_defaults(handler=cmd_attachments)

@@ -13,6 +13,7 @@ from datetime import datetime
 import session_clock
 
 from plane_cli.api import api_request
+from plane_cli.config import add_json_flag
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
@@ -232,5 +233,5 @@ def register_comment(sub):
                            help="Registrar la duración propuesta (solo vale si se mostró hace menos de 30 min para este ticket)")
     p_comment.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide (por defecto: según --worker-type o el entorno)")
     p_comment.add_argument("--session", metavar="ID", help="ID de la sesión del agente (por defecto: variable de entorno o directorio de trabajo)")
-    p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_comment)
     p_comment.set_defaults(handler=cmd_comment)

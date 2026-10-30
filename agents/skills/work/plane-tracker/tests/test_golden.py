@@ -60,7 +60,7 @@ class Golden(unittest.TestCase):
 
     # --- lectura --------------------------------------------------------------
     def test_get(self):
-        steps = [["get", "OMNIFY-1"], ["get", "OMNIFY-1", "--json"], ["get", "OMNIFY-1", "--no-comments", "--no-description"],
+        steps = [["get", "OMNIFY-1"], ["get", "OMNIFY-1", "--json"], ["--json", "get", "OMNIFY-1"], ["get", "OMNIFY-1", "--no-comments", "--no-description"],
                  ["get", "OMNIFY-1", "--last", "2", "--full"], ["get", "OMNIFY-2", "--history"], ["get", "OMNIFY-3", "--history", "--json"],
                  ["get", "1"], ["get", "OPS-13"], ["get", "OMNIFY-999"], ["get", "10000000-0000-4000-8000-000000000002", "--json"],
                  ["get"], ["get", "@"]]
@@ -70,7 +70,7 @@ class Golden(unittest.TestCase):
         self.golden("get_no_ticket", [{"args": ["get"], "cwd": "/"}])
 
     def test_list_search_labels_projects(self):
-        steps = [["list"], ["list", "--json"], ["list", "-p", "OPS"], ["list", "-p", "nope"],
+        steps = [["list"], ["list", "--json"], ["--json", "list"], ["list", "-p", "OPS"], ["list", "-p", "nope"],
                  ["search", "formulario"], ["search", "3"], ["search", "OMNIFY-2"], ["search", "zzz"], ["search", "validaciones", "--json", "-p", "OMNIFY"],
                  ["search", "x", "-p", "NOPE"], ["search", "de la", "--refresh"], ["search", "soporte", "-p", "OPS"],
                  ["labels"], ["labels", "--json", "-p", "OPS", "--refresh"], ["labels", "-p", "NOPE"],
@@ -86,7 +86,7 @@ class Golden(unittest.TestCase):
 
     # --- reportes -------------------------------------------------------------
     def test_report(self):
-        steps = [["report", "--date", "2026-10-20"], ["report", "--date", "2026-10-20", "--json"],
+        steps = [["report", "--date", "2026-10-20"], ["report", "--date", "2026-10-20", "--json"], ["--json", "report", "--date", "2026-10-20"],
                  ["report", "--date", "2026-10-20", "--track", "subagent"], ["report", "--date", "2026-10-20", "--worker-type", "human"],
                  ["report", "--date", "2026-10-20", "-p", "OPS"], ["report", "--date", "2026-10-20", "-p", "OPS", "--json"],
                  ["report", "--date", "bad"], ["report", "--date", "2026-10-20", "--check"], ["report", "--date", "2026-10-20", "--check", "--json"],

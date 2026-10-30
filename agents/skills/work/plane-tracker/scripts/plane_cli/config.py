@@ -1,7 +1,7 @@
 """Entorno compartido: directorio de caché y sus rutas, reloj, medianoche local y variables de entorno.
 
 Expone: CACHE_DIR, db_file(), request_log(), proposal_file(), now(), local_midnight_utc(), positive_int(),
-load_zshrc_local_if_needed(), get_env_or_fail().
+add_json_flag(), load_zshrc_local_if_needed(), get_env_or_fail().
 No hace: acceso a red ni a SQLite. Las rutas y el reloj se leen en cada llamada (por atributo del módulo) para que
 los tests puedan sustituirlos.
 """
@@ -41,6 +41,14 @@ def positive_int(value):
     if n < 1:
         raise argparse.ArgumentTypeError("debe ser un entero >= 1")
     return n
+
+
+def add_json_flag(parser, hidden=False, help="Salida en JSON"):
+    """Añade `--json` sin valor por defecto: así el flag vale en cualquier nivel del parser y el último no lo pisa.
+
+    Los handlers lo leen con getattr(args, "json", False).
+    """
+    parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS if hidden else help)
 
 
 def load_zshrc_local_if_needed():

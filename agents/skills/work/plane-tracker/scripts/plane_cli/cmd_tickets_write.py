@@ -11,6 +11,7 @@ import urllib.error
 from datetime import datetime
 
 from plane_cli.api import api_request
+from plane_cli.config import add_json_flag
 from plane_cli.attachments import upload_attachment, validate_attachment_paths
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.resolve import get_labels_map, get_projects_map, get_states_map, resolve_issue, resolve_project_and_seq
@@ -248,7 +249,7 @@ def register_update(sub):
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")
     p_update.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
     p_update.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
-    p_update.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_update)
     p_update.set_defaults(handler=cmd_update)
 
 
@@ -263,5 +264,5 @@ def register_create(sub):
     p_create.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
     p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
     p_create.add_argument("--attach", nargs="+", metavar="FILE", help="Archivo(s) a adjuntar al crear el ticket (máx. 50 MB cada uno)")
-    p_create.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_create)
     p_create.set_defaults(handler=cmd_create)

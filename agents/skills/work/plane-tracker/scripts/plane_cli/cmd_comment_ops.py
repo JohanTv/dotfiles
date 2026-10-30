@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import session_clock
 
 from plane_cli.api import api_request
+from plane_cli.config import add_json_flag
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.proposal_store import load_recent_proposal, save_group, save_proposal
 from plane_cli.proposals import build_proposal, build_split, current_session_id, print_proposal, print_split
@@ -169,7 +170,7 @@ def register_propose_duration(sub):
     p_prop.add_argument("--date", metavar="YYYY-MM-DD", help="Día a medir (por defecto hoy): para sesiones de días anteriores")
     p_prop.add_argument("--since", metavar="HH:MM|ISO", help="Inicio de la ventana medida (hora local del día medido)")
     p_prop.add_argument("--until", metavar="HH:MM|ISO", help="Fin de la ventana medida (hora local del día medido)")
-    p_prop.add_argument("--json", action="store_true", help="Salida en JSON")
+    add_json_flag(p_prop)
     p_prop.set_defaults(handler=cmd_propose_duration)
 
 
