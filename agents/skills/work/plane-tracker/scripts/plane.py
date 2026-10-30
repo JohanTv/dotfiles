@@ -33,6 +33,9 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import session_clock
 import flow_metrics
 
+from plane_cli import config
+from plane_cli.config import get_env_or_fail, positive_int
+
 # ------------------------------------------------------------------------------
 # Conversor Markdown → HTML (stdlib, sin dependencias externas)
 # Soporta el subconjunto que Plane CE/Tiptap renderiza correctamente:
@@ -182,8 +185,6 @@ def markdown_to_html(md: str) -> str:
     return "\n".join(html_parts) or "<p></p>"
 
 
-CACHE_DIR = os.path.expanduser("~/.cache/plane")
-DB_FILE = os.path.join(CACHE_DIR, "worklogs.db")
 PROJECTS_TTL = 86400  # 24 horas
 SYNC_COOLDOWN = 300   # 5 minutos
 
@@ -195,8 +196,8 @@ DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", 
 
 def get_db():
     """Retorna una conexión a SQLite3 con WAL mode y timeout defensivo."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_FILE, timeout=15.0)
+    os.makedirs(config.CACHE_DIR, exist_ok=True)
+    conn = sqlite3.connect(config.db_file(), timeout=15.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL;")
     conn.execute("PRAGMA busy_timeout = 10000;")
@@ -363,47 +364,20 @@ def init_db(conn):
 # Entorno y Red
 # ------------------------------------------------------------------------------
 
-def load_zshrc_local_if_needed():
-    """Carga variables desde ~/.zshrc.local si no están en el entorno."""
-    local_env = os.path.expanduser("~/.zshrc.local")
-    if os.path.isfile(local_env):
-        try:
-            with open(local_env, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("export "):
-                        line = line[7:].strip()
-                        if "=" in line:
-                            k, v = line.split("=", 1)
-                            k = k.strip()
-                            v = v.strip().strip("'\"")
-                            if k not in os.environ and v:
-                                os.environ[k] = v
-        except Exception:
-            pass
 
-def get_env_or_fail(var_name, description):
-    load_zshrc_local_if_needed()
-    val = os.environ.get(var_name)
-    if not val:
-        sys.stderr.write(f"Error: Variable de entorno '{var_name}' ({description}) no configurada.\n")
-        sys.stderr.write("Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.\n")
-        sys.exit(1)
-    return val
-
-REQUEST_LOG = os.path.join(CACHE_DIR, "requests.log")
 REQUEST_LOG_MAX_BYTES = 1_000_000
 
 def log_request(method, url, status, elapsed_ms, attempt, error=None):
     """JSONL con metadatos de cada llamada (sin cuerpos ni cabeceras) para diagnosticar latencia y caídas."""
     try:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        if os.path.exists(REQUEST_LOG) and os.path.getsize(REQUEST_LOG) > REQUEST_LOG_MAX_BYTES:
-            os.replace(REQUEST_LOG, REQUEST_LOG + ".1")
+        os.makedirs(config.CACHE_DIR, exist_ok=True)
+        log_path = config.request_log()
+        if os.path.exists(log_path) and os.path.getsize(log_path) > REQUEST_LOG_MAX_BYTES:
+            os.replace(log_path, log_path + ".1")
         record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "method": method,
                   "path": urllib.parse.urlparse(url).path, "status": status, "ms": int(elapsed_ms),
                   "attempt": attempt, "error": error}
-        fd = os.open(REQUEST_LOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         with os.fdopen(fd, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
@@ -1108,19 +1082,12 @@ def merge_daily_worklogs(rows):
 #   - Con marcas `focus`, cada ticket recibe solo el tiempo de sus propios intervalos.
 # ------------------------------------------------------------------------------
 
-PROPOSAL_FILE = os.path.join(CACHE_DIR, "last_proposal.json")
 PROPOSAL_TTL_SECONDS = 30 * 60
 # Reuniones y soporte no dejan huella en un transcript: ahí siempre se pregunta.
 NO_PROPOSAL_BUCKETS = ("toil_support", "coordination")
 MAX_PROPOSAL_WARN_MINUTES = 8 * 60
 FOCUS_KEEP_DAYS = 3
 
-def _now():
-    return datetime.now(timezone.utc)
-
-def _local_midnight_utc(moment_utc):
-    local = moment_utc.astimezone()
-    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
 def _hhmm_utc(day, hhmm):
     return datetime.strptime(f"{day} {hhmm}", "%Y-%m-%d %H:%M").astimezone(timezone.utc)
@@ -1128,11 +1095,12 @@ def _hhmm_utc(day, hhmm):
 @contextlib.contextmanager
 def proposal_store():
     """last_proposal.json con lectura-modificación-escritura atómica y exclusión entre procesos."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(PROPOSAL_FILE + ".lock", "a") as lock:
+    os.makedirs(config.CACHE_DIR, exist_ok=True)
+    proposal_path = config.proposal_file()
+    with open(proposal_path + ".lock", "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
-            with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
+            with open(proposal_path, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
         except (OSError, ValueError):
             data = {}
@@ -1142,11 +1110,11 @@ def proposal_store():
         data["proposals"] = {k: v for k, v in data["proposals"].items() if v.get("ts", 0) > cutoff}
         data["groups"] = {k: v for k, v in data["groups"].items() if v.get("ts", 0) > cutoff}
         yield data
-        tmp = PROPOSAL_FILE + ".tmp"
+        tmp = proposal_path + ".tmp"
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(data, handle)
-        os.replace(tmp, PROPOSAL_FILE)
+        os.replace(tmp, proposal_path)
 
 def _entry_key(ticket, session_id):
     return f"{ticket}|{session_id}"
@@ -1280,7 +1248,7 @@ def _resolve_window(args, now):
         day_start = day.astimezone(timezone.utc)
         day_str = date_arg
     else:
-        day_start = _local_midnight_utc(now)
+        day_start = config.local_midnight_utc(now)
         day_str = now.astimezone().strftime("%Y-%m-%d")
     if day_start > now:
         raise ValueError("--date no puede ser una fecha futura.")
@@ -1355,7 +1323,7 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
     if not stamps:
         return {"ok": False, "agent": agent, "session_id": session_id, "reason": f"Sin evidencia de tiempos para la sesión {session_id} ({agent})."}
 
-    now = _now()
+    now = config.now()
     try:
         win = _resolve_window(args, now)
     except ValueError as exc:
@@ -2322,7 +2290,7 @@ def summarize_requests(records, since):
 def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
     """Latencia y errores de las últimas llamadas a Plane (caídas, timeouts, lentitud)."""
     records = []
-    for path in (REQUEST_LOG + ".1", REQUEST_LOG):
+    for path in (config.request_log() + ".1", config.request_log()):
         try:
             with open(path, "r", encoding="utf-8") as handle:
                 for line in handle:
@@ -2357,7 +2325,7 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
             sys.stderr.write(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})\n")
         sys.exit(1)
 
-    now = _now()
+    now = config.now()
     iso = now.isoformat(timespec="seconds")
     with conn:  # las marcas son útiles solo el día en curso: se purgan las antiguas
         conn.execute("DELETE FROM session_marks WHERE COALESCE(ended_at, started_at) < ?", ((now - timedelta(days=FOCUS_KEEP_DAYS)).isoformat(timespec="seconds"),))
@@ -2365,7 +2333,7 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
 
     if getattr(args, "status", False):
         stamps = session_clock.timestamps(agent, session_id)
-        midnight = _local_midnight_utc(now)
+        midnight = config.local_midnight_utc(now)
         runs = session_clock.active_runs(stamps, midnight, now)
         marks = focus_intervals(conn, session_id, midnight, now)
         per_ticket = {t: session_clock.total_minutes(session_clock.intersect(runs, ivs)) for t, ivs in marks.items()}
@@ -2576,11 +2544,6 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
         print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment-edit o report --sync.\n")
     sys.exit(1 if errors else 0)
 
-def positive_int(value):
-    n = int(value)
-    if n < 1:
-        raise argparse.ArgumentTypeError("debe ser un entero >= 1")
-    return n
 
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)

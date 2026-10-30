@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import flow_metrics as fm  # noqa: E402
 import plane  # noqa: E402
+from plane_cli import config  # noqa: E402
 import session_clock as sc  # noqa: E402
 
 UTC = timezone.utc
@@ -40,10 +41,9 @@ class Base(unittest.TestCase):
         os.environ["TZ"] = "America/Lima"
         time.tzset()
         self.tmp = tempfile.TemporaryDirectory()
-        self._saved = (plane.PROPOSAL_FILE, plane.CACHE_DIR, plane._now, sc.timestamps, sc.resolve_session)
-        plane.CACHE_DIR = self.tmp.name
-        plane.PROPOSAL_FILE = os.path.join(self.tmp.name, "last_proposal.json")
-        plane._now = lambda: NOW
+        self._saved = (config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session)
+        config.CACHE_DIR = self.tmp.name
+        config.now = lambda: NOW
         sc.timestamps = lambda agent, sid, **kw: STAMPS
         sc.resolve_session = lambda agent, cwd, explicit=None, env=None, **kw: (SID, "test", [])
         self.conn = sqlite3.connect(":memory:")
@@ -51,7 +51,7 @@ class Base(unittest.TestCase):
         plane.init_db(self.conn)
 
     def tearDown(self):
-        plane.PROPOSAL_FILE, plane.CACHE_DIR, plane._now, sc.timestamps, sc.resolve_session = self._saved
+        config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session = self._saved
         self.tmp.cleanup()
         if self._tz is None:
             os.environ.pop("TZ", None)
@@ -240,11 +240,11 @@ class Split(Base):
         plane.consume_proposal("OMNIFY-1", SID)
         self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
         plane.save_proposal("OMNIFY-1", {"ok": True, "session_id": SID, "segments": []})
-        with open(plane.PROPOSAL_FILE) as f:
+        with open(config.proposal_file()) as f:
             data = json.load(f)
         for entry in data["proposals"].values():
             entry["ts"] -= plane.PROPOSAL_TTL_SECONDS + 5
-        with open(plane.PROPOSAL_FILE, "w") as f:
+        with open(config.proposal_file(), "w") as f:
             json.dump(data, f)
         self.assertIsNone(plane.load_recent_proposal("OMNIFY-1"))
 
