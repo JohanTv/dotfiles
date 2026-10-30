@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import plane  # noqa: E402
+from plane_cli import attachments  # noqa: E402
 from plane_cli import proposals  # noqa: E402
 from plane_cli import worklog  # noqa: E402
 import session_clock as sc  # noqa: E402
@@ -151,7 +152,7 @@ class PlaneIntegration(unittest.TestCase):
         self.assertEqual(worklog.extract_metadata_from_comment("<p>x</p>" + block), meta)
 
     def test_multipart_puts_file_last_and_keeps_fields(self):
-        body, header = plane.build_multipart({"key": "k1", "policy": "p"}, 'a"b.txt', "text/plain", b"DATA")
+        body, header = attachments.build_multipart({"key": "k1", "policy": "p"}, 'a"b.txt', "text/plain", b"DATA")
         boundary = header.split("boundary=")[1]
         self.assertTrue(body.startswith(f"--{boundary}\r\n".encode()))
         self.assertLess(body.index(b'name="policy"'), body.index(b'name="file"'))
