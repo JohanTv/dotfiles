@@ -26,29 +26,11 @@ from plane_cli.worklog import (
 )
 
 
-def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
-    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    args.issue = issue_ref
-    content = ""
-    if args.file:
-        with open(args.file, "r", encoding="utf-8") as f:
-            content = f.read()
-    elif args.message:
-        content = args.message
-    else:
-        content = sys.stdin.read()
-
-    if not content.strip():
-        sys.stderr.write("Error: El comentario está vacío.\n")
-        sys.exit(1)
-    reject_placeholders(content)
-
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-
+def _resolve_duration(args, conn, meta, issue_ref):
+    """Duración en minutos y propuesta aceptada (si la hay); termina el proceso si falta o es inválida."""
     # --- Duración explícita (NUNCA estimar por defecto) ---------------------------------
     # Se valida ANTES de publicar: no puede quedar un comentario en Plane sin su worklog.
     # Fuentes válidas: metadata dual-layer (duration_minutes / duration_net_minutes) o --duration N.
-    meta = extract_metadata_from_comment(content)
     meta_duration = None
     if meta:
         meta_duration = meta.get("duration_minutes") or meta.get("duration_net_minutes")
@@ -91,6 +73,57 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     if duration < 1 or duration > 24 * 60:
         sys.stderr.write(f"Error: duración fuera de rango ({duration} min). Debe estar entre 1 y 1440 minutos.\n")
         sys.exit(1)
+    return duration, proposal
+
+
+def _record_measurement(meta, args, proposal, worker_type):
+    """Anota en la metadata cómo se obtuvo la duración: propuesta medida o declarada por quien registra."""
+    if proposal:
+        meta["date"] = proposal["date"]
+        meta["start_time"] = proposal["start_time"]
+        meta["end_time"] = proposal["end_time"]
+        meta["segments"] = proposal["segments"]
+        meta["measured_by"] = {
+            "kind": "proposal_split" if proposal.get("split") else "proposal", "adapter": proposal["agent"],
+            "confidence": proposal["confidence"], "session": proposal["session_id"], "gross_minutes": proposal["gross_minutes"],
+            "attribution": proposal["attribution"],
+        }
+        if proposal.get("split"):
+            meta["measured_by"]["split"] = proposal["split"]
+        if proposal.get("window_override"):
+            meta["measured_by"]["window_override"] = proposal["window_override"]
+    else:
+        # Duración declarada (no medida): se audita aparte; la sesión (si se resuelve sin ambigüedad) evita doble conteo.
+        declared = {"kind": "declared", "worker_type": worker_type}
+        declared_agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
+        if declared_agent:
+            declared_session = session_clock.resolve_session(declared_agent, os.getcwd(), getattr(args, "session", None))[0]
+            if declared_session:
+                declared["session"] = declared_session
+        meta["measured_by"] = declared
+
+
+def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    args.issue = issue_ref
+    content = ""
+    if args.file:
+        with open(args.file, "r", encoding="utf-8") as f:
+            content = f.read()
+    elif args.message:
+        content = args.message
+    else:
+        content = sys.stdin.read()
+
+    if not content.strip():
+        sys.stderr.write("Error: El comentario está vacío.\n")
+        sys.exit(1)
+    reject_placeholders(content)
+
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+
+    meta = extract_metadata_from_comment(content)
+    duration, proposal = _resolve_duration(args, conn, meta, issue_ref)
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     # Convertir Markdown → HTML si el contenido no viene ya como HTML
@@ -140,29 +173,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
             end_t = datetime.strptime(meta["end_time"], "%H:%M")
             meta["start_time"] = derived_start(end_t, duration)
 
-    if proposal:
-        meta["date"] = proposal["date"]
-        meta["start_time"] = proposal["start_time"]
-        meta["end_time"] = proposal["end_time"]
-        meta["segments"] = proposal["segments"]
-        meta["measured_by"] = {
-            "kind": "proposal_split" if proposal.get("split") else "proposal", "adapter": proposal["agent"],
-            "confidence": proposal["confidence"], "session": proposal["session_id"], "gross_minutes": proposal["gross_minutes"],
-            "attribution": proposal["attribution"],
-        }
-        if proposal.get("split"):
-            meta["measured_by"]["split"] = proposal["split"]
-        if proposal.get("window_override"):
-            meta["measured_by"]["window_override"] = proposal["window_override"]
-    else:
-        # Duración declarada (no medida): se audita aparte; la sesión (si se resuelve sin ambigüedad) evita doble conteo.
-        declared = {"kind": "declared", "worker_type": worker_type}
-        declared_agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
-        if declared_agent:
-            declared_session = session_clock.resolve_session(declared_agent, os.getcwd(), getattr(args, "session", None))[0]
-            if declared_session:
-                declared["session"] = declared_session
-        meta["measured_by"] = declared
+    _record_measurement(meta, args, proposal, worker_type)
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
     # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --sync`.
