@@ -40,9 +40,9 @@ plane-tracker report --week
 ### Convenciones de nombrado
 
 * En la raíz viven los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
-* Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `focus`, `worklog`.
+* Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `outbox`, `focus`, `worklog`.
 * Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección (p. ej. `get --history`, `report --refresh`).
-* Verbos: `add` / `list` / `edit` / `delete` / `replace`; marcas `set` / `clear` / `status`; derivados `propose` / `check`.
+* Verbos: `add` / `list` / `edit` / `delete` / `replace` / `flush`; marcas `set` / `clear` / `status`; derivados `propose` / `check`.
 * El ID de un hijo que es obligatorio va posicional (`attachment delete ISSUE ID`); si es opcional (por defecto, tu último comentario) va como `--comment-id`.
 * `--json` es global: funciona antes o después del comando.
 * Un nombre antiguo, un sinónimo o un verbo faltante termina con exit 2 y un mensaje que indica el comando correcto, antes de validar el entorno.
@@ -213,7 +213,18 @@ Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la p
 plane-tracker handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
 plane-tracker worklog check [--today|--week|--date D] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
 ```
-`worklog check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --refresh`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible) y `unlinked`. Sale con código 1 si hay inconsistencias.
+`worklog check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --refresh`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible), `pending` (fila en cola de publicación) y `unlinked`. Sale con código 1 si hay inconsistencias.
+
+---
+
+### C.6 Plane caído: `outbox`
+Exit 3 significa que Plane no responde (circuito abierto, timeouts o `PLANE_OFFLINE=1`). Las lecturas responden con lo local y avisan su antigüedad; `comment add` guarda el comentario con su worklog y lo encola (exit 0, `⏳ En cola`); el resto de las escrituras falla con exit 3.
+```bash
+plane-tracker outbox list [--all] [--json]                         # registros abiertos con vista previa (nunca el texto completo)
+plane-tracker outbox flush [--limit N] [--include-old] [--retry-failed] [--json]   # publica en orden de creación
+plane-tracker outbox drop ID [--force] [--keep-worklog] [--json]   # descarta un registro y su worklog provisional
+```
+`flush` sondea Plane aunque el circuito esté en enfriamiento, se detiene ante el primer fallo de disponibilidad (exit 3), marca `failed` los rechazados (404, 400...) y sigue, y omite los de más de 7 días salvo `--include-old`. Un registro cuya entrega es dudosa se busca en Plane por su `client_id` antes de reenviarse; `drop` de uno así exige `--force`. Mientras haya registros sin publicar, cada comando lo avisa por stderr. `PLANE_NO_QUEUE=1` hace que `comment add` falle con exit 3 en lugar de encolar.
 
 ---
 
