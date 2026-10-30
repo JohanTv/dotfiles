@@ -11,7 +11,7 @@ import re
 import sys
 import time
 
-from plane_cli.api import api_request
+from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
 from plane_cli.resolve import (
@@ -251,8 +251,10 @@ def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
     force_refresh = getattr(args, "refresh", False)
     try:
         sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
-    except Exception as e:
-        sys.stderr.write(f"⚠ Modo offline / advertencia de red: no se pudo sincronizar Plane ({e}). Consultando caché local SQLite.\n")
+    except PlaneUnavailable as exc:
+        if not conn.execute("SELECT 1 FROM issues_cache WHERE project_id = ? LIMIT 1", (project_id,)).fetchone():
+            raise
+        sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); consultando la caché local.\n")
 
     raw_query = args.query.strip()
     matches = []

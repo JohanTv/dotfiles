@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import flow_metrics
 import session_clock
 
-from plane_cli.api import api_request
+from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.resolve import get_states_map, resolve_issue, resolve_project_and_seq
 from plane_cli.timeutil import format_minutes, time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
@@ -181,6 +181,9 @@ def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id
             project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, label)
             issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
             flow, transitions, states = build_ticket_flow(conn, base_url, api_key, workspace, project_id, issue, label)
+        except PlaneUnavailable as exc:
+            sys.stderr.write(f"⚠ {label}: Plane no responde ({exc.cause}); se omite.\n")
+            continue
         except SystemExit:
             sys.stderr.write(f"⚠ {label}: no se pudo consultar en Plane (¿eliminado?); se omite.\n")
             continue
