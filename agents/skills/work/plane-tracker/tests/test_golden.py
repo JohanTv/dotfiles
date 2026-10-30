@@ -47,7 +47,7 @@ class Golden(unittest.TestCase):
             {"args": ["report", "--today", "--week"]},
             {"args": ["get", "X1"]},
             {"args": ["get", "OTRO-5"]},
-            {"args": ["list"], "env_set": {"PLANE_BASE_URL": "http://127.0.0.1:1"}},
+            {"args": ["list"], "env_set": {"PLANE_BASE_URL": "{DEAD}"}},
             {"args": ["comment", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
             {"args": ["comment-edit", "OMNIFY-1", "-m", "x"], "env_drop": NO_ENV},
             {"args": ["--json", "attachments", "OMNIFY-1"], "env_drop": NO_ENV},
@@ -206,7 +206,7 @@ class Golden(unittest.TestCase):
         def setup(sb):
             sb.fake.fail = [("GET", r"/projects/%s/issues/$" % gs.P2, 503, {"detail": "caído"})]
         steps = [["projects"], ["list"], ["list", "-p", "OPS"], ["health"], ["health", "--json"], ["health", "--hours", "1"]]
-        self.golden("health", steps, setup=setup, scrub=("ts", "ms", "p50_ms", "p95_ms", "max_ms"))
+        self.golden("health", steps, setup=setup, scrub=("ts", "ms", "p50_ms", "p95_ms", "max_ms", "last_ok"))
 
     def test_handoff(self):
         steps = [["handoff"], ["handoff", "OMNIFY-9", "--base", "main"], ["handoff", "--base", "nope"], ["handoff", "--base", "--evil"],

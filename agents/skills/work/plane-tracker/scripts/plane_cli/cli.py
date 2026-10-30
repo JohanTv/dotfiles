@@ -2,6 +2,7 @@
 
 Expone: COMMANDS, add_group(), command_tree(), build_parser(), main().
 No hace: lógica de comandos (vive en cmd_*.py).
+Códigos de salida: 0 éxito; 1 error definitivo o de validación; 2 uso; 3 Plane no disponible (PlaneUnavailable).
 Antes de parsear, main() consulta renamed.suggestion(): un nombre retirado o un verbo ausente termina con código 2.
 COMMANDS define el árbol y el orden de `--help`: cada entrada es un registrador (comando raíz) o una tupla
 (nombre, ayuda, registradores) que declara un grupo `<sustantivo> <verbo>`. El arranque es: parsear argumentos,
@@ -13,6 +14,7 @@ import os
 import sys
 
 from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_read, cmd_report, cmd_tickets_write, renamed
+from plane_cli.circuit import PlaneUnavailable, format_unavailable
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
 
@@ -99,5 +101,8 @@ def main(argv=None):
 
     try:
         args.handler(args, conn, base_url, api_key, workspace, default_project_id)
+    except PlaneUnavailable as exc:
+        sys.stderr.write(format_unavailable(exc))
+        sys.exit(3)
     finally:
         conn.close()

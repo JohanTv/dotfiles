@@ -1,11 +1,17 @@
-"""Cliente HTTP de la API de Plane con reintento ante 429 y registro de latencia.
+"""Cliente HTTP de la API de Plane: clasificación de fallos, reintentos acotados, circuito y registro de latencia.
 
-Expone: api_request(), log_request().
+Expone: api_request(), probe_plane(), classify(), log_request(), PlaneUnavailable.
 No hace: interpretar los datos de la API ni tocar SQLite.
+Un fallo transitorio (502/503/504, timeouts, conexión rechazada o cortada, DNS, respuesta ilegible) lanza PlaneUnavailable
+y cuenta para el circuito; los errores definitivos (4xx, 500) se imprimen y terminan con código 1, o se relanzan como
+HTTPError con raise_on_error. Solo los GET se reintentan ante un fallo transitorio, y los timeouts nunca; el 429 se
+reintenta con cualquier método porque la petición no se procesó. PLANE_OFFLINE=1 impide cualquier acceso a la red.
 """
 
+import http.client
 import json
 import os
+import socket
 import sys
 import time
 import urllib.error
@@ -13,10 +19,18 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from plane_cli import config
+from plane_cli import circuit, config
+from plane_cli.circuit import PlaneUnavailable
 
 
 REQUEST_LOG_MAX_BYTES = 1_000_000
+REQUEST_TIMEOUT = 15
+PROBE_TIMEOUT = 5
+RETRY_PAUSE = 0.5
+RETRY_MAX_ELAPSED = 5
+RATE_LIMIT_MAX_WAIT = 30
+TRANSIENT_HTTP = (502, 503, 504)
+TIMEOUT_KINDS = ("timeout", "read_timeout")
 
 
 def log_request(method, url, status, elapsed_ms, attempt, error=None):
@@ -36,39 +50,139 @@ def log_request(method, url, status, elapsed_ms, attempt, error=None):
         pass
 
 
-def api_request(url, api_key, method="GET", data=None, timeout=10, max_retries=3, raise_on_error=False):
-    """Ejecuta peticiones HTTP a la API de Plane con tolerancia a 429 (Rate Limit) y registro de latencia."""
+def classify(exc):
+    """(kind, delivered) de un fallo transitorio; None si el error es definitivo (4xx, 500).
+
+    delivered="no": la petición no llegó a enviarse (conexión rechazada, DNS, timeout de conexión).
+    delivered="unknown": pudo llegar al servidor (timeout de lectura, conexión cortada, 502/503/504, respuesta ilegible).
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return (f"http_{exc.code}", "unknown") if exc.code in TRANSIENT_HTTP else None
+    if isinstance(exc, urllib.error.URLError):
+        reason = exc.reason
+        if isinstance(reason, socket.gaierror):
+            return "dns", "no"
+        if isinstance(reason, TimeoutError):
+            return "timeout", "no"
+        if isinstance(reason, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+            return "reset", "unknown"
+        return "refused", "no"
+    if isinstance(exc, TimeoutError):
+        return "read_timeout", "unknown"
+    if isinstance(exc, ValueError):
+        return "bad_response", "unknown"
+    if isinstance(exc, (ConnectionError, http.client.IncompleteRead)):
+        return "reset", "unknown"
+    if isinstance(exc, http.client.HTTPException):
+        return "bad_response", "unknown"
+    return "reset", "unknown"
+
+
+def _send(url, method, payload, headers, timeout, attempt):
+    """Una petición. Devuelve el JSON; lanza HTTPError (cualquier código) o _Transient (fallo de red/respuesta)."""
+    req = urllib.request.Request(url, data=payload, headers=headers, method=method)
+    started = time.monotonic()
+    elapsed = lambda: (time.monotonic() - started) * 1000
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = resp.status
+            raw = b"" if status == 204 else resp.read()
+    except urllib.error.HTTPError as exc:
+        log_request(method, url, exc.code, elapsed(), attempt)
+        exc.elapsed = elapsed() / 1000
+        raise
+    except (OSError, http.client.HTTPException) as exc:
+        kind, delivered = classify(exc)
+        reason = str(getattr(exc, "reason", exc))[:80]
+        log_request(method, url, None, elapsed(), attempt, error=f"{type(exc).__name__}: {reason}")
+        raise _Transient(kind, delivered, elapsed() / 1000) from exc
+    try:
+        result = json.loads(raw.decode("utf-8")) if raw else {}
+    except ValueError as exc:
+        log_request(method, url, None, elapsed(), attempt, error=f"{type(exc).__name__}: respuesta no válida")
+        raise _Transient("bad_response", "unknown", elapsed() / 1000) from exc
+    log_request(method, url, status, elapsed(), attempt)
+    return result
+
+
+class _Transient(Exception):
+    def __init__(self, kind, delivered, elapsed):
+        super().__init__(kind)
+        self.kind, self.delivered, self.elapsed = kind, delivered, elapsed
+
+
+def _probe_runner(url, api_key):
+    """Sonda GET /users/me/ (timeout corto, sin reintentos): (ok, kind). Cualquier respuesta del servidor cuenta como viva."""
+    probe_url = url.split("/api/v1/")[0] + "/api/v1/users/me/"
+
+    def run():
+        try:
+            _send(probe_url, "GET", None, {"x-api-key": api_key}, PROBE_TIMEOUT, 1)
+        except urllib.error.HTTPError as exc:
+            found = classify(exc)
+            exc.close()
+            return (False, found[0]) if found else (True, None)
+        except _Transient as exc:
+            return False, exc.kind
+        return True, None
+    return run
+
+
+def probe_plane(base_url, api_key, force=False):
+    """Sondeo explícito del circuito (ver circuit.probe): True/False, o None si no tocaba sondear."""
+    return circuit.probe(_probe_runner(base_url.rstrip("/") + "/api/v1/", api_key), force=force)
+
+
+def _rate_limit_wait(exc):
+    try:
+        wait = float(exc.headers.get("Retry-After", 1))
+    except (TypeError, ValueError):
+        wait = 1.0
+    return min(wait + 0.5, RATE_LIMIT_MAX_WAIT)
+
+
+def api_request(url, api_key, method="GET", data=None, timeout=REQUEST_TIMEOUT, max_retries=3, raise_on_error=False):
+    """Ejecuta una petición a la API de Plane. Lanza PlaneUnavailable ante fallos transitorios (ver el docstring del módulo)."""
+    if os.environ.get("PLANE_OFFLINE") == "1":
+        raise PlaneUnavailable("offline", "no")
+    circuit.gate(_probe_runner(url, api_key))
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-
-    for attempt in range(max_retries):
-        req = urllib.request.Request(url, data=payload, headers=headers, method=method)
-        started = time.monotonic()
+    attempt = rate_limited = 0
+    retried = False
+    while True:
+        attempt += 1
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                log_request(method, url, resp.status, (time.monotonic() - started) * 1000, attempt + 1)
-                if resp.status == 204:
-                    return {}
-                content = resp.read().decode("utf-8")
-                return json.loads(content) if content else {}
-        except urllib.error.HTTPError as e:
-            log_request(method, url, e.code, (time.monotonic() - started) * 1000, attempt + 1)
-            if e.code == 429 and attempt < max_retries - 1:
-                retry_after = int(e.headers.get("Retry-After", 1))
-                time.sleep(retry_after + 0.5)
-                continue
-            if raise_on_error:
-                raise e
-            err_msg = e.read().decode("utf-8")
-            sys.stderr.write(f"Error HTTP {e.code} en {url}: {err_msg}\n")
-            sys.exit(1)
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            reason = str(getattr(e, "reason", e))[:80]
-            log_request(method, url, None, (time.monotonic() - started) * 1000, attempt + 1, error=f"{type(e).__name__}: {reason}")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            if raise_on_error:
-                raise e
-            sys.stderr.write(f"Error de red/conexión con Plane ({url}): {e}\n")
-            sys.exit(1)
+            result = _send(url, method, payload, headers, timeout, attempt)
+        except urllib.error.HTTPError as exc:
+            found = classify(exc)
+            if found:
+                exc.close()
+                transient = _Transient(*found, exc.elapsed)
+            else:
+                if exc.code == 429 and rate_limited < max_retries - 1:
+                    rate_limited += 1
+                    exc.close()
+                    time.sleep(_rate_limit_wait(exc))
+                    continue
+                circuit.record(True)
+                if raise_on_error:
+                    raise
+                try:
+                    detail = exc.read().decode("utf-8")
+                except (OSError, http.client.HTTPException, ValueError):
+                    detail = ""
+                exc.close()
+                sys.stderr.write(f"Error HTTP {exc.code} en {url}: {detail}\n")
+                sys.exit(1)
+        except _Transient as exc:
+            transient = exc
+        else:
+            circuit.record(True)
+            return result
+        if method == "GET" and not retried and transient.kind not in TIMEOUT_KINDS and transient.elapsed < RETRY_MAX_ELAPSED:
+            retried = True
+            time.sleep(RETRY_PAUSE)
+            continue
+        state = circuit.record(False, transient.kind)
+        raise PlaneUnavailable(transient.kind, transient.delivered, since=circuit.hhmm(state["since"]))

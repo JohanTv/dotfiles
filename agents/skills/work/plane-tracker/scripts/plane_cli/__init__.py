@@ -2,7 +2,7 @@
 
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
   1. config        rutas de caché, reloj, variables de entorno
-  2. db, api       SQLite local y cliente HTTP de Plane
+  2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
   3. mdhtml, resolve, timeutil, worklog, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
@@ -11,7 +11,8 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
 Módulos:
   config          CACHE_DIR, db_file(), request_log(), proposal_file(), now(), get_env_or_fail()
   db              conexión SQLite (WAL) y esquema
-  api             api_request() con reintento ante 429 y registro de latencia
+  circuit         circuito de fallo rápido entre procesos y PlaneUnavailable
+  api             api_request(): clasificación de fallos, reintentos acotados, circuito y registro de latencia
   mdhtml          Markdown -> HTML de Plane
   resolve         proyectos, tickets, estados, etiquetas y usuario activo (con caché)
   timeutil        horarios y fusión de intervalos (Klee) para los reportes
