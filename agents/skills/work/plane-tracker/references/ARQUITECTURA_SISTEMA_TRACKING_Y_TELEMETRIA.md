@@ -75,7 +75,7 @@ plane-tracker create "[SPIKE] Auditoría de concurrencia en envíos masivos SMS"
   --labels "backend,sms,bug" \
   -d "Análisis forense de deadlocks..."
 ```
-El motor de `plane.py`:
+El comando `create` (`scripts/plane_cli/cmd_tickets_write.py`):
 1. Identifica el prefijo `[SPIKE]`.
 2. Asocia las etiquetas validadas contra la tabla local `labels`.
 3. Deriva automáticamente la rama Git según la fase:
@@ -157,7 +157,7 @@ Para no crear 20 micro-tickets a la semana que destruyan las métricas de sprint
 ### 4.1 Fusión de Intervalos de Klee (Medida de Lebesgue en 1D)
 Cuando múltiples sesiones o subagentes trabajan en paralelo sobre el mismo ticket o en tickets cruzados, la suma escalar de horas infla el tiempo por encima de la jornada real.
 
-El algoritmo implementado en `plane.py` ordena todos los intervalos temporales $[s_i, e_i]$ y calcula su unión matemática continua:
+El algoritmo implementado en `scripts/plane_cli/timeutil.py` ordena todos los intervalos temporales $[s_i, e_i]$ y calcula su unión matemática continua:
 $$\mu\left(\bigcup_{i=1}^n [s_i, e_i]\right)$$
 
 * **Wall-Clock Time:** El tiempo real de reloj que Johan estuvo activo frente a la máquina.

@@ -3,7 +3,7 @@
 
 **Binario:** `~/.local/bin/plane-tracker`  
 **Wrapper Dotfiles:** `Code/dotfiles/bin/common/plane-tracker`  
-**Motor Python:** `Code/dotfiles/agents/skills/work/plane-tracker/scripts/plane.py`  
+**Motor Python:** `Code/dotfiles/agents/skills/work/plane-tracker/scripts/plane.py` (punto de entrada; el código está en `scripts/plane_cli/`)  
 **Caché Relacional:** `~/.cache/plane/worklogs.db` (SQLite3 WAL Mode)
 
 ---
