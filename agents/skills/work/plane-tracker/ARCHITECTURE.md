@@ -15,7 +15,7 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 |---|---|---|
 | `plane.py` | 16 | Punto de entrada: ajusta `sys.path` y llama a `cli.main()`. |
 | `plane_cli/__init__.py` | 30 | Docstring con el mapa de capas y módulos. |
-| `plane_cli/config.py` | 75 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), reloj `now()`, `local_midnight_utc()`, `positive_int()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
+| `plane_cli/config.py` | 80 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), reloj `now()`, `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
 | `plane_cli/db.py` | 180 | Conexión SQLite (WAL), `ensure_columns()` y esquema (`init_db()`). |
 | `plane_cli/api.py` | 75 | `api_request()` con reintento ante 429 y `log_request()` (JSONL de latencias). |
 | `plane_cli/mdhtml.py` | 150 | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
@@ -25,25 +25,26 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 | `plane_cli/sync.py` | 145 | `sync_remote_worklogs()`: comentarios de Plane a SQLite. |
 | `plane_cli/proposal_store.py` | 100 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | 290 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
-| `plane_cli/flow.py` | 210 | Lead/cycle time y esfuerzo por ticket, y el comando `report --flow`. |
-| `plane_cli/attachments.py` | 135 | Subida firmada, borrado y listado de adjuntos; comandos `attach` y `attachments`. |
-| `plane_cli/cmd_comment.py` | 235 | Comando `comment`. |
-| `plane_cli/cmd_comment_ops.py` | 195 | Comandos `comment-edit`, `comment-delete` y `propose-duration`. |
-| `plane_cli/cmd_tickets_write.py` | 270 | Comandos `create`, `update` y `link`. |
+| `plane_cli/flow.py` | 210 | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
+| `plane_cli/renamed.py` | 150 | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
+| `plane_cli/attachments.py` | 170 | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
+| `plane_cli/cmd_comment.py` | 235 | Comando `comment add`. |
+| `plane_cli/cmd_comment_ops.py` | 200 | Comandos `comment edit`, `comment delete` y `worklog propose`. |
+| `plane_cli/cmd_tickets_write.py` | 270 | Comandos `create`, `update` y `link add`. |
 | `plane_cli/cmd_read.py` | 405 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
-| `plane_cli/cmd_report.py` | 220 | Comando `report` y `report --check`. |
-| `plane_cli/cmd_ops.py` | 235 | Comandos `health`, `focus` y `handoff`, con sus ayudantes de git. |
-| `plane_cli/cli.py` | 65 | Parser raíz, `COMMAND_REGISTRARS` (lista ordenada) y `main()`. |
+| `plane_cli/cmd_report.py` | 235 | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
+| `plane_cli/cmd_ops.py` | 255 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
+| `plane_cli/cli.py` | 105 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()` y `main()`. |
 
 ## Capas y regla de dependencias
 
 1. `config`: no importa nada del paquete.
 2. `db`, `api`: dependen de `config`.
 3. Lógica reutilizable (`mdhtml`, `resolve`, `timeutil`, `worklog`, `sync`, `proposal_store`, `proposals`, `flow`,
-   `attachments`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (`attach`,
-   `attachments`) y `flow` (`report --flow`), que además contienen el comando que los usa, no definen parsers.
+   `attachments`, `renamed`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (grupo
+   `attachment`) y `flow` (`report flow`), que además contienen el comando que los usa, no definen parsers.
 4. `cmd_*`: importan de las capas 1 a 3; **nunca** se importan entre sí ni importan `cli`.
-5. `cli`: importa los `cmd_*` y `attachments` para registrar los subcomandos.
+5. `cli`: importa los `cmd_*`, `attachments` y `renamed` para registrar el árbol de comandos y consultar las pistas.
 
 Ninguna biblioteca importa un `cmd_*`. No hay ciclos de import. `tests/test_structure.py` lo verifica con un análisis del
 AST, además de los nombres globales no definidos, el tamaño de archivos (450 líneas) y de funciones (150 líneas) y que
@@ -62,18 +63,50 @@ Los módulos se importan siempre por nombre explícito (`from plane_cli.resolve 
 - **Docstring de cabecera** en cada módulo: responsabilidad, qué expone y qué no hace.
 - **Firma de los comandos:** `cmd_x(args, conn, base_url, api_key, workspace, default_project_id)`, aunque el comando
   no use todos los parámetros. `cli.main()` los llama como `args.handler(...)`.
-- **Registro de subcomandos:** cada comando tiene `register_<comando>(sub)` (con guion bajo en lugar de guion) que define
-  su parser y hace `set_defaults(handler=cmd_<comando>)`.
+- **Registro de subcomandos:** cada comando o verbo tiene `register_<comando>[_<verbo>](sub)` que define su parser y hace
+  `set_defaults(handler=...)`; el handler es `cmd_<comando>[_<verbo>]`. Ningún handler lee `args.command` ni `args.verb`.
+
+## Nomenclatura de comandos
+
+El árbol se declara en `COMMANDS` (`cli.py`); su orden es el de `--help`. Cada entrada es un registrador (comando de la
+raíz) o una tupla `(nombre, ayuda, registradores)` que `add_group()` convierte en un grupo `<sustantivo> <verbo>`: el
+verbo es obligatorio (`dest="verb"`, `required=True`) y el usage lista los verbos (`{add,edit,delete}`).
+
+Reglas:
+
+1. La raíz solo tiene los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en
+   plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
+2. Toda otra familia es un grupo `<sustantivo singular> <verbo>`, aunque tenga un solo verbo (`link add`).
+3. Un flag nunca elige la operación: la operación es el verbo (o la vista posicional `report flow`).
+4. Verbos: `add`, `list`, `edit`, `delete`, `replace`; marcas: `set`, `clear`, `status`; derivados: `propose`, `check`.
+5. Los sinónimos de verbo y los nombres retirados no son alias: terminan con código 2 y una pista (`renamed.py`).
+6. El ID requerido de un hijo es posicional (`attachment delete ISSUE ID`); si es opcional (por defecto, el último
+   propio) es un flag (`--comment-id`).
+7. Se mantienen los flags que no eligen operación y las claves JSON.
+
+`--json` es global: `add_json_flag()` lo declara con `default=argparse.SUPPRESS` en la raíz, oculto en cada grupo y en
+cada hoja que produce JSON. Sin valor por defecto, el último nivel que lo vea no pisa a los anteriores, y
+`--json comment add`, `comment --json add` y `comment add --json` valen igual. Los handlers lo leen con
+`getattr(args, "json", False)`; una hoja sin `--json` propio acepta el de la raíz y lo ignora.
+
+`main()` llama primero a `renamed.suggestion(argv, command_tree(parser))`: `command_tree()` deriva `{comando: (verbos)}`
+del propio parser, así que `renamed.py` no duplica el árbol ni importa `cli`. Si devuelve texto, se imprime como
+`plane-tracker: error: <texto>` con código 2, antes de validar el entorno.
 
 ## Agregar un comando
 
-1. Crear (o ampliar) un `plane_cli/cmd_x.py` con `cmd_nombre(args, conn, base_url, api_key, workspace, default_project_id)`
-   y `register_nombre(sub)`, que añade el parser con sus flags y termina en `set_defaults(handler=cmd_nombre)`. Si el
-   archivo supera las 450 líneas, o la lógica es reutilizable por otros comandos, esa lógica va a un módulo de la capa 3.
-2. Añadir `cmd_x.register_nombre` a `COMMAND_REGISTRARS` en `cli.py`, en la posición en que debe aparecer en `--help`.
-3. Añadir los casos al golden: el `--help` del subcomando (lista `SUBCOMMANDS` en `tests/test_golden.py`) y un escenario
-   con su salida, peticiones al servidor falso y filas locales. Generarlo con `GOLDEN_UPDATE=1` y revisar el diff a mano.
-4. Documentar el comando en `SKILL.md` (sección de comandos disponibles).
+1. Decidir su lugar según las reglas de nomenclatura: comando de la raíz o verbo de un grupo (nuevo o existente).
+2. Crear (o ampliar) un `plane_cli/cmd_x.py` con `cmd_nombre(args, conn, base_url, api_key, workspace, default_project_id)`
+   y `register_nombre(sub)`, que añade el parser (con `help` de una línea de hasta 60 caracteres sin punto final; el
+   texto largo va en `description=`), declara `--json` con `add_json_flag()` si produce JSON y termina en
+   `set_defaults(handler=cmd_nombre)`. Si el archivo supera las 450 líneas, o la lógica es reutilizable por otros
+   comandos, esa lógica va a un módulo de la capa 3.
+3. Añadir el registrador a `COMMANDS` en `cli.py`, en la posición en que debe aparecer en `--help`: suelto si es un
+   comando de la raíz, dentro de la tupla de su grupo si es un verbo (un grupo nuevo añade `(nombre, ayuda, (...))`).
+4. Actualizar `TREE` en `tests/test_cli_tree.py` y, en `tests/test_golden.py`, `ROOT_COMMANDS` o `GROUPS` (alimentan el
+   `--help` de cada ruta) y un escenario con su salida, peticiones al servidor falso y filas locales. Generarlo con
+   `GOLDEN_UPDATE=1` y revisar el diff a mano.
+5. Documentar el comando en `SKILL.md` (sección de comandos disponibles).
 
 ## Tests
 
@@ -90,6 +123,8 @@ python3 -m unittest discover -s tests
 - `GOLDEN_UPDATE=1` reescribe los golden; solo se usa cuando el cambio de comportamiento es intencional, y el diff se
   revisa como parte del cambio. `PLANE_PY=<ruta>` apunta el harness a otro `plane.py`.
 - `test_structure.py` guarda las reglas estructurales descritas arriba.
+- `test_cli_tree.py` fija el árbol exacto (y su orden), que cada hoja tenga `handler` y los grupos no, y el tamaño de la
+  ayuda global; `test_renamed.py` las pistas de nombres retirados; `test_json_flag.py` las posiciones válidas de `--json`.
 - Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando los módulos de
   `plane_cli` directamente y sustituyendo `config.CACHE_DIR` / `config.now`.
 
@@ -97,8 +132,8 @@ python3 -m unittest discover -s tests
 
 - **`--help`**: global y por subcomando, idéntico y sin variables de entorno. El nombre de uso sale de `sys.argv[0]`
   (`plane.py`).
-- **Orden de los subcomandos**: es el orden de `COMMAND_REGISTRARS`; argparse lo refleja en `--help`.
-- **Orden de arranque**: parsear argumentos, luego validar el entorno (`PLANE_BASE_URL`, `PLANE_API_KEY`; falta de alguna
+- **Orden de los subcomandos**: es el orden de `COMMANDS`; argparse lo refleja en `--help`.
+- **Orden de arranque**: consultar `renamed.suggestion()` (código 2), parsear argumentos, luego validar el entorno (`PLANE_BASE_URL`, `PLANE_API_KEY`; falta de alguna
   termina con código 1, incluso en comandos que no llaman a la API) y solo entonces abrir la base de datos.
 - **Nombre y ruta de `scripts/plane.py`**: el wrapper `plane-tracker` y `SKILL.md` apuntan a él, y su `sys.path` usa
   `os.path.realpath(__file__)` para resolver el symlink del skill.
