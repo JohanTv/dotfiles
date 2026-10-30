@@ -152,6 +152,16 @@ Prefiere `link` para PRs y documentos (queda estructurado y no notifica como com
 
 ---
 
+### C.4 Adjuntos y salud de la conexión
+```bash
+plane-tracker attach OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
+plane-tracker attachments OMNIFY-205 [--json]             # lista los adjuntos
+plane-tracker health [--hours 24] [--json]                # latencia (p50/p95) y errores recientes de la API
+```
+Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro JSONL (sin cuerpos ni cabeceras) en `~/.cache/plane/requests.log` (rota a 1 MB) con método, ruta, estado, milisegundos, intento y error; `health` lo resume para distinguir caídas de lentitud.
+
+---
+
 ### D. `plane-tracker update` (Transiciones de Estado)
 Permite mover tickets entre columnas del Kanban sin abrir el navegador.
 

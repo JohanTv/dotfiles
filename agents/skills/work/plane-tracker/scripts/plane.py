@@ -22,6 +22,8 @@ import urllib.parse
 import re
 import time
 import argparse
+import mimetypes
+import uuid
 from datetime import datetime, timedelta, date, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -375,20 +377,41 @@ def get_env_or_fail(var_name, description):
         sys.exit(1)
     return val
 
+REQUEST_LOG = os.path.join(CACHE_DIR, "requests.log")
+REQUEST_LOG_MAX_BYTES = 1_000_000
+
+def log_request(method, url, status, elapsed_ms, attempt, error=None):
+    """JSONL con metadatos de cada llamada (sin cuerpos ni cabeceras) para diagnosticar latencia y caídas."""
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        if os.path.exists(REQUEST_LOG) and os.path.getsize(REQUEST_LOG) > REQUEST_LOG_MAX_BYTES:
+            os.replace(REQUEST_LOG, REQUEST_LOG + ".1")
+        record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "method": method,
+                  "path": urllib.parse.urlparse(url).path, "status": status, "ms": int(elapsed_ms),
+                  "attempt": attempt, "error": error}
+        fd = os.open(REQUEST_LOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
 def api_request(url, api_key, method="GET", data=None, timeout=10, max_retries=3, raise_on_error=False):
-    """Ejecuta peticiones HTTP a la API de Plane con tolerancia a 429 (Rate Limit)."""
+    """Ejecuta peticiones HTTP a la API de Plane con tolerancia a 429 (Rate Limit) y registro de latencia."""
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"x-api-key": api_key, "Content-Type": "application/json"}
-    
+
     for attempt in range(max_retries):
         req = urllib.request.Request(url, data=payload, headers=headers, method=method)
+        started = time.monotonic()
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
+                log_request(method, url, resp.status, (time.monotonic() - started) * 1000, attempt + 1)
                 if resp.status == 204:
                     return {}
                 content = resp.read().decode("utf-8")
                 return json.loads(content) if content else {}
         except urllib.error.HTTPError as e:
+            log_request(method, url, e.code, (time.monotonic() - started) * 1000, attempt + 1)
             if e.code == 429 and attempt < max_retries - 1:
                 retry_after = int(e.headers.get("Retry-After", 1))
                 time.sleep(retry_after + 0.5)
@@ -398,7 +421,9 @@ def api_request(url, api_key, method="GET", data=None, timeout=10, max_retries=3
             err_msg = e.read().decode("utf-8")
             sys.stderr.write(f"Error HTTP {e.code} en {url}: {err_msg}\n")
             sys.exit(1)
-        except urllib.error.URLError as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            reason = str(getattr(e, "reason", e))[:80]
+            log_request(method, url, None, (time.monotonic() - started) * 1000, attempt + 1, error=f"{type(e).__name__}: {reason}")
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue
@@ -1813,6 +1838,132 @@ def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id
           f"{agg['excluded']} excluidos (umbrella, instant_close, no_transition)")
     print("   Nota: el esfuerzo sale de los worklogs de la caché local y de la metadata en los comentarios; lo no registrado no aparece.\n")
 
+
+# ------------------------------------------------------------------------------
+# Adjuntos del work item (flujo de Plane: crear -> subir a almacenamiento -> confirmar)
+# ------------------------------------------------------------------------------
+
+ATTACH_MAX_BYTES = 50 * 1024 * 1024
+
+def build_multipart(fields, filename, content_type, data):
+    """multipart/form-data para el POST firmado de almacenamiento (el archivo debe ir al final)."""
+    boundary = uuid.uuid4().hex
+    parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode("utf-8") for k, v in fields.items()]
+    safe_name = filename.replace('"', "_")
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{safe_name}"\r\nContent-Type: {content_type}\r\n\r\n'.encode("utf-8") + data + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+def upload_attachment(base_url, api_key, workspace, project_id, issue_id, path):
+    attachments_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_id}/issue-attachments/"
+    name = os.path.basename(path)
+    content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    with open(path, "rb") as handle:
+        data = handle.read()
+    created = api_request(attachments_url, api_key, method="POST", data={"name": name, "type": content_type, "size": len(data)})
+    asset_id, upload = created["asset_id"], created["upload_data"]
+    body, header = build_multipart(upload["fields"], name, content_type, data)
+    try:
+        req = urllib.request.Request(upload["url"], data=body, headers={"Content-Type": header}, method="POST")
+        with urllib.request.urlopen(req, timeout=60):
+            pass
+        api_request(f"{attachments_url}{asset_id}/", api_key, method="PATCH", data={"is_uploaded": True})
+    except BaseException:
+        # No dejar un adjunto "pendiente" huérfano si falla la subida o la confirmación.
+        try:
+            api_request(f"{attachments_url}{asset_id}/", api_key, method="DELETE", raise_on_error=True)
+        except Exception:
+            pass
+        raise
+    return name, len(data)
+
+def local_stamp(value):
+    moment = session_clock.parse_time(value)
+    return moment.astimezone().strftime("%Y-%m-%d %H:%M") if moment else ""
+
+def cmd_attach(args, conn, base_url, api_key, workspace, default_project_id):
+    """Sube uno o varios archivos al work item."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    for path in args.files:
+        if not os.path.isfile(path):
+            sys.stderr.write(f"Error: '{path}' no es un archivo.\n")
+            sys.exit(1)
+        if os.path.getsize(path) > ATTACH_MAX_BYTES:
+            sys.stderr.write(f"Error: '{path}' supera {ATTACH_MAX_BYTES // (1024 * 1024)} MB.\n")
+            sys.exit(1)
+    for path in args.files:
+        try:
+            name, size = upload_attachment(base_url, api_key, workspace, project_id, issue["id"], path)
+        except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError) as exc:
+            sys.stderr.write(f"Error subiendo '{path}': {exc}\n")
+            sys.exit(1)
+        print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
+
+def cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id):
+    """Lista los adjuntos del work item."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/issue-attachments/"
+    data = api_request(url, api_key)
+    items = data if isinstance(data, list) else data.get("results", [])
+    rows = [{"id": a.get("id"), "name": (a.get("attributes") or {}).get("name"), "size": (a.get("attributes") or {}).get("size") or a.get("size"),
+             "created_at": a.get("created_at")} for a in items]
+    if getattr(args, "json", False):
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return
+    print(f"\n📎 Adjuntos de {issue_ref} ({len(rows)}):")
+    for r in rows:
+        print(f"   • {r['name']}  ({(r['size'] or 0) / 1024:.1f} KB)  {local_stamp(r['created_at'])}  {r['id']}")
+    print("")
+
+# ------------------------------------------------------------------------------
+# Salud de la conexión con Plane (a partir del registro de llamadas)
+# ------------------------------------------------------------------------------
+
+def summarize_requests(records, since):
+    """Agrega el registro de llamadas posteriores a `since` (datetime UTC)."""
+    recent = []
+    for r in records:
+        ts = session_clock.parse_time(r.get("ts"))
+        if ts and ts >= since:
+            recent.append((ts, r))
+    lat = sorted(r["ms"] for _, r in recent if r.get("status"))
+    failures = [(ts, r) for ts, r in recent if not r.get("status") or r["status"] >= 400]
+    by_error = {}
+    for _, r in failures:
+        key = r.get("error") or f"HTTP {r.get('status')}"
+        by_error[key] = by_error.get(key, 0) + 1
+    pct = lambda q: lat[min(len(lat) - 1, int(len(lat) * q))] if lat else None
+    return {"requests": len(recent), "failures": len(failures), "retried": sum(1 for _, r in recent if r.get("attempt", 1) > 1),
+            "p50_ms": pct(0.5), "p95_ms": pct(0.95), "max_ms": lat[-1] if lat else None,
+            "errors": by_error, "last_failures": [dict(r, ts=ts.astimezone().strftime("%Y-%m-%d %H:%M:%S")) for ts, r in failures[-5:]]}
+
+def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
+    """Latencia y errores de las últimas llamadas a Plane (caídas, timeouts, lentitud)."""
+    records = []
+    for path in (REQUEST_LOG + ".1", REQUEST_LOG):
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    try:
+                        records.append(json.loads(line))
+                    except ValueError:
+                        continue
+        except OSError:
+            continue
+    summary = summarize_requests(records, datetime.now(timezone.utc) - timedelta(hours=args.hours))
+    if getattr(args, "json", False):
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        return
+    print(f"\n🩺 Plane · últimas {args.hours} h: {summary['requests']} llamadas, {summary['failures']} fallidas, {summary['retried']} con reintento")
+    print(f"   • Latencia: p50 {summary['p50_ms']} ms · p95 {summary['p95_ms']} ms · máx {summary['max_ms']} ms")
+    for key, count in sorted(summary["errors"].items(), key=lambda kv: -kv[1]):
+        print(f"   • {count} × {key}")
+    for f in summary["last_failures"]:
+        print(f"     {f['ts']}  {f['method']} {f['path'][-60:]}  → {f.get('error') or 'HTTP ' + str(f.get('status'))} ({f['ms']} ms)")
+    print("")
+
 def positive_int(value):
     n = int(value)
     if n < 1:
@@ -2361,6 +2512,19 @@ def main():
     p_link.add_argument("url", help="URL del enlace (https://...)")
     p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")
 
+    # attach / attachments
+    p_attach = subparsers.add_parser("attach", help="Subir archivos al work item")
+    p_attach.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
+    p_attach.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
+    p_attachments = subparsers.add_parser("attachments", help="Listar los adjuntos del work item")
+    p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
+    p_attachments.add_argument("--json", action="store_true", help="Salida en JSON")
+
+    # health
+    p_health = subparsers.add_parser("health", help="Latencia y errores recientes de la API de Plane")
+    p_health.add_argument("--hours", type=positive_int, default=24, help="Ventana en horas (por defecto 24)")
+    p_health.add_argument("--json", action="store_true", help="Salida en JSON")
+
     # propose-duration
     p_prop = subparsers.add_parser("propose-duration", help="Medir la sesión del agente y proponer una duración (no registra nada)")
     p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
@@ -2471,6 +2635,12 @@ def main():
     try:
         if args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "attach":
+            cmd_attach(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "attachments":
+            cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "health":
+            cmd_health(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "link":
             cmd_link(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "propose-duration":

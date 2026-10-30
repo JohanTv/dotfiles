@@ -148,6 +148,28 @@ class PlaneIntegration(unittest.TestCase):
         self.assertEqual(block.count("-->"), 1)
         self.assertEqual(plane.extract_metadata_from_comment("<p>x</p>" + block), meta)
 
+    def test_multipart_puts_file_last_and_keeps_fields(self):
+        body, header = plane.build_multipart({"key": "k1", "policy": "p"}, 'a"b.txt', "text/plain", b"DATA")
+        boundary = header.split("boundary=")[1]
+        self.assertTrue(body.startswith(f"--{boundary}\r\n".encode()))
+        self.assertLess(body.index(b'name="policy"'), body.index(b'name="file"'))
+        self.assertIn(b'filename="a_b.txt"', body)
+        self.assertTrue(body.endswith(f"--{boundary}--\r\n".encode()))
+
+    def test_request_summary(self):
+        now = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
+        iso_ = lambda m: (now - timedelta(minutes=m)).isoformat()
+        records = [
+            {"ts": iso_(5), "method": "GET", "path": "/a", "status": 200, "ms": 100, "attempt": 1, "error": None},
+            {"ts": iso_(4), "method": "GET", "path": "/a", "status": 200, "ms": 300, "attempt": 2, "error": None},
+            {"ts": iso_(3), "method": "GET", "path": "/b", "status": None, "ms": 10000, "attempt": 1, "error": "URLError: timed out"},
+            {"ts": iso_(2000), "method": "GET", "path": "/old", "status": 500, "ms": 50, "attempt": 1, "error": None},
+        ]
+        summary = plane.summarize_requests(records, now - timedelta(hours=1))
+        self.assertEqual((summary["requests"], summary["failures"], summary["retried"]), (3, 1, 1))
+        self.assertEqual(summary["errors"], {"URLError: timed out": 1})
+        self.assertEqual(summary["max_ms"], 300)
+
     def test_umbrella_buckets_get_no_proposal(self):
         class Args:
             agent = "claude"
