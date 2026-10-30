@@ -1,0 +1,170 @@
+$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+[exit 0]
+--- stdout ---
+⏱  Reparto de 45 min medidos (grupo <GRP>):
+   • OMNIFY-1     22 min  (10:00–10:22)
+   • OPS-13       23 min  (10:22–14:15)
+   • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
+   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+--- stderr ---
+
+
+$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20 --json
+[exit 0]
+--- stdout ---
+{
+  "ok": true,
+  "group": "<GRP>",
+  "total": 45,
+  "parts": {
+    "OMNIFY-1": {
+      "ok": true,
+      "agent": "claude",
+      "session_id": "sess-golden-0001",
+      "origin": "--session",
+      "confidence": "media",
+      "attribution": "split",
+      "minutes": 22,
+      "net_minutes": 22.0,
+      "gross_minutes": 22.0,
+      "pauses": 0,
+      "events": 17,
+      "date": "2026-10-20",
+      "start_time": "10:00",
+      "end_time": "10:22",
+      "segments": [
+        {
+          "start": "10:00",
+          "end": "10:22",
+          "minutes": 22,
+          "start_utc": "2026-10-20T10:00:00+00:00",
+          "end_utc": "2026-10-20T10:22:00+00:00"
+        }
+      ],
+      "window": "00:00–24:00",
+      "window_override": null,
+      "excluded_minutes": 0.0,
+      "unattributed_minutes": 0,
+      "warnings": [],
+      "split": {
+        "group": "<GRP>",
+        "of": 45,
+        "share": 22
+      }
+    },
+    "OPS-13": {
+      "ok": true,
+      "agent": "claude",
+      "session_id": "sess-golden-0001",
+      "origin": "--session",
+      "confidence": "media",
+      "attribution": "split",
+      "minutes": 23,
+      "net_minutes": 23.0,
+      "gross_minutes": 233.0,
+      "pauses": 1,
+      "events": 17,
+      "date": "2026-10-20",
+      "start_time": "10:22",
+      "end_time": "14:15",
+      "segments": [
+        {
+          "start": "10:22",
+          "end": "10:30",
+          "minutes": 8,
+          "start_utc": "2026-10-20T10:22:00+00:00",
+          "end_utc": "2026-10-20T10:30:00+00:00"
+        },
+        {
+          "start": "14:00",
+          "end": "14:15",
+          "minutes": 15,
+          "start_utc": "2026-10-20T14:00:00+00:00",
+          "end_utc": "2026-10-20T14:15:00+00:00"
+        }
+      ],
+      "window": "00:00–24:00",
+      "window_override": null,
+      "excluded_minutes": 0.0,
+      "unattributed_minutes": 0,
+      "warnings": [
+        "Hay 1 pausa(s) de más de 10 min descontadas (pueden ser lectura humana, no inactividad)."
+      ],
+      "split": {
+        "group": "<GRP>",
+        "of": 45,
+        "share": 23
+      }
+    }
+  }
+}
+--- stderr ---
+
+
+$ plane.py propose-duration --split OMNIFY-1=10m,OPS-999=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+[exit 0]
+--- stdout ---
+⏱  Reparto de 22 min medidos (grupo <GRP>):
+   • OMNIFY-1     10 min  (10:00–10:10)
+   • OPS-999      12 min  (10:10–10:22)
+   • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
+   ⚠ Se excluyeron 23 min ya registrados o reservados para esta sesión.
+   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+--- stderr ---
+
+
+$ plane.py propose-duration --split A=hola --agent claude --session sess-golden-0001 --date 2026-10-20
+[exit 1]
+--- stdout ---
+✖ Sin propuesta para reparto: No hay minutos medidos que repartir.
+   Pregunta cuánto demoró; no se infiere ni se inventa.
+--- stderr ---
+
+
+$ plane.py propose-duration --split OMNIFY-1=50%,OPS-13=rest --agent claude --session sess-golden-0001 --date 2026-10-20
+[exit 0]
+--- stdout ---
+⏱  Reparto de 33 min medidos (grupo <GRP>):
+   • OMNIFY-1     16 min  (10:00–10:28)
+   • OPS-13       17 min  (10:28–14:15)
+   • Fuente: claude · sesión sess-golden-0001 · confianza media · ventana 00:00–24:00
+   ⚠ Hay 1 pausa(s) de más de 10 min descontadas (pueden ser lectura humana, no inactividad).
+   ⚠ Se excluyeron 12 min ya registrados o reservados para esta sesión.
+   Registra cada parte con: plane-tracker comment <TICKET> -m "..." --accept-proposal
+--- stderr ---
+
+
+$ plane.py comment OMNIFY-1 -m Parte uno --accept-proposal --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000001)
+--- stderr ---
+
+
+$ plane.py comment OPS-13 -m Parte dos --accept-proposal --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OPS-13 (ID Comentario: c9000000-0000-4000-8000-000000000002)
+--- stderr ---
+
+
+$ plane.py comment OPS-13 -m Sin reparto --agent claude --session sess-golden-0001
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+✖ Sin propuesta para OPS-13: No hay actividad medible en la ventana (o ya está registrada/reservada para esta sesión).
+   Pregunta cuánto demoró; no se infiere ni se inventa.
+Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Parte uno</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 16, \"end_time\": \"10:28\", \"measured_by\": {\"adapter\": \"claude\", \"attribution\": \"split\", \"confidence\": \"media\", \"gross_minutes\": 28.0, \"kind\": \"proposal_split\", \"session\": \"sess-golden-0001\", \"split\": {\"group\": \"<GRP>\", \"of\": 33, \"share\": 16}}, \"notes\": \"Parte uno\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"segments\": [{\"end\": \"10:10\", \"end_utc\": \"2026-10-20T10:10:00+00:00\", \"minutes\": 10, \"start\": \"10:00\", \"start_utc\": \"2026-10-20T10:00:00+00:00\"}, {\"end\": \"10:28\", \"end_utc\": \"2026-10-20T10:28:00+00:00\", \"minutes\": 6, \"start\": \"10:22\", \"start_utc\": \"2026-10-20T10:22:00+00:00\"}], \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/20000000-0000-4000-8000-000000000013/comments/ {"comment_html": "<p>Parte dos</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 17, \"end_time\": \"14:15\", \"measured_by\": {\"adapter\": \"claude\", \"attribution\": \"split\", \"confidence\": \"media\", \"gross_minutes\": 227.0, \"kind\": \"proposal_split\", \"session\": \"sess-golden-0001\", \"split\": {\"group\": \"<GRP>\", \"of\": 33, \"share\": 17}}, \"notes\": \"Parte dos\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"segments\": [{\"end\": \"10:30\", \"end_utc\": \"2026-10-20T10:30:00+00:00\", \"minutes\": 2, \"start\": \"10:28\", \"start_utc\": \"2026-10-20T10:28:00+00:00\"}, {\"end\": \"14:15\", \"end_utc\": \"2026-10-20T14:15:00+00:00\", \"minutes\": 15, \"start\": \"14:00\", \"start_utc\": \"2026-10-20T14:00:00+00:00\"}], \"start_time\": \"10:28\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+
+=== worklogs ===
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "2026-10-20", "duration_minutes": 16, "end_time": "10:28", "issue_name": "Validaciones de formulario SMS", "notes": "Parte uno", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000001", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "2026-10-20", "duration_minutes": 16, "end_time": "10:28", "measured_by": {"adapter": "claude", "attribution": "split", "confidence": "media", "gross_minutes": 28.0, "kind": "proposal_split", "session": "sess-golden-0001", "split": {"group": "<GRP>", "of": 33, "share": 16}}, "notes": "Parte uno", "phase": "dev", "schema_version": "2.2", "segments": [{"end": "10:10", "end_utc": "2026-10-20T10:10:00+00:00", "minutes": 10, "start": "10:00", "start_utc": "2026-10-20T10:00:00+00:00"}, {"end": "10:28", "end_utc": "2026-10-20T10:28:00+00:00", "minutes": 6, "start": "10:22", "start_utc": "2026-10-20T10:22:00+00:00"}], "start_time": "10:00", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "10:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "2026-10-20", "duration_minutes": 17, "end_time": "14:15", "issue_name": "Tareas Rápidas y Soporte - W43", "notes": "Parte dos", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000002", "project_id": "OPS", "raw_payload": {"capacity_bucket": "deep_work", "date": "2026-10-20", "duration_minutes": 17, "end_time": "14:15", "measured_by": {"adapter": "claude", "attribution": "split", "confidence": "media", "gross_minutes": 227.0, "kind": "proposal_split", "session": "sess-golden-0001", "split": {"group": "<GRP>", "of": 33, "share": 17}}, "notes": "Parte dos", "phase": "dev", "schema_version": "2.2", "segments": [{"end": "10:30", "end_utc": "2026-10-20T10:30:00+00:00", "minutes": 2, "start": "10:28", "start_utc": "2026-10-20T10:28:00+00:00"}, {"end": "14:15", "end_utc": "2026-10-20T14:15:00+00:00", "minutes": 15, "start": "14:00", "start_utc": "2026-10-20T14:00:00+00:00"}], "start_time": "10:28", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "10:28", "stoppers_json": "[]", "ticket_id": "OPS-13", "track": "main", "worker_type": "human"}

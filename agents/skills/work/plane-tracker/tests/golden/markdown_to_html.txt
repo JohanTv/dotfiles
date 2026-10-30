@@ -1,0 +1,86 @@
+### vacío
+''
+<p></p>
+
+### solo espacios
+'   \n '
+<p></p>
+
+### párrafo
+'uno\ndos\n\ntres'
+<p>uno<br>dos</p>
+<p>tres</p>
+
+### crlf
+'a\r\nb\rc'
+<p>a<br>b<br>c</p>
+
+### headings
+'# H1\n## H2 **b**\n###### H6'
+<h1>H1</h1>
+<h2>H2 <strong>b</strong></h2>
+<h6>H6</h6>
+
+### negrita cursiva
+'a ***x*** **y** *z* ~~w~~'
+<p>a <strong><em>x</em></strong> <strong>y</strong> <em>z</em> <s>w</s></p>
+
+### código inline
+'usa `a<b>&c` y **b**'
+<p>usa <code>a&amp;lt;b&amp;gt;&amp;amp;c</code> y <strong>b</strong></p>
+
+### enlace
+'[txt](https://x.example/a?b=1)'
+<p><a href="https://x.example/a?b=1">txt</a></p>
+
+### escape
+'a < b & c > d'
+<p>a &lt; b &amp; c &gt; d</p>
+
+### regla
+'---\n***\n___'
+<hr>
+<hr>
+<hr>
+
+### lista
+'- uno\n* dos **b**\n- tres'
+<ul><li>uno</li><li>dos <strong>b</strong></li><li>tres</li></ul>
+
+### lista ordenada
+'1. a\n2. b\n10. c'
+<ol><li>a</li><li>b</li><li>c</li></ol>
+
+### cita
+'> uno\n> dos\n>tres'
+<blockquote><p>uno<br>dos<br>tres</p></blockquote>
+
+### tabla
+'| a | b |\n|---|:--:|\n| 1 | **2** |\n| 3 | 4 |'
+<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td><strong>2</strong></td></tr><tr><td>3</td><td>4</td></tr></tbody></table>
+
+### tabla sin cuerpo
+'| a | b |\n|---|---|'
+<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody></tbody></table>
+
+### tarea
+'- [ ] pendiente\n- [x] hecho'
+<ul><li>[ ] pendiente</li><li>[x] hecho</li></ul>
+
+### bloque de código
+'```python\nx = 1 < 2\n```\ndespués'
+<pre><code class="language-python">x = 1 &lt; 2</code></pre>
+<p>después</p>
+
+### bloque sin lenguaje ni cierre
+'```\nsin cerrar'
+<pre><code>sin cerrar</code></pre>
+
+### mezcla
+'# T\n\ntexto\n- a\n- b\n\n1. x\n\n> q\n\n`c`'
+<h1>T</h1>
+<p>texto</p>
+<ul><li>a</li><li>b</li></ul>
+<ol><li>x</li></ol>
+<blockquote><p>q</p></blockquote>
+<p><code>c</code></p>

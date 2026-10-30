@@ -1,0 +1,135 @@
+$ plane.py comment-delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000001 eliminado de OMNIFY-1 (0 worklog local(es) borrado(s))
+--- stderr ---
+
+
+$ plane.py comment-delete OMNIFY-1
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000004 eliminado de OMNIFY-1 (0 worklog local(es) borrado(s))
+--- stderr ---
+
+
+$ plane.py comment-delete OMNIFY-3
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: No hay comentarios propios en el ticket. Indica el ID con --comment-id.
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 -m Texto **nuevo**
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000001 actualizado en OMNIFY-1
+--- stderr ---
+
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m <p>HTML nuevo</p>
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000004 actualizado en OMNIFY-1
+--- stderr ---
+
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m Pendiente [COMPLETAR]
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: el texto aún tiene marcadores [COMPLETAR]; complétalos antes de publicar.
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --duration 30 --track rev --capacity research_rd --worker-type subagent
+[exit 0]
+--- stdout ---
+✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 13:30-14:00 (30 min, rev, research_rd)
+--- stderr ---
+
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --embed-metadata
+[exit 0]
+--- stdout ---
+✔ Metadata del worklog añadida al comentario c1000000-0000-4000-8000-000000000004 (sin cambiar su texto visible)
+--- stderr ---
+
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --embed-metadata
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --duration 45 --track otro
+[exit 0]
+--- stdout ---
+✔ Worklog corregido en c1000000-0000-4000-8000-000000000001: 2026-10-20 10:00-11:00 (45 min, otro, deep_work)
+--- stderr ---
+
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-0000000000ff --embed-metadata
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.
+
+$ plane.py comment-edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
+[exit 0]
+--- stdout ---
+
+--- stderr ---
+Advertencia: nada que hacer (usa -m y/o --duration).
+
+$ plane.py comment-edit OMNIFY-1 --duration 10
+[exit 0]
+--- stdout ---
+✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 13:50-14:00 (10 min, main, deep_work)
+--- stderr ---
+
+
+$ plane.py comment-delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000004 eliminado de OMNIFY-1 (1 worklog local(es) borrado(s))
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/ {"comment_html": "<p>Texto <strong>nuevo</strong></p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>HTML nuevo</p>"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"research_rd\", \"date\": \"2026-10-20\", \"duration_minutes\": 30, \"end_time\": \"14:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"subagent\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"13:30\", \"stoppers\": [], \"track\": \"rev\", \"worker_type\": \"subagent\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"research_rd\", \"date\": \"2026-10-20\", \"duration_minutes\": 30, \"end_time\": \"14:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"subagent\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"13:30\", \"stoppers\": [], \"track\": \"rev\", \"worker_type\": \"subagent\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/ {"comment_html": "<p>Avance del formulario.</p><!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"edited_at\": \"<VOLATIL>\", \"end_time\": \"11:00\", \"measured_by\": {\"kind\": \"corrected\", \"was\": null}, \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"previous_duration_minutes\": 60, \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"otro\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 10, \"end_time\": \"14:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"13:50\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+
+=== worklogs ===
+{"capacity_bucket": "deep_work", "created_at": "<VOLATIL>", "date": "2026-10-20", "duration_minutes": 45, "end_time": "11:00", "issue_name": "Validaciones de formulario SMS", "notes": "Avance del formulario", "phase": "dev", "plane_comment_id": "c1000000-0000-4000-8000-000000000001", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "2026-10-20", "duration_minutes": 45, "edited_at": "<VOLATIL>", "end_time": "11:00", "measured_by": {"kind": "corrected", "was": null}, "notes": "Avance del formulario", "phase": "dev", "previous_duration_minutes": 60, "schema_version": "2.2", "start_time": "10:00", "stoppers": [], "track": "otro", "worker_type": "human"}, "role": "backend_engineer", "start_time": "10:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "otro", "worker_type": "human"}

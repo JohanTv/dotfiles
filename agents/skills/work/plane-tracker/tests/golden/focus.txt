@@ -1,0 +1,100 @@
+$ plane.py focus --status --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+
+🎯 Foco de la sesión sess-golden-0001 (claude) · hoy
+   • Ahora: — (sin foco)
+   • Sin foco : 0 min (no se atribuyen solos)
+--- stderr ---
+
+
+$ plane.py focus --status --json --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+{
+  "session": "sess-golden-0001",
+  "agent": "claude",
+  "current": null,
+  "tickets": {},
+  "unattributed_minutes": 0.0
+}
+--- stderr ---
+
+
+$ plane.py focus --off --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco cerrado (no había foco abierto)
+--- stderr ---
+
+
+$ plane.py focus OMNIFY-1 --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco en OMNIFY-1 · sesión sess-golden-0001 (claude)
+--- stderr ---
+
+
+$ plane.py focus OMNIFY-1 --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ El foco ya está en OMNIFY-1
+--- stderr ---
+
+
+$ plane.py focus OPS-13 --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco en OPS-13 (antes OMNIFY-1) · sesión sess-golden-0001 (claude)
+--- stderr ---
+
+
+$ plane.py focus OMNIFY-2 --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco en OMNIFY-2 (antes OPS-13) · sesión sess-golden-0001 (claude)
+--- stderr ---
+
+
+$ plane.py focus --off --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco cerrado (era OMNIFY-2)
+--- stderr ---
+
+
+$ plane.py focus --off --agent claude --session sess-golden-0001
+[exit 0]
+--- stdout ---
+✔ Foco cerrado (no había foco abierto)
+--- stderr ---
+
+
+$ plane.py focus --agent claude --session sess-golden-0001
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: indica el ticket (plane-tracker focus OMNIFY-205), o usa --off / --status.
+
+$ plane.py focus OMNIFY-1
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no se pudo determinar el agente (usa --agent claude|opencode|agy).
+
+$ plane.py focus OMNIFY-1 --agent claude --session no-existe
+[exit 0]
+--- stdout ---
+✔ Foco en OMNIFY-1 · sesión no-existe (claude)
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/

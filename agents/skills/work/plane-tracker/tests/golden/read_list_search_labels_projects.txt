@@ -1,0 +1,264 @@
+$ plane.py list
+[exit 0]
+--- stdout ---
+
+📋 Tickets recientes (3 obtenidos):
+  • #1    [HIGH]    Validaciones de formulario SMS
+  • #2    [MEDIUM]  Acortador de enlaces
+  • #3    [LOW]     Webhook SMS duplicado
+--- stderr ---
+
+
+$ plane.py list --json
+[exit 0]
+--- stdout ---
+[
+  {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "sequence_id": 1,
+    "name": "Validaciones de formulario SMS",
+    "priority": "high",
+    "state": "11003922-0000-4000-8000-11111111-111",
+    "created_at": "2026-10-01T10:00:00Z",
+    "updated_at": "2026-10-20T15:00:00Z",
+    "completed_at": null,
+    "start_date": "2026-10-01",
+    "target_date": "2026-11-01",
+    "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
+    "labels": []
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000002",
+    "sequence_id": 2,
+    "name": "Acortador de enlaces",
+    "priority": "medium",
+    "state": "11005808-0000-4000-8000-11111111-111",
+    "created_at": "2026-10-10T09:00:00Z",
+    "updated_at": "2026-10-15T12:00:00Z",
+    "completed_at": "2026-10-15T12:00:00Z",
+    "start_date": null,
+    "target_date": null,
+    "description_html": "",
+    "labels": []
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000003",
+    "sequence_id": 3,
+    "name": "Webhook SMS duplicado",
+    "priority": "low",
+    "state": "11004618-0000-4000-8000-11111111-111",
+    "created_at": "2026-10-05T09:00:00Z",
+    "updated_at": "2026-10-06T12:00:00Z",
+    "completed_at": null,
+    "start_date": null,
+    "target_date": null,
+    "description_html": "<p>Sin alcance.</p>",
+    "labels": []
+  }
+]
+--- stderr ---
+
+
+$ plane.py list -p OPS
+[exit 0]
+--- stdout ---
+
+📋 Tickets recientes (1 obtenidos):
+  • #13   [NONE]    Tareas Rápidas y Soporte - W43
+--- stderr ---
+
+
+$ plane.py list -p nope
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'nope' no encontrado. Opciones: OMNIFY, OPS
+
+$ plane.py search formulario
+[exit 0]
+--- stdout ---
+
+🔍 Coincidencias encontradas en OMNIFY (1):
+  • OMNIFY-1     (Progreso)     [HIGH]    Validaciones de formulario SMS
+
+💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-1-descripcion
+   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
+--- stderr ---
+
+
+$ plane.py search 3
+[exit 0]
+--- stdout ---
+
+🔍 Coincidencias encontradas en OMNIFY (1):
+  • OMNIFY-3     (Cancelado)    [LOW]     Webhook SMS duplicado
+
+💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-3-descripcion
+   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
+--- stderr ---
+
+
+$ plane.py search OMNIFY-2
+[exit 0]
+--- stdout ---
+
+🔍 Coincidencias encontradas en OMNIFY (1):
+  • OMNIFY-2     (Completado)   [MEDIUM]  Acortador de enlaces
+
+💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-2-descripcion
+   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
+--- stderr ---
+
+
+$ plane.py search zzz
+[exit 0]
+--- stdout ---
+
+ℹ No se encontraron tickets similares a 'zzz' en OMNIFY.
+💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create "[FEAT] zzz"
+--- stderr ---
+
+
+$ plane.py search validaciones --json -p OMNIFY
+[exit 0]
+--- stdout ---
+{
+  "query": "validaciones",
+  "project": "OMNIFY",
+  "count": 1,
+  "results": [
+    {
+      "ticket_id": "OMNIFY-1",
+      "title": "Validaciones de formulario SMS",
+      "state_name": "Progreso",
+      "state_group": "started",
+      "priority": "high"
+    }
+  ]
+}
+--- stderr ---
+
+
+$ plane.py search x -p NOPE
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'NOPE' no encontrado.
+
+$ plane.py search de la --refresh
+[exit 0]
+--- stdout ---
+
+ℹ No se encontraron tickets similares a 'de la' en OMNIFY.
+💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create "[FEAT] de la"
+--- stderr ---
+
+
+$ plane.py search soporte -p OPS
+[exit 0]
+--- stdout ---
+
+🔍 Coincidencias encontradas en OPS (1):
+  • OPS-13       (Progreso)     [NONE]    Tareas Rápidas y Soporte - W43
+
+💡 Para trabajar en uno existente: git checkout -b feat/OPS-13-descripcion
+   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
+--- stderr ---
+
+
+$ plane.py labels
+[exit 0]
+--- stdout ---
+
+🏷  Etiquetas disponibles para el proyecto OMNIFY (4):
+  • backend            (#111111)
+  • bug                (#d00000)
+  • frontend           (#00aa55)
+  • sms                
+
+💡 Úsalas en: plane-tracker create ... --labels 'backend,bug'
+--- stderr ---
+
+
+$ plane.py labels --json -p OPS --refresh
+[exit 0]
+--- stdout ---
+[
+  {
+    "id": "1b000000-0000-4000-8000-22222222-222",
+    "name": "backend",
+    "color": "#111111"
+  },
+  {
+    "id": "1b100000-0000-4000-8000-22222222-222",
+    "name": "bug",
+    "color": "#d00000"
+  },
+  {
+    "id": "1b300000-0000-4000-8000-22222222-222",
+    "name": "frontend",
+    "color": "#00aa55"
+  },
+  {
+    "id": "1b200000-0000-4000-8000-22222222-222",
+    "name": "sms",
+    "color": ""
+  }
+]
+--- stderr ---
+
+
+$ plane.py labels -p NOPE
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'NOPE' no encontrado. Opciones: OMNIFY, OPS
+
+$ plane.py projects
+[exit 0]
+--- stdout ---
+
+📂 Proyectos en el workspace 'ws':
+  • OMNIFY         ➔  Omnify
+  • OPS            ➔  Operaciones
+
+💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').
+   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.
+--- stderr ---
+
+
+$ plane.py projects --json --refresh
+[exit 0]
+--- stdout ---
+[
+  {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "name": "Omnify",
+    "identifier": "OMNIFY"
+  },
+  {
+    "id": "22222222-2222-4222-8222-222222222222",
+    "name": "Operaciones",
+    "identifier": "OPS"
+  }
+]
+--- stderr ---
+
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=50
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
+GET /api/v1/workspaces/ws/projects/

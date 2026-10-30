@@ -1,0 +1,54 @@
+$ plane.py list
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 500 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50: {"detail": "boom"}
+
+$ plane.py labels
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 404 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/: {"detail": "nada"}
+
+$ plane.py search formulario
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 500 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100: {"detail": "boom"}
+
+$ plane.py get OMNIFY-1
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 500 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/: {"detail": "boom"}
+
+$ plane.py get OPS-13
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 403 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/: {"detail": "prohibido"}
+
+$ plane.py comment OPS-13 -m hola --duration 5
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error HTTP 400 en http://127.0.0.1:PORT/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/20000000-0000-4000-8000-000000000013/comments/: {"detail": "malo"}
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/20000000-0000-4000-8000-000000000013/comments/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/
+POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/20000000-0000-4000-8000-000000000013/comments/ {"comment_html": "<p>hola</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"<VOLATIL>\", \"duration_minutes\": 5, \"end_time\": \"<VOLATIL>\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"hola\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"<VOLATIL>\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
