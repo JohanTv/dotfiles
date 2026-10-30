@@ -3,7 +3,7 @@
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
   1. config        rutas de caché, reloj, variables de entorno
   2. db, api       SQLite local y cliente HTTP de Plane
-  3. mdhtml, resolve, timeutil, worklog, sync, proposal_store, proposals, flow, attachments
+  3. mdhtml, resolve, timeutil, worklog, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -20,6 +20,7 @@ Módulos:
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)
   flow            lead/cycle time y esfuerzo por ticket; `report flow`
+  renamed         pistas de error para nombres retirados y verbos ausentes
   attachments     subida, borrado y listado de adjuntos; `attachment add|list|delete|replace`
   cmd_comment     `comment add`
   cmd_comment_ops `comment edit`, `comment delete`, `worklog propose`
