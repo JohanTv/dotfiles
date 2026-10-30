@@ -358,13 +358,16 @@ def normalize(text, sandbox, scrub=()):
     text = text.replace(str(sandbox.fake.port), "PORT").replace(sandbox.tmp.name, "<TMP>")
     text = re.sub(r"\b[0-9a-f]{40}\b", "<SHA>", text)
     text = re.sub(r"\b(group\W+|grupo |pendiente )[0-9a-f]{8}\b", r"\1<GRP>", text)
+    if scrub:
+        # Las marcas completas de tiempo se limpian ANTES de sustituir la fecha de hoy: si no, según la hora
+        # del día la fecha local coincide con la UTC y la marca queda como "<HOY> hh:mm:ss".
+        text = re.sub(r"\b20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\b", "<TS>", text)
     now = datetime.now()
     text = text.replace(now.strftime("%Y-%m-%d"), "<HOY>").replace(now.strftime("%d/%m/%Y"), "<HOY>")
     text = re.sub(r"abierto desde hace [\d.]+ (días|min|h)", "abierto desde hace <N> \\1", text)
     if scrub:
         text = re.sub(r'(\d+) ms\b', "<N> ms", text)
         text = re.sub(r'"(%s)": (?:"[^"]*"|[\d.]+)' % "|".join(scrub), r'"\1": "<VOLATIL>"', text)
-        text = re.sub(r"\b20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\b", "<TS>", text)
     return text
 
 
