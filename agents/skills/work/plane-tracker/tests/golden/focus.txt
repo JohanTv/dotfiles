@@ -128,8 +128,7 @@ $ plane.py focus
 --- stdout ---
 
 --- stderr ---
-usage: plane.py focus [-h] {set,clear,status} ...
-plane.py focus: error: the following arguments are required: {set,clear,status}
+plane-tracker: error: falta el verbo (set|clear|status); ej: plane-tracker focus set OPS-13
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/

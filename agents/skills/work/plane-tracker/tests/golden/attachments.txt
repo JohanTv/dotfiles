@@ -108,8 +108,7 @@ $ plane.py attachment
 --- stdout ---
 
 --- stderr ---
-usage: plane.py attachment [-h] {add,list,delete,replace} ...
-plane.py attachment: error: the following arguments are required: {add,list,delete,replace}
+plane-tracker: error: falta el verbo (add|list|delete|replace); ej: plane-tracker attachment list OPS-13
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/

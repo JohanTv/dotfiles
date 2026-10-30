@@ -2,6 +2,7 @@
 
 Expone: COMMANDS, add_group(), command_tree(), build_parser(), main().
 No hace: lógica de comandos (vive en cmd_*.py).
+Antes de parsear, main() consulta renamed.suggestion(): un nombre retirado o un verbo ausente termina con código 2.
 COMMANDS define el árbol y el orden de `--help`: cada entrada es un registrador (comando raíz) o una tupla
 (nombre, ayuda, registradores) que declara un grupo `<sustantivo> <verbo>`. El arranque es: parsear argumentos,
 validar el entorno y solo entonces abrir la base de datos (así `--help` funciona sin credenciales).
@@ -9,8 +10,9 @@ validar el entorno y solo entonces abrir la base de datos (así `--help` funcion
 
 import argparse
 import os
+import sys
 
-from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_read, cmd_report, cmd_tickets_write
+from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_read, cmd_report, cmd_tickets_write, renamed
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
 
@@ -78,8 +80,14 @@ def build_parser():
     return parser
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    parser = build_parser()
+    hint = renamed.suggestion(argv, command_tree(parser))
+    if hint:
+        sys.stderr.write(f"plane-tracker: error: {hint}\n")
+        sys.exit(2)
+    args = parser.parse_args(argv)
 
     base_url = get_env_or_fail("PLANE_BASE_URL", "URL de Plane")
     api_key = get_env_or_fail("PLANE_API_KEY", "API Key de Plane")
