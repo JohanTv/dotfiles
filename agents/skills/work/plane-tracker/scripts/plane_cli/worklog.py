@@ -205,7 +205,7 @@ def check_worklogs(local_rows, comments, s_str, e_str):
             issues.append({"code": "orphan", "ticket": ticket, "comment_id": cid, "detail": "el comentario ya no existe en Plane"})
             continue
         if not comment["has_block"]:
-            issues.append({"code": "no_block", "ticket": ticket, "comment_id": cid, "detail": "el comentario no lleva telemetría: no se reconstruiría con --sync"})
+            issues.append({"code": "no_block", "ticket": ticket, "comment_id": cid, "detail": "el comentario no lleva telemetría: no se reconstruiría con report --refresh"})
             continue
         for row in rows:
             diffs = [f"{f}: local {row.get(f)!r} ≠ Plane {comment['meta'].get(f)!r}" for f in CHECK_FIELDS
@@ -217,5 +217,5 @@ def check_worklogs(local_rows, comments, s_str, e_str):
         meta = comment.get("meta") or {}
         if comment["has_block"] and cid not in by_cid and meta.get("duration_minutes") and s_str <= str(meta.get("date", "")) <= e_str:
             issues.append({"code": "missing_local", "ticket": next(iter(tickets), "?"), "comment_id": cid,
-                           "detail": f"comentario con telemetría ({meta.get('date')} {meta.get('start_time')}, {meta.get('duration_minutes')} min) sin fila local; usa report --sync"})
+                           "detail": f"comentario con telemetría ({meta.get('date')} {meta.get('start_time')}, {meta.get('duration_minutes')} min) sin fila local; usa report --refresh"})
     return issues

@@ -1,10 +1,11 @@
 """Adjuntos del work item: subida por almacenamiento firmado, borrado y listado.
 
-Expone: upload_attachment(), validate_attachment_paths(), build_multipart(), cmd_attach(), cmd_attachments(),
-register_attach(), register_attachments().
+Expone: upload_attachment(), validate_attachment_paths(), build_multipart(), attachment_id(), cmd_attachment_add(),
+cmd_attachment_list(), cmd_attachment_delete(), cmd_attachment_replace(), register_attachment_add/list/delete/replace().
 No hace: crear tickets.
 """
 
+import argparse
 import json
 import mimetypes
 import os
@@ -78,35 +79,55 @@ def delete_attachment(base_url, api_key, workspace, project_id, issue_id, attach
     api_request(url, api_key, method="DELETE")
 
 
-def cmd_attach(args, conn, base_url, api_key, workspace, default_project_id):
-    """Sube archivos al work item; con --replace ID sustituye un adjunto (sube el nuevo y luego borra el viejo)."""
+def attachment_id(value):
+    """Tipo argparse: UUID de adjunto; se rechaza antes de tocar la red."""
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{value}' no es un UUID de adjunto (ver `attachment list`)")
+    return value
+
+
+def _upload_files(args, conn, base_url, api_key, workspace, default_project_id, files):
+    """Resuelve el ticket, valida los archivos y los sube; devuelve (project_id, issue)."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-    validate_attachment_paths(args.files)
-    if args.replace and len(args.files) != 1:
-        sys.stderr.write("Error: --replace admite exactamente un archivo.\n")
-        sys.exit(1)
-    for path in args.files:
+    validate_attachment_paths(files)
+    for path in files:
         try:
             name, size = upload_attachment(base_url, api_key, workspace, project_id, issue["id"], path)
         except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError) as exc:
             sys.stderr.write(f"Error subiendo '{path}': {exc}\n")
             sys.exit(1)
         print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
-        if args.replace:
-            delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.replace)
-            print(f"✔ Adjunto anterior {args.replace} eliminado (reemplazado)")
+    return project_id, issue
 
 
-def cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id):
+def cmd_attachment_add(args, conn, base_url, api_key, workspace, default_project_id):
+    """Sube archivos al work item."""
+    _upload_files(args, conn, base_url, api_key, workspace, default_project_id, args.files)
+
+
+def cmd_attachment_replace(args, conn, base_url, api_key, workspace, default_project_id):
+    """Sustituye un adjunto: sube el nuevo y, si salió bien, borra el anterior."""
+    project_id, issue = _upload_files(args, conn, base_url, api_key, workspace, default_project_id, [args.file])
+    delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.id)
+    print(f"✔ Adjunto anterior {args.id} eliminado (reemplazado)")
+
+
+def cmd_attachment_delete(args, conn, base_url, api_key, workspace, default_project_id):
+    """Elimina un adjunto del work item."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.id)
+    print(f"✔ Adjunto {args.id} eliminado de {issue_ref}")
+
+
+def cmd_attachment_list(args, conn, base_url, api_key, workspace, default_project_id):
     """Lista los adjuntos del work item."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/issue-attachments/"
-    if getattr(args, "delete", None):
-        delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.delete)
-        print(f"✔ Adjunto {args.delete} eliminado de {issue_ref}")
-        return
     data = api_request(url, api_key)
     items = data if isinstance(data, list) else data.get("results", [])
     rows = [{"id": a.get("id"), "name": (a.get("attributes") or {}).get("name"), "size": (a.get("attributes") or {}).get("size") or a.get("size"),
@@ -120,17 +141,30 @@ def cmd_attachments(args, conn, base_url, api_key, workspace, default_project_id
     print("")
 
 
-def register_attach(sub):
-    p_attach = sub.add_parser("attach", help="Subir archivos al work item")
-    p_attach.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
-    p_attach.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
-    p_attach.add_argument("--replace", metavar="ID", help="Id de un adjunto a sustituir: sube el nuevo y, si salió bien, borra el anterior")
-    p_attach.set_defaults(handler=cmd_attach)
+def register_attachment_add(sub):
+    p_add = sub.add_parser("add", help="Subir archivos al work item")
+    p_add.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
+    p_add.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
+    p_add.set_defaults(handler=cmd_attachment_add)
 
 
-def register_attachments(sub):
-    p_attachments = sub.add_parser("attachments", help="Listar los adjuntos del work item")
-    p_attachments.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
-    add_json_flag(p_attachments)
-    p_attachments.add_argument("--delete", metavar="ID", help="Eliminar el adjunto con ese id")
-    p_attachments.set_defaults(handler=cmd_attachments)
+def register_attachment_list(sub):
+    p_list = sub.add_parser("list", help="Listar los adjuntos del work item")
+    p_list.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
+    add_json_flag(p_list)
+    p_list.set_defaults(handler=cmd_attachment_list)
+
+
+def register_attachment_delete(sub):
+    p_delete = sub.add_parser("delete", help="Eliminar un adjunto del work item")
+    p_delete.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
+    p_delete.add_argument("id", type=attachment_id, help="UUID del adjunto (ver `attachment list`)")
+    p_delete.set_defaults(handler=cmd_attachment_delete)
+
+
+def register_attachment_replace(sub):
+    p_replace = sub.add_parser("replace", help="Sustituir un adjunto: sube el nuevo y borra el anterior")
+    p_replace.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
+    p_replace.add_argument("id", type=attachment_id, help="UUID del adjunto a sustituir (ver `attachment list`)")
+    p_replace.add_argument("file", help="Archivo nuevo (máx. 50 MB)")
+    p_replace.set_defaults(handler=cmd_attachment_replace)

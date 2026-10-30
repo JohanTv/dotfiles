@@ -6,7 +6,7 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
   3. mdhtml, resolve, timeutil, worklog, sync, proposal_store, proposals, flow, attachments
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
-  5. cli           parser raíz, COMMAND_REGISTRARS ordenado y main()
+  5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
 
 Módulos:
   config          CACHE_DIR, db_file(), request_log(), proposal_file(), now(), get_env_or_fail()
@@ -19,13 +19,13 @@ Módulos:
   sync            sincroniza worklogs de los comentarios de Plane a SQLite
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)
-  flow            lead/cycle time y esfuerzo por ticket; `report --flow`
-  attachments     subida, borrado y listado de adjuntos; `attach`, `attachments`
-  cmd_comment     `comment`
-  cmd_comment_ops `comment-edit`, `comment-delete`, `propose-duration`
-  cmd_tickets_write `create`, `update`, `link`
+  flow            lead/cycle time y esfuerzo por ticket; `report flow`
+  attachments     subida, borrado y listado de adjuntos; `attachment add|list|delete|replace`
+  cmd_comment     `comment add`
+  cmd_comment_ops `comment edit`, `comment delete`, `worklog propose`
+  cmd_tickets_write `create`, `update`, `link add`
   cmd_read        `get`, `list`, `search`, `labels`, `projects`, `whoami`
-  cmd_report      `report`, `report --check`
-  cmd_ops         `health`, `focus`, `handoff`
-  cli             parser raíz y despacho
+  cmd_report      `report`, `worklog check`
+  cmd_ops         `health`, `focus set|clear|status`, `handoff`
+  cli             parser raíz, grupos de verbos y despacho
 """

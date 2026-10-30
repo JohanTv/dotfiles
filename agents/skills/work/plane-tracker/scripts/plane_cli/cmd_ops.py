@@ -1,7 +1,7 @@
-"""Comandos operativos: `health`, `focus` y `handoff`.
+"""Comandos operativos: `health`, `focus set|clear|status` y `handoff`.
 
-Expone: register_health(), register_focus(), register_handoff(), cmd_health(), cmd_focus(), cmd_handoff(),
-summarize_requests(), handoff_facts(), format_handoff(), sanitize_remote(), HandoffError.
+Expone: register_health(), register_focus_set/clear/status(), register_handoff(), cmd_health(), cmd_focus_set/clear/status(),
+cmd_handoff(), summarize_requests(), handoff_facts(), format_handoff(), sanitize_remote(), HandoffError.
 No hace: escribir en Plane.
 """
 
@@ -68,8 +68,8 @@ def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
     print("")
 
 
-def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
-    """Marca en qué ticket trabaja esta sesión; `propose-duration` atribuye a cada ticket solo sus intervalos."""
+def _focus_context(args, conn):
+    """(agente, sesión, ahora, marcas abiertas) de esta sesión; purga las marcas antiguas y termina si no resuelve la sesión."""
     agent = getattr(args, "agent", None) or session_clock.detect_agent()
     if not agent:
         sys.stderr.write("Error: no se pudo determinar el agente (usa --agent claude|opencode|agy).\n")
@@ -80,41 +80,45 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
         for sid, ts in cands:
             sys.stderr.write(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})\n")
         sys.exit(1)
-
     now = config.now()
-    iso = now.isoformat(timespec="seconds")
     with conn:  # las marcas son útiles solo el día en curso: se purgan las antiguas
         conn.execute("DELETE FROM session_marks WHERE COALESCE(ended_at, started_at) < ?", ((now - timedelta(days=FOCUS_KEEP_DAYS)).isoformat(timespec="seconds"),))
     current = conn.execute("SELECT id, ticket FROM session_marks WHERE session_id = ? AND ended_at IS NULL", (session_id,)).fetchall()
+    return agent, session_id, now, current
 
-    if getattr(args, "status", False):
-        stamps = session_clock.timestamps(agent, session_id)
-        midnight = config.local_midnight_utc(now)
-        runs = session_clock.active_runs(stamps, midnight, now)
-        marks = focus_intervals(conn, session_id, midnight, now)
-        per_ticket = {t: session_clock.total_minutes(session_clock.intersect(runs, ivs)) for t, ivs in marks.items()}
-        unattributed = session_clock.total_minutes(session_clock.subtract(runs, [iv for ivs in marks.values() for iv in ivs]))
-        result = {"session": session_id, "agent": agent, "current": current[0]["ticket"] if current else None,
-                  "tickets": {t: round(m, 1) for t, m in per_ticket.items()}, "unattributed_minutes": round(unattributed, 1)}
-        if getattr(args, "json", False):
-            print(json.dumps(result, indent=2, ensure_ascii=False))
-            return
-        print(f"\n🎯 Foco de la sesión {session_id} ({agent}) · hoy")
-        print(f"   • Ahora: {result['current'] or '— (sin foco)'}")
-        for t, m in sorted(result["tickets"].items(), key=lambda kv: -kv[1]):
-            print(f"   • {t:<10} {m:.0f} min atribuidos")
-        print(f"   • Sin foco : {unattributed:.0f} min (no se atribuyen solos)\n")
+
+def cmd_focus_status(args, conn, base_url, api_key, workspace, default_project_id):
+    """Tiempo atribuido hoy a cada ticket por las marcas de foco de la sesión."""
+    agent, session_id, now, current = _focus_context(args, conn)
+    stamps = session_clock.timestamps(agent, session_id)
+    midnight = config.local_midnight_utc(now)
+    runs = session_clock.active_runs(stamps, midnight, now)
+    marks = focus_intervals(conn, session_id, midnight, now)
+    per_ticket = {t: session_clock.total_minutes(session_clock.intersect(runs, ivs)) for t, ivs in marks.items()}
+    unattributed = session_clock.total_minutes(session_clock.subtract(runs, [iv for ivs in marks.values() for iv in ivs]))
+    result = {"session": session_id, "agent": agent, "current": current[0]["ticket"] if current else None,
+              "tickets": {t: round(m, 1) for t, m in per_ticket.items()}, "unattributed_minutes": round(unattributed, 1)}
+    if getattr(args, "json", False):
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return
+    print(f"\n🎯 Foco de la sesión {session_id} ({agent}) · hoy")
+    print(f"   • Ahora: {result['current'] or '— (sin foco)'}")
+    for t, m in sorted(result["tickets"].items(), key=lambda kv: -kv[1]):
+        print(f"   • {t:<10} {m:.0f} min atribuidos")
+    print(f"   • Sin foco : {unattributed:.0f} min (no se atribuyen solos)\n")
 
-    if getattr(args, "off", False):
-        with conn:
-            conn.execute("UPDATE session_marks SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL", (iso, session_id))
-        print("✔ Foco cerrado" + (f" (era {current[0]['ticket']})" if current else " (no había foco abierto)"))
-        return
 
-    if not args.issue:
-        sys.stderr.write("Error: indica el ticket (plane-tracker focus OMNIFY-205), o usa --off / --status.\n")
-        sys.exit(1)
+def cmd_focus_clear(args, conn, base_url, api_key, workspace, default_project_id):
+    """Cierra la marca de foco abierta de esta sesión."""
+    agent, session_id, now, current = _focus_context(args, conn)
+    with conn:
+        conn.execute("UPDATE session_marks SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL", (now.isoformat(timespec="seconds"), session_id))
+    print("✔ Foco cerrado" + (f" (era {current[0]['ticket']})" if current else " (no había foco abierto)"))
+
+
+def cmd_focus_set(args, conn, base_url, api_key, workspace, default_project_id):
+    """Marca en qué ticket trabaja esta sesión; `worklog propose` atribuye a cada ticket solo sus intervalos."""
+    agent, session_id, now, current = _focus_context(args, conn)
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     ticket = issue_ref.upper()
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
@@ -124,6 +128,7 @@ def cmd_focus(args, conn, base_url, api_key, workspace, default_project_id):
     if any(row["ticket"] == ticket for row in current):
         print(f"✔ El foco ya está en {ticket}")
         return
+    iso = now.isoformat(timespec="seconds")
     with conn:
         conn.execute("UPDATE session_marks SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL", (iso, session_id))
         conn.execute("INSERT INTO session_marks (session_id, agent, ticket, started_at) VALUES (?,?,?,?)", (session_id, agent, ticket, iso))
@@ -206,7 +211,7 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
     print(format_handoff(facts))
     ticket = args.issue or detect_ticket_from_git() or "<TICKET>"
     sys.stderr.write(f"\nCompleta los {PLACEHOLDER}, guarda el texto en un archivo y publícalo con:\n"
-                     f"  plane-tracker comment {ticket} -f relevo.md --duration <min>   (o --accept-proposal)\n")
+                     f"  plane-tracker comment add {ticket} -f relevo.md --duration <min>   (o --accept-proposal)\n")
 
 
 def register_health(sub):
@@ -223,12 +228,26 @@ def register_handoff(sub):
     p_handoff.set_defaults(handler=cmd_handoff)
 
 
-def register_focus(sub):
-    p_focus = sub.add_parser("focus", help="Marcar en qué ticket trabaja esta sesión (reparte el tiempo medido por ticket)")
-    p_focus.add_argument("issue", nargs="?", default=None, help="Ticket en el que empiezas a trabajar")
-    p_focus.add_argument("--off", action="store_true", help="Cerrar la marca de foco actual")
-    p_focus.add_argument("--status", action="store_true", help="Ver el tiempo atribuido hoy a cada ticket")
-    p_focus.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente de la sesión (por defecto: según el entorno)")
-    p_focus.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
-    add_json_flag(p_focus)
-    p_focus.set_defaults(handler=cmd_focus)
+def _add_session_args(parser):
+    parser.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente de la sesión (por defecto: según el entorno)")
+    parser.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
+
+
+def register_focus_set(sub):
+    p_set = sub.add_parser("set", help="Marcar en qué ticket trabaja esta sesión (reparte el tiempo medido por ticket)")
+    p_set.add_argument("issue", help="Ticket en el que empiezas a trabajar")
+    _add_session_args(p_set)
+    p_set.set_defaults(handler=cmd_focus_set)
+
+
+def register_focus_clear(sub):
+    p_clear = sub.add_parser("clear", help="Cerrar la marca de foco actual")
+    _add_session_args(p_clear)
+    p_clear.set_defaults(handler=cmd_focus_clear)
+
+
+def register_focus_status(sub):
+    p_status = sub.add_parser("status", help="Ver el tiempo atribuido hoy a cada ticket")
+    _add_session_args(p_status)
+    add_json_flag(p_status)
+    p_status.set_defaults(handler=cmd_focus_status)

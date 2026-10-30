@@ -4,6 +4,6 @@ $ plane.py get
 
 --- stderr ---
 Error: No se especificó ticket y no se detectó identificador en la rama actual de Git.
-Usa: 'plane-tracker comment OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.
+Usa: 'plane-tracker comment add OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.
 
 === peticiones al servidor ===

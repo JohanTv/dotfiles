@@ -1,9 +1,10 @@
-"""Punto de entrada de la CLI: parser raíz, registro ordenado de subcomandos y despacho.
+"""Punto de entrada de la CLI: parser raíz, árbol de comandos y despacho.
 
-Expone: COMMAND_REGISTRARS, build_parser(), main().
+Expone: COMMANDS, add_group(), command_tree(), build_parser(), main().
 No hace: lógica de comandos (vive en cmd_*.py).
-El orden de COMMAND_REGISTRARS es el orden de los subcomandos en `--help`. El arranque es: parsear argumentos, validar
-el entorno y solo entonces abrir la base de datos (así `--help` funciona sin credenciales).
+COMMANDS define el árbol y el orden de `--help`: cada entrada es un registrador (comando raíz) o una tupla
+(nombre, ayuda, registradores) que declara un grupo `<sustantivo> <verbo>`. El arranque es: parsear argumentos,
+validar el entorno y solo entonces abrir la base de datos (así `--help` funciona sin credenciales).
 """
 
 import argparse
@@ -13,35 +14,67 @@ from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_re
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
 
-COMMAND_REGISTRARS = (
-    cmd_comment.register_comment,
-    cmd_tickets_write.register_link,
-    attachments.register_attach,
-    attachments.register_attachments,
-    cmd_ops.register_health,
-    cmd_ops.register_handoff,
-    cmd_ops.register_focus,
-    cmd_comment_ops.register_propose_duration,
-    cmd_tickets_write.register_create,
-    cmd_comment_ops.register_comment_delete,
-    cmd_comment_ops.register_comment_edit,
-    cmd_tickets_write.register_update,
+COMMANDS = (
+    cmd_read.register_search,
     cmd_read.register_get,
     cmd_read.register_list,
-    cmd_read.register_search,
+    cmd_tickets_write.register_create,
+    cmd_tickets_write.register_update,
+    ("comment", "Comentarios: add | edit | delete",
+     (cmd_comment.register_comment_add, cmd_comment_ops.register_comment_edit, cmd_comment_ops.register_comment_delete)),
+    ("attachment", "Adjuntos: add | list | delete | replace",
+     (attachments.register_attachment_add, attachments.register_attachment_list, attachments.register_attachment_delete,
+      attachments.register_attachment_replace)),
+    ("link", "Enlaces: add", (cmd_tickets_write.register_link_add,)),
+    ("focus", "Foco de la sesión: set | clear | status",
+     (cmd_ops.register_focus_set, cmd_ops.register_focus_clear, cmd_ops.register_focus_status)),
+    ("worklog", "Tiempos: propose | check", (cmd_comment_ops.register_worklog_propose, cmd_report.register_worklog_check)),
+    cmd_report.register_report,
+    cmd_ops.register_handoff,
     cmd_read.register_labels,
     cmd_read.register_projects,
     cmd_read.register_whoami,
-    cmd_report.register_report,
+    cmd_ops.register_health,
 )
+
+
+def add_group(sub, name, help, registrars):
+    """Grupo `<name> <verbo>`: el verbo es obligatorio y `--json` se acepta antes de él."""
+    group = sub.add_parser(name, help=help, description=help)
+    add_json_flag(group, hidden=True)
+    verbs = group.add_subparsers(dest="verb", required=True)
+    for register in registrars:
+        register(verbs)
+    verbs.metavar = "{" + ",".join(verbs.choices) + "}"
+    return group
+
+
+def _subparsers_of(parser):
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return action
+    return None
+
+
+def command_tree(parser):
+    """{comando: (verbos...)} del parser; los comandos raíz sin verbos llevan una tupla vacía."""
+    root = _subparsers_of(parser)
+    tree = {}
+    for name, child in (root.choices if root else {}).items():
+        verbs = _subparsers_of(child)
+        tree[name] = tuple(verbs.choices) if verbs else ()
+    return tree
 
 
 def build_parser():
     parser = argparse.ArgumentParser(description="CLI de Plane CE para Agentes de IA y Reportes de Actividad (v2.3 SQLite3)")
     add_json_flag(parser, help="Salida en formato JSON para agentes")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    for register in COMMAND_REGISTRARS:
-        register(subparsers)
+    subparsers = parser.add_subparsers(dest="command", required=True, metavar="<comando>")
+    for entry in COMMANDS:
+        if callable(entry):
+            entry(subparsers)
+        else:
+            add_group(subparsers, *entry)
     return parser
 
 

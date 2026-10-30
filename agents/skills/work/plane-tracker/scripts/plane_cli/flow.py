@@ -1,4 +1,4 @@
-"""Flujo por work item: lead/cycle time, tiempo por estado y esfuerzo, y el reporte `report --flow`.
+"""Flujo por work item: lead/cycle time, tiempo por estado y esfuerzo, y el reporte `report flow`.
 
 Expone: build_ticket_flow(), flow_to_json(), print_flow(), format_lifecycle(), format_span(), cmd_report_flow().
 No hace: escribir en Plane.
@@ -195,7 +195,7 @@ def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id
         return
     print(f"\n🔁 Flujo por ticket · {s_str} → {e_str} (calendario; lead/cycle en UTC)")
     if not rows:
-        print("   (sin tickets con worklogs en caché ni cerrados en el periodo; usa --sync para traer más)\n")
+        print("   (sin tickets con worklogs en caché ni cerrados en el periodo; `report --refresh` trae a la caché los worklogs de Plane)\n")
         return
     for label, title, f in rows:
         outcome = {"completed": "✔", "cancelled": "✖", "open": "…"}[f["outcome"]]

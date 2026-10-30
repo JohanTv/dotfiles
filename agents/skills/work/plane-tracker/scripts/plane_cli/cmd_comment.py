@@ -1,6 +1,6 @@
-"""Comando `comment`: publicar un comentario con su worklog.
+"""Comando `comment add`: publicar un comentario con su worklog.
 
-Expone: register_comment(), cmd_comment().
+Expone: register_comment_add(), cmd_comment().
 No hace: editar ni borrar comentarios.
 """
 
@@ -177,7 +177,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     _record_measurement(meta, args, proposal, worker_type)
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
-    # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --sync`.
+    # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --refresh`.
     if "PLANE_WORKLOG_METADATA" not in comment_html:
         comment_html += "\n" + worklog_metadata_block(meta)
     res = api_request(url, api_key, method="POST", data={"comment_html": comment_html})
@@ -217,8 +217,8 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
 
 
-def register_comment(sub):
-    p_comment = sub.add_parser("comment", help="Publicar comentario en un ticket")
+def register_comment_add(sub):
+    p_comment = sub.add_parser("add", help="Publicar comentario en un ticket")
     p_comment.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")

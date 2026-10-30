@@ -1,6 +1,6 @@
-"""Comandos `comment-edit`, `comment-delete` y `propose-duration`.
+"""Comandos `comment edit`, `comment delete` y `worklog propose`.
 
-Expone: register_comment_edit(), register_comment_delete(), register_propose_duration(), cmd_comment_edit(),
+Expone: register_comment_edit(), register_comment_delete(), register_worklog_propose(), cmd_comment_edit(),
 cmd_comment_delete(), cmd_propose_duration().
 No hace: publicar comentarios nuevos.
 """
@@ -44,7 +44,7 @@ def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_proje
             print(json.dumps(result, indent=2, ensure_ascii=False))
         elif result["ok"]:
             print_split(result, sys.stdout)
-            print("   Registra cada parte con: plane-tracker comment <TICKET> -m \"...\" --accept-proposal")
+            print("   Registra cada parte con: plane-tracker comment add <TICKET> -m \"...\" --accept-proposal")
         else:
             print_proposal(result, "reparto", sys.stdout)
         sys.exit(0 if result["ok"] else 1)
@@ -157,8 +157,8 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
         sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
 
 
-def register_propose_duration(sub):
-    p_prop = sub.add_parser("propose-duration", help="Medir la sesión del agente y proponer una duración (no registra nada)")
+def register_worklog_propose(sub):
+    p_prop = sub.add_parser("propose", help="Medir la sesión del agente y proponer una duración (no registra nada)")
     p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_prop.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide")
     p_prop.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
@@ -175,14 +175,14 @@ def register_propose_duration(sub):
 
 
 def register_comment_delete(sub):
-    p_cdel = sub.add_parser("comment-delete", help="Eliminar un comentario (por defecto el último propio) y su worklog local")
+    p_cdel = sub.add_parser("delete", help="Eliminar un comentario (por defecto el último propio) y su worklog local")
     p_cdel.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
     p_cdel.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
     p_cdel.set_defaults(handler=cmd_comment_delete)
 
 
 def register_comment_edit(sub):
-    p_cedit = sub.add_parser("comment-edit", help="Editar un comentario y/o vincularle su worklog local sin publicar otro")
+    p_cedit = sub.add_parser("edit", help="Editar un comentario y/o vincularle su worklog local sin publicar otro")
     p_cedit.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
     p_cedit.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
     p_cedit.add_argument("-m", "--message", help="Nuevo texto del comentario")

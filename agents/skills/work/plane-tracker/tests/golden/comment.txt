@@ -1,4 +1,4 @@
-$ plane.py comment OMNIFY-1 -m **Hola** mundo
+$ plane.py comment add OMNIFY-1 -m **Hola** mundo
 
 - uno
 - dos --duration 15 --track t1 --capacity tooling_dx
@@ -8,35 +8,35 @@ $ plane.py comment OMNIFY-1 -m **Hola** mundo
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m mismo minuto --duration 15 --track t1 --capacity tooling_dx --json
+$ plane.py comment add OMNIFY-1 -m mismo minuto --duration 15 --track t1 --capacity tooling_dx --json
 [exit 0]
 --- stdout ---
 {"status": "ok", "action": "comment", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "comment_id": "c9000000-0000-4000-8000-000000000002"}
 --- stderr ---
 ⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).
 
-$ plane.py comment OPS-13 -f cuerpo.md --duration 5 --worker-type agent:claude --session sess-golden-0001 --json
+$ plane.py comment add OPS-13 -f cuerpo.md --duration 5 --worker-type agent:claude --session sess-golden-0001 --json
 [exit 0]
 --- stdout ---
 {"status": "ok", "action": "comment", "issue_id": "20000000-0000-4000-8000-000000000013", "sequence_id": 13, "comment_id": "c9000000-0000-4000-8000-000000000003"}
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-2 --duration 7
+$ plane.py comment add OMNIFY-2 --duration 7
 [exit 0]
 --- stdout ---
 ✔ Comentario publicado exitosamente en OMNIFY-2 (ID Comentario: c9000000-0000-4000-8000-000000000004)
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m <p>Ya es <b>HTML</b></p> --duration 3
+$ plane.py comment add OMNIFY-1 -m <p>Ya es <b>HTML</b></p> --duration 3
 [exit 0]
 --- stdout ---
 ✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000005)
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m Con metadata
+$ plane.py comment add OMNIFY-1 -m Con metadata
 <!-- PLANE_WORKLOG_METADATA {"date": "<VOLATIL>", "start_time": "<VOLATIL>", "duration_minutes": 20, "notes": "meta", "track": "mm"} -->
 [exit 0]
 --- stdout ---
@@ -44,7 +44,7 @@ $ plane.py comment OMNIFY-1 -m Con metadata
 --- stderr ---
 
 
-$ plane.py comment OMNIFY-1 -m x --duration 0
+$ plane.py comment add OMNIFY-1 -m x --duration 0
 [exit 1]
 --- stdout ---
 
@@ -53,28 +53,28 @@ $ plane.py comment OMNIFY-1 -m x --duration 0
    Pregunta cuánto demoró; no se infiere ni se inventa.
 Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
 
-$ plane.py comment OMNIFY-1 -m x --duration 9999
+$ plane.py comment add OMNIFY-1 -m x --duration 9999
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: duración fuera de rango (9999 min). Debe estar entre 1 y 1440 minutos.
 
-$ plane.py comment OMNIFY-1 -m    
+$ plane.py comment add OMNIFY-1 -m    
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: El comentario está vacío.
 
-$ plane.py comment OMNIFY-1 -m Pendiente [COMPLETAR] --duration 5
+$ plane.py comment add OMNIFY-1 -m Pendiente [COMPLETAR] --duration 5
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: el texto aún tiene marcadores [COMPLETAR]; complétalos antes de publicar.
 
-$ plane.py comment OMNIFY-1 -m sin duración --capacity toil_support --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m sin duración --capacity toil_support --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 
@@ -83,21 +83,21 @@ $ plane.py comment OMNIFY-1 -m sin duración --capacity toil_support --agent cla
    Pregunta cuánto demoró; no se infiere ni se inventa.
 Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
 
-$ plane.py comment OMNIFY-1 -m sin duración --accept-proposal --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m sin duración --accept-proposal --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: no hay una propuesta reciente (<30 min) de esta sesión para OMNIFY-1. Repite sin --accept-proposal para generarla.
 
-$ plane.py comment OMNIFY-1 -m sin duración --capacity coordination --accept-proposal
+$ plane.py comment add OMNIFY-1 -m sin duración --capacity coordination --accept-proposal
 [exit 1]
 --- stdout ---
 
 --- stderr ---
 Error: el balde 'coordination' (soporte/reuniones) no admite propuesta medida; usa --duration.
 
-$ plane.py comment OMNIFY-1 -m sin duración --agent claude --session sess-golden-0001
+$ plane.py comment add OMNIFY-1 -m sin duración --agent claude --session sess-golden-0001
 [exit 1]
 --- stdout ---
 
@@ -106,7 +106,7 @@ $ plane.py comment OMNIFY-1 -m sin duración --agent claude --session sess-golde
    Pregunta cuánto demoró; no se infiere ni se inventa.
 Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.
 
-$ plane.py comment OMNIFY-999 -m x --duration 5
+$ plane.py comment add OMNIFY-999 -m x --duration 5
 [exit 1]
 --- stdout ---
 
