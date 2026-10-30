@@ -1362,6 +1362,12 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"   • Enlace: {web_url}")
         print(f"   • Sugerencia de rama Git: {branch_sugg}\n")
 
+def positive_int(value):
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("debe ser un entero >= 1")
+    return n
+
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
@@ -1369,43 +1375,64 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
 
     # Obtener comentarios del ticket para análisis de contexto y handoff
     comments = []
-    try:
-        url_c = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
-        comments_data = api_request(url_c, api_key)
-        comments = comments_data.get("results", [])
-    except Exception:
-        pass
+    skip_comments = getattr(args, "no_comments", False)
+    if not skip_comments:
+        try:
+            url_c = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+            comments_data = api_request(url_c, api_key)
+            comments = comments_data.get("results", [])
+        except Exception:
+            pass
+
+    total_comments = len(comments)
+    last = getattr(args, "last", None)
+    if last:
+        comments = comments[-last:]
+    first_idx = total_comments - len(comments) + 1
+    limit = None if getattr(args, "full", False) else 300
+
+    get_states_map(conn, base_url, api_key, workspace, project_id)
+    state_row = conn.execute("SELECT name FROM states WHERE id = ?", (issue.get("state"),)).fetchone()
+    state_name = state_row["name"] if state_row else "?"
 
     if getattr(args, "json", False):
         issue_copy = dict(issue)
         issue_copy["comments"] = comments
+        issue_copy["comments_skipped"] = skip_comments
+        issue_copy["total_comments"] = None if skip_comments else total_comments
+        issue_copy["state_name"] = None if state_name == "?" else state_name
+        if getattr(args, "no_description", False):
+            issue_copy.pop("description_html", None)
+            issue_copy.pop("description", None)
         print(json.dumps(issue_copy, indent=2))
         return
 
     print(f"\n📌 {args.issue}: {issue.get('name')}")
+    print(f"   • Estado    : {state_name}")
     print(f"   • Prioridad : {issue.get('priority', 'none').upper()}")
     print(f"   • Creado el : {issue.get('created_at')[:10]}")
     print(f"   • UUID      : {issue.get('id')}")
 
-    desc = issue.get("description_html") or ""
+    desc = "" if getattr(args, "no_description", False) else (issue.get("description_html") or "")
     clean_desc = re.sub(r"<[^>]+>", " ", desc).strip()
     if clean_desc:
         clean_desc = " ".join(clean_desc.split())
-        if len(clean_desc) > 300:
-            clean_desc = clean_desc[:297] + "..."
+        if limit and len(clean_desc) > limit:
+            clean_desc = clean_desc[: limit - 3] + "..."
         print(f"\n📄 Descripción:")
         print(f"   {clean_desc}")
 
     if comments:
-        print(f"\n💬 Contexto de Relevo / Comentarios ({len(comments)}):")
-        for i, c in enumerate(comments, 1):
+        shown = f"{len(comments)} de {total_comments}" if len(comments) < total_comments else str(total_comments)
+        print(f"\n💬 Contexto de Relevo / Comentarios ({shown}):")
+        for i, c in enumerate(comments, first_idx):
             c_html = c.get("comment_html") or ""
             # Remover bloques de metadata oculta
             text_only = re.sub(r"<!--[\s\S]*?-->", "", c_html)
             text_only = re.sub(r"<[^>]+>", " ", text_only).strip()
             text_only = " ".join(text_only.split())
-            if len(text_only) > 300:
-                text_only = text_only[:297] + "..."
+            if limit and len(text_only) > limit:
+                text_only = text_only[: limit - 3] + "..."
             created = c.get("created_at", "")[:16].replace("T", " ")
             print(f"   [{i}] ({created}): {text_only}")
     print("")
@@ -1896,6 +1923,10 @@ def main():
     p_get = subparsers.add_parser("get", help="Obtener detalles de un ticket")
     p_get.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_get.add_argument("--json", action="store_true", help="Salida en JSON")
+    p_get.add_argument("--no-comments", action="store_true", help="No traer ni mostrar comentarios (ahorra tokens)")
+    p_get.add_argument("--last", type=positive_int, metavar="N", help="Mostrar solo los últimos N comentarios (por defecto: todos)")
+    p_get.add_argument("--full", action="store_true", help="Sin truncar descripción ni comentarios (por defecto 300 caracteres)")
+    p_get.add_argument("--no-description", action="store_true", help="Omitir la descripción")
 
     # list
     p_list = subparsers.add_parser("list", help="Listar tickets del proyecto")
