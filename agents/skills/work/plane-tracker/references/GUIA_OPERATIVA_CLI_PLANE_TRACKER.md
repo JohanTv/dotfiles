@@ -114,6 +114,18 @@ plane-tracker get OMNIFY-197 --full                          # sin truncar descr
 
 ---
 
+### C.1 `plane-tracker propose-duration` (Duración medida)
+Mide la sesión del agente (solo timestamps, nunca contenido) y propone una duración sin registrar nada.
+
+```bash
+plane-tracker propose-duration OMNIFY-197 --worker-type agent:claude
+plane-tracker propose-duration OMNIFY-197 --agent opencode --session ses_xxxxxxxx   # sesión ambigua en el directorio
+plane-tracker comment OMNIFY-197 -m "..." --accept-proposal                         # registra lo propuesto (30 min, un solo uso)
+```
+*Fuentes:* Claude Code (transcript, `$CLAUDE_CODE_SESSION_ID`), OpenCode (`opencode.db`, solo `time_created`), Antigravity CLI (`conversation_summaries.db`, solo hitos; confianza baja). Las pausas de más de 10 min se descuentan de la medición neta.
+
+---
+
 ### D. `plane-tracker update` (Transiciones de Estado)
 Permite mover tickets entre columnas del Kanban sin abrir el navegador.
 

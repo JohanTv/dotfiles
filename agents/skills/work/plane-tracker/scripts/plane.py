@@ -22,8 +22,11 @@ import urllib.parse
 import re
 import time
 import argparse
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import session_clock
 
 # ------------------------------------------------------------------------------
 # Conversor Markdown → HTML (stdlib, sin dependencias externas)
@@ -999,6 +1002,144 @@ def merge_daily_worklogs(rows):
 
     return consolidated, day_wall_clock_minutes, total_compute_minutes
 
+
+# ------------------------------------------------------------------------------
+# Propuesta de duración medida (nunca se registra sola)
+# ------------------------------------------------------------------------------
+
+PROPOSAL_FILE = os.path.join(CACHE_DIR, "last_proposal.json")
+PROPOSAL_TTL_SECONDS = 30 * 60
+# Reuniones y soporte no dejan huella en un transcript: ahí siempre se pregunta.
+NO_PROPOSAL_BUCKETS = ("toil_support", "coordination")
+MAX_PROPOSAL_WARN_MINUTES = 8 * 60
+
+def _local_midnight_utc(moment_utc):
+    local = moment_utc.astimezone()
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+def _session_anchor(conn, session_id, today):
+    """Fin (UTC) del último worklog de hoy ya registrado para esta sesión, o None."""
+    row = conn.execute(
+        "SELECT MAX(end_time) AS e FROM worklogs WHERE date = ? AND raw_payload LIKE ?",
+        (today, f"%{session_id}%"),
+    ).fetchone()
+    if not row or not row["e"]:
+        return None
+    try:
+        local = datetime.strptime(f"{today} {row['e']}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return None
+    return local.astimezone(timezone.utc)
+
+def build_proposal(conn, args, capacity_bucket, worker_type):
+    """Mide la sesión (solo tiempos) y devuelve un dict; 'ok' False significa preguntar."""
+    if capacity_bucket in NO_PROPOSAL_BUCKETS:
+        return {"ok": False, "reason": f"El balde '{capacity_bucket}' (soporte/reuniones) no deja huella en un transcript: pregunta la duración."}
+
+    agent = getattr(args, "agent", None) or session_clock.agent_from_worker_type(worker_type) or session_clock.detect_agent()
+    if not agent:
+        return {"ok": False, "reason": "No se pudo determinar el agente (usa --agent claude|opencode|agy o --worker-type agent:<x>)."}
+
+    session_id, origin, cands = session_clock.resolve_session(agent, os.getcwd(), getattr(args, "session", None))
+    if not session_id:
+        listed = [{"id": sid, "last_activity": ts.astimezone().strftime("%Y-%m-%d %H:%M")} for sid, ts in cands]
+        return {"ok": False, "agent": agent, "candidates": listed,
+                "reason": f"No se pudo determinar la sesión de {agent}: {origin}. Indica --session <id>."}
+
+    stamps = session_clock.timestamps(agent, session_id)
+    if not stamps:
+        return {"ok": False, "agent": agent, "session_id": session_id,
+                "reason": f"Sin evidencia de tiempos para la sesión {session_id} ({agent})."}
+
+    now = datetime.now(timezone.utc)
+    today = now.astimezone().strftime("%Y-%m-%d")
+    window_start = _local_midnight_utc(now)
+    anchor = _session_anchor(conn, session_id, today)
+    if anchor:
+        window_start = max(window_start, anchor + timedelta(minutes=1))
+
+    m = session_clock.measure(stamps, window_start, now)
+    minutes = int(round(m["gross_minutes"] if agent == "agy" else m["net_minutes"]))
+    if m["events"] < 2 or minutes < 1:
+        return {"ok": False, "agent": agent, "session_id": session_id,
+                "reason": "No hay actividad medible en la ventana (desde el último registro de esta sesión o desde las 00:00)."}
+
+    start_local, end_local = m["start"].astimezone(), m["end"].astimezone()
+    warnings = []
+    if minutes > MAX_PROPOSAL_WARN_MINUTES:
+        warnings.append(f"La propuesta supera {MAX_PROPOSAL_WARN_MINUTES // 60} h: revisa si la sesión cubre varios tickets.")
+    if m["pauses"]:
+        warnings.append(f"Se descontaron {m['pauses']} pausa(s) de más de 10 min (pueden ser lectura humana, no inactividad).")
+    if agent == "agy":
+        warnings.append("agy solo expone hitos de la conversación: la medición es aproximada.")
+    warnings.append("Si la sesión tocó varios tickets, reparte el tiempo con --duration en cada uno.")
+
+    return {
+        "ok": True, "agent": agent, "session_id": session_id, "origin": origin,
+        "confidence": session_clock.CONFIDENCE[agent],
+        "minutes": minutes, "net_minutes": round(m["net_minutes"], 1), "gross_minutes": round(m["gross_minutes"], 1),
+        "pauses": m["pauses"], "events": m["events"],
+        "date": start_local.strftime("%Y-%m-%d"),
+        "start_time": start_local.strftime("%H:%M"), "end_time": end_local.strftime("%H:%M"),
+        "anchor": "último registro de la sesión" if anchor else "inicio del día (00:00)",
+        "warnings": warnings,
+    }
+
+def print_proposal(proposal, ticket, stream):
+    if not proposal["ok"]:
+        stream.write(f"✖ Sin propuesta para {ticket}: {proposal['reason']}\n")
+        for c in proposal.get("candidates", []):
+            stream.write(f"   • {c['id']}  (última actividad {c['last_activity']})\n")
+        stream.write("   Pregunta cuánto demoró; no se infiere ni se inventa.\n")
+        return
+    stream.write(f"⏱  Propuesta para {ticket}: {proposal['minutes']} min ({proposal['start_time']}–{proposal['end_time']}, {proposal['date']})\n")
+    stream.write(f"   • Fuente   : {proposal['agent']} · sesión {proposal['session_id']} ({proposal['origin']}) · confianza {proposal['confidence']}\n")
+    stream.write(f"   • Medición : neta {proposal['net_minutes']} min · bruta {proposal['gross_minutes']} min · {proposal['events']} eventos\n")
+    stream.write(f"   • Ventana  : desde {proposal['anchor']}\n")
+    for w in proposal["warnings"]:
+        stream.write(f"   ⚠ {w}\n")
+
+def save_proposal(ticket, proposal):
+    try:
+        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        data = {}
+    data[ticket] = {"ts": time.time(), "proposal": proposal}
+    data = {k: v for k, v in data.items() if time.time() - v.get("ts", 0) < PROPOSAL_TTL_SECONDS}
+    fd = os.open(PROPOSAL_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(data, handle)
+
+def consume_proposal(ticket):
+    """Una propuesta aceptada no puede volver a usarse (evita registrar dos veces lo mismo)."""
+    try:
+        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if data.pop(ticket, None) is not None:
+            with open(PROPOSAL_FILE, "w", encoding="utf-8") as handle:
+                json.dump(data, handle)
+    except (OSError, ValueError):
+        pass
+
+def load_recent_proposal(ticket):
+    try:
+        with open(PROPOSAL_FILE, "r", encoding="utf-8") as handle:
+            entry = json.load(handle).get(ticket)
+    except (OSError, ValueError):
+        return None
+    if not entry or time.time() - entry.get("ts", 0) > PROPOSAL_TTL_SECONDS:
+        return None
+    return entry.get("proposal")
+
+def derived_start(end_dt, duration):
+    """HH:MM de inicio derivado de la duración; nunca antes de las 00:00 del día del fin."""
+    start = end_dt - timedelta(minutes=duration)
+    if start.date() != end_dt.date():
+        sys.stderr.write("⚠ La duración cruza la medianoche: el inicio se limita a 00:00 del día del registro.\n")
+        return "00:00"
+    return start.strftime("%H:%M")
+
 # ------------------------------------------------------------------------------
 # Comandos CLI
 # ------------------------------------------------------------------------------
@@ -1030,12 +1171,26 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta_duration = meta.get("duration_minutes") or meta.get("duration_net_minutes")
     duration = getattr(args, "duration", None) or meta_duration
 
+    proposal = None
     if not duration:
-        sys.stderr.write("Error: Falta la duración de la sesión y no se puede estimar.\n")
-        sys.stderr.write("Usa --duration <minutos> (ej: --duration 5) o incluye el bloque PLANE_WORKLOG_METADATA\n")
-        sys.stderr.write("con 'duration_minutes' en el contenido.\n")
-        sys.stderr.write("Si el trabajo ocurrió fuera de la conversación, el agente debe preguntar cuánto demoró; no inferir ni inventar.\n")
-        sys.exit(1)
+        capacity_hint = getattr(args, "capacity_bucket", None) or (meta.get("capacity_bucket") if meta else None) or "deep_work"
+        worker_hint = getattr(args, "worker_type", None) or (meta.get("worker_type") if meta else None)
+        proposal_key = issue_ref.upper()
+        if getattr(args, "accept_proposal", False):
+            proposal = load_recent_proposal(proposal_key)
+            if not proposal:
+                sys.stderr.write(f"Error: no hay una propuesta reciente (<30 min) para {proposal_key}. Repite sin --accept-proposal para generarla.\n")
+                sys.exit(1)
+            duration = proposal["minutes"]
+        else:
+            result = build_proposal(conn, args, capacity_hint, worker_hint)
+            print_proposal(result, proposal_key, sys.stderr)
+            if result["ok"]:
+                save_proposal(proposal_key, result)
+                sys.stderr.write("   Para registrarla tal cual: repite el comando con --accept-proposal; para ajustarla usa --duration N.\n")
+            else:
+                sys.stderr.write("Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.\n")
+            sys.exit(1)
 
     try:
         duration = int(duration)
@@ -1074,7 +1229,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta = {
             "schema_version": "2.2",
             "date": now.strftime("%Y-%m-%d"),
-            "start_time": (now - timedelta(minutes=duration)).strftime("%H:%M"),
+            "start_time": derived_start(now, duration),
             "end_time": now.strftime("%H:%M"),
             "duration_minutes": duration,
             "track": track,
@@ -1094,7 +1249,23 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta.setdefault("end_time", now.strftime("%H:%M"))
         if not meta.get("start_time"):
             end_t = datetime.strptime(meta["end_time"], "%H:%M")
-            meta["start_time"] = (end_t - timedelta(minutes=duration)).strftime("%H:%M")
+            meta["start_time"] = derived_start(end_t, duration)
+
+    if proposal:
+        meta["date"] = proposal["date"]
+        meta["start_time"] = proposal["start_time"]
+        meta["end_time"] = proposal["end_time"]
+        meta["measured_by"] = {
+            "kind": "proposal", "adapter": proposal["agent"], "confidence": proposal["confidence"],
+            "session": proposal["session_id"], "gross_minutes": proposal["gross_minutes"],
+        }
+    else:
+        # Duración declarada (no medida): se audita aparte; la sesión (si se conoce) evita doble conteo.
+        declared = {"kind": "declared", "worker_type": worker_type}
+        env_agent = session_clock.detect_agent()
+        if env_agent:
+            declared["session"] = os.environ.get(session_clock.SESSION_ENV[env_agent])
+        meta["measured_by"] = declared
 
     entry = {
         "id": res.get("id"),
@@ -1102,7 +1273,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "track": track,
         "issue_name": issue.get("name", ""),
         "date": meta.get("date", now.strftime("%Y-%m-%d")),
-        "start_time": meta.get("start_time", (now - timedelta(minutes=duration)).strftime("%H:%M")),
+        "start_time": meta.get("start_time", derived_start(now, duration)),
         "end_time": meta.get("end_time", now.strftime("%H:%M")),
         "duration_minutes": duration,
         "worker_type": worker_type,
@@ -1115,12 +1286,34 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "created_at": datetime.now().isoformat(),
         "raw_payload": meta
     }
+    clash = conn.execute(
+        "SELECT 1 FROM worklogs WHERE ticket_id = ? AND track = ? AND date = ? AND start_time = ?",
+        (entry["ticket_id"], entry["track"], entry["date"], entry["start_time"]),
+    ).fetchone()
+    if clash:
+        sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
     upsert_worklog(conn, entry)
+    if proposal:
+        consume_proposal(issue_ref.upper())
 
     if getattr(args, "json", False):
         print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": res.get("id")}))
     else:
         print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {res.get('id')})")
+
+def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_project_id):
+    """Solo lectura: mide la sesión y muestra la propuesta de duración sin registrar nada."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    key = issue_ref.upper()
+    capacity = getattr(args, "capacity_bucket", None) or "deep_work"
+    result = build_proposal(conn, args, capacity, getattr(args, "worker_type", None))
+    if result["ok"]:
+        save_proposal(key, result)
+    if getattr(args, "json", False):
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print_proposal(result, key, sys.stdout)
+    sys.exit(0 if result["ok"] else 1)
 
 def _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue):
     """ID del comentario a tocar: el indicado, o el último comentario propio del ticket."""
@@ -1881,7 +2074,22 @@ def main():
     p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
     p_comment.add_argument("--duration", type=int, metavar="MIN",
                            help="Duración neta de la sesión en minutos (requerido si el contenido no lleva metadata telemétrica). Ej: --duration 5")
+    p_comment.add_argument("--accept-proposal", action="store_true",
+                           help="Registrar la duración propuesta (solo vale si se mostró hace menos de 30 min para este ticket)")
+    p_comment.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide (por defecto: según --worker-type o el entorno)")
+    p_comment.add_argument("--session", metavar="ID", help="ID de la sesión del agente (por defecto: variable de entorno o directorio de trabajo)")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
+
+    # propose-duration
+    p_prop = subparsers.add_parser("propose-duration", help="Medir la sesión del agente y proponer una duración (no registra nada)")
+    p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
+    p_prop.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide")
+    p_prop.add_argument("--session", metavar="ID", help="ID de la sesión del agente")
+    p_prop.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
+    p_prop.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
+                        choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],
+                        help="Balde de capacidad (toil_support y coordination no admiten propuesta)")
+    p_prop.add_argument("--json", action="store_true", help="Salida en JSON")
 
     # create
     p_create = subparsers.add_parser("create", help="Crear un nuevo ticket / work item en Plane")
@@ -1979,6 +2187,8 @@ def main():
     try:
         if args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "propose-duration":
+            cmd_propose_duration(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "comment-delete":
             cmd_comment_delete(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "comment-edit":
