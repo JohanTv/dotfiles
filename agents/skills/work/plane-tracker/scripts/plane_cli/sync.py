@@ -1,7 +1,7 @@
 """Sincronización de los worklogs registrados en los comentarios de Plane hacia SQLite.
 
 Expone: sync_remote_worklogs().
-No hace: imprimir reportes.
+No hace: imprimir reportes. Si Plane deja de responder a mitad del sync lo termina con un aviso y sin marcar la marca de agua.
 """
 
 import sys
@@ -10,7 +10,7 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
-from plane_cli.api import api_request
+from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.resolve import get_actor_uuid, get_projects_map
 from plane_cli.timeutil import time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment, upsert_worklog
@@ -42,16 +42,21 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                 target_idents.append(pref)
 
     candidate_tasks = []
+    unavailable = []
     for ident in target_idents:
         proj = projects_map[ident]
         proj_id = proj["id"]
         url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{proj_id}/issues/?order_by=-updated_at&limit=15"
         try:
             data = api_request(url, api_key, raise_on_error=True)
+        except PlaneUnavailable as exc:
+            unavailable.append(exc)
+            break
         except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                continue
-            pass
+            if e.code not in (401, 403, 404):
+                sys.stderr.write(f"⚠ {ident}: Plane respondió HTTP {e.code}; se omite el proyecto.\n")
+            e.close()
+            continue
         except Exception:
             continue
 
@@ -73,9 +78,11 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
         try:
             c_data = api_request(c_url, api_key, raise_on_error=True)
             return ident, iss, c_data.get("results", [])
+        except PlaneUnavailable as exc:
+            unavailable.append(exc)
+            return ident, iss, []
         except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                return ident, iss, []
+            e.close()
             return ident, iss, []
         except Exception:
             return ident, iss, []
@@ -129,6 +136,10 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                         }
                         upsert_worklog(conn, entry)
                         synced_count += 1
+
+    if unavailable:
+        sys.stderr.write(f"⚠ Sincronización incompleta: Plane no responde ({unavailable[0].cause}); se usan los datos locales.\n")
+        return
 
     # Actualizar watermark de sync
     now = time.time()

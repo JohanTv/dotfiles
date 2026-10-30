@@ -291,7 +291,8 @@ $ plane.py worklog check --date 2026-10-20 --json
       "detail": "comentario con telemetría (2026-10-20 12:00, 60 min) sin fila local; usa report --refresh"
     }
   ],
-  "ok": false
+  "ok": false,
+  "unreachable": 0
 }
 --- stderr ---
 

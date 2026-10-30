@@ -10,7 +10,7 @@ import time
 import urllib.error
 from datetime import datetime, timedelta
 
-from plane_cli.api import api_request
+from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag
 from plane_cli.flow import cmd_report_flow
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
@@ -57,8 +57,9 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
         results[label] = (len(t_rows), found)
         issues += found
     errors = [i for i in issues if i["code"] in CHECK_ERRORS]
+    unreachable = sum(1 for i in issues if i["code"] == "unreachable")
     if getattr(args, "json", False):
-        print(json.dumps({"period": [s_str, e_str], "issues": issues, "ok": not errors}, indent=2, ensure_ascii=False))
+        print(json.dumps({"period": [s_str, e_str], "issues": issues, "ok": not errors, "unreachable": unreachable}, indent=2, ensure_ascii=False))
     else:
         print(f"\n🔎 Consistencia worklogs ↔ comentarios · {s_str} → {e_str}")
         if not by_ticket:
@@ -71,7 +72,9 @@ def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_i
             if i["code"] == "unreachable":
                 print(f"   ? {i['ticket']}: {i['detail']}")
         print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment edit o report --refresh.\n")
-    sys.exit(1 if errors else 0)
+    if unreachable and not errors:
+        sys.stderr.write(f"⚠ {unreachable} ticket(s) no se pudieron comprobar en Plane: el resultado está incompleto.\n")
+    sys.exit(1 if errors else 3 if unreachable else 0)
 
 
 def _period(args, today):
@@ -120,7 +123,10 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
 
     needs_sync = force_sync or (not has_entries and (now - last_synced > SYNC_COOLDOWN))
     if needs_sync:
-        sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=getattr(args, "project", None))
+        try:
+            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=getattr(args, "project", None))
+        except PlaneUnavailable as exc:
+            sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); se omite la sincronización y se usan los datos locales.\n")
 
     # Construir query SQL indexada con filtros opcionales
     query = "SELECT * FROM worklogs WHERE date >= ? AND date <= ?"
