@@ -71,12 +71,12 @@ def compute_flow(issue, transitions, states, worklogs, now):
                 end = start if group(sid) in TERMINAL_GROUPS else now
             segments.append((start, end, sid))
     else:
-        flags.append("sin_transicion")
+        flags.append("no_transition")
         if current.get("group") not in TERMINAL_GROUPS and issue.get("state"):
             segments.append((created, now, issue["state"]))
 
     if any(sid not in states for _, _, sid in segments):
-        flags.append("estado_desconocido")
+        flags.append("unknown_state")
 
     # Resultado y cierre: el estado actual manda (un ticket reabierto vuelve a estar abierto).
     outcome = {"completed": "completed", "cancelled": "cancelled"}.get(current.get("group"), "open")
@@ -100,11 +100,11 @@ def compute_flow(issue, transitions, states, worklogs, now):
                 active += span
     has_started = any(group(sid) == "started" for _, _, sid in segments)
     if not has_started:
-        flags.append("sin_started")
+        flags.append("no_started")
     if _UMBRELLA.search(issue.get("name") or ""):
-        flags.append("paraguas")
+        flags.append("umbrella")
     if outcome != "open" and lead < MIN_MEANINGFUL_LEAD:
-        flags.append("cierre_instantaneo")
+        flags.append("instant_close")
 
     intervals, compute, out_before, out_after = [], 0, 0, 0
     for entry in worklogs:
@@ -143,7 +143,7 @@ def compute_flow(issue, transitions, states, worklogs, now):
 def aggregate(flows):
     """Medianas de lead/cycle de tickets completados con flujo real, WIP y cobertura."""
     def real(f):
-        return f["outcome"] == "completed" and not {"paraguas", "cierre_instantaneo", "sin_transicion"} & set(f["flags"])
+        return f["outcome"] == "completed" and not {"umbrella", "instant_close", "no_transition"} & set(f["flags"])
 
     done = [f for f in flows if real(f)]
     leads = [f["lead_minutes"] for f in done]

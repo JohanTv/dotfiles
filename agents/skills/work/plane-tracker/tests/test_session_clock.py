@@ -142,6 +142,12 @@ class PlaneIntegration(unittest.TestCase):
         self.assertIn("medianoche", err.getvalue())
         self.assertEqual(plane.derived_start(datetime(2026, 10, 29, 10, 0), 30), "09:30")
 
+    def test_worklog_metadata_block_roundtrip(self):
+        meta = {"date": "2026-10-29", "start_time": "10:00", "notes": "a -- b --> c", "duration_minutes": 5}
+        block = plane.worklog_metadata_block(meta)
+        self.assertEqual(block.count("-->"), 1)
+        self.assertEqual(plane.extract_metadata_from_comment("<p>x</p>" + block), meta)
+
     def test_umbrella_buckets_get_no_proposal(self):
         class Args:
             agent = "claude"

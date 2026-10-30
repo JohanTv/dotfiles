@@ -1171,6 +1171,11 @@ def load_recent_proposal(ticket):
         return None
     return entry.get("proposal")
 
+def worklog_metadata_block(meta):
+    """Comentario HTML oculto con la telemetría del worklog (los '--' se escapan para no cerrarlo)."""
+    payload = json.dumps(meta, ensure_ascii=False, sort_keys=True).replace("--", "\\u002d\\u002d")
+    return f"<!-- PLANE_WORKLOG_METADATA {payload} -->"
+
 def derived_start(end_dt, duration):
     """HH:MM de inicio derivado de la duración; nunca antes de las 00:00 del día del fin."""
     start = end_dt - timedelta(minutes=duration)
@@ -1247,7 +1252,6 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         comment_html = content
     else:
         comment_html = markdown_to_html(content)
-    res = api_request(url, api_key, method="POST", data={"comment_html": comment_html})
 
     # Caching atómico en SQLite3
     now = datetime.now()
@@ -1305,6 +1309,12 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         if env_agent:
             declared["session"] = os.environ.get(session_clock.SESSION_ENV[env_agent])
         meta["measured_by"] = declared
+
+    # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
+    # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --sync`.
+    if "PLANE_WORKLOG_METADATA" not in comment_html:
+        comment_html += "\n" + worklog_metadata_block(meta)
+    res = api_request(url, api_key, method="POST", data={"comment_html": comment_html})
 
     entry = {
         "id": res.get("id"),
@@ -1723,7 +1733,7 @@ def print_flow(flow, transitions, states, stream=None):
     if flow["worklogs_before_created"] or flow["worklogs_after_closed"]:
         out.write(f"   • Fuera de ventana: {flow['worklogs_before_created']} antes de crear · {flow['worklogs_after_closed']} después de cerrar\n")
     if flow["flags"]:
-        out.write("   • Banderas  : " + ", ".join(flow["flags"]) + "\n")
+        out.write("   • Flags     : " + ", ".join(flow["flags"]) + "\n")
     for t in transitions:
         a = states.get(t["from_id"], {}).get("name", "?")
         b = states.get(t["to_id"], {}).get("name", "?")
@@ -1769,7 +1779,7 @@ def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id
         print(f"      {title[:70]}")
     print(f"\n   Resumen: {agg['completed']} completados · {agg['cancelled']} cancelados · {agg['open']} abiertos")
     print(f"   Mediana lead {format_span(agg['median_lead_minutes'])} (n={agg['n_lead']}) · cycle {format_span(agg['median_cycle_minutes'])} (n={agg['n_cycle']}); "
-          f"{agg['excluded']} excluidos (paraguas, cierres instantáneos, sin historial)")
+          f"{agg['excluded']} excluidos (umbrella, instant_close, no_transition)")
     print("   Nota: el esfuerzo sale de los worklogs de la caché local y de la metadata en los comentarios; lo no registrado no aparece.\n")
 
 def positive_int(value):
