@@ -6,7 +6,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
-import plane  # noqa: E402
+from plane_cli import mdhtml  # noqa: E402
 
 CASES = [
     ("vacío", ""), ("solo espacios", "   \n "), ("párrafo", "uno\ndos\n\ntres"), ("crlf", "a\r\nb\rc"),
@@ -23,7 +23,7 @@ class MarkdownHtml(unittest.TestCase):
     def test_golden(self):
         out = []
         for name, source in CASES:
-            out += [f"### {name}", repr(source), plane.markdown_to_html(source), ""]
+            out += [f"### {name}", repr(source), mdhtml.markdown_to_html(source), ""]
         gs.check_golden(self, "markdown_to_html", "\n".join(out))
 
 
