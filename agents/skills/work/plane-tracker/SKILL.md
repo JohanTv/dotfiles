@@ -90,6 +90,8 @@ Plane cuenta con estados oficiales por proyecto. Las transiciones de estado debe
 
 ## 3. Comandos CLI Disponibles (`plane-tracker` o `scripts/plane.py`)
 
+Estructura del código y cómo añadir un comando: `ARCHITECTURE.md`.
+
 El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `OPS-44`), persiste localmente en SQLite3 (`~/.cache/plane/worklogs.db` con WAL Mode) y carga variables seguras desde `~/.zshrc.local`. Puede invocarse como comando global `plane-tracker` o directamente con Python.
 
 ### A. Publicar Bitácora Dual-Layer (Comentario)
