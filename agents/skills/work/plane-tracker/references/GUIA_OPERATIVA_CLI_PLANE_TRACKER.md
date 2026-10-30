@@ -103,8 +103,13 @@ Muestra la metadata, descripción del ticket y **extrae el historial cronológic
 plane-tracker get OMNIFY-197
 plane-tracker get OPS-44
 
-# Salida JSON para procesamiento por LLM
+# Salida JSON para procesamiento por LLM (incluye state_name)
 plane-tracker get OMNIFY-197 --json
+
+# Control de tokens (por defecto se traen todos los comentarios, truncados a 300 caracteres)
+plane-tracker get OMNIFY-197 --no-comments --no-description  # solo metadata y estado
+plane-tracker get OMNIFY-197 --last 2                        # últimos 2 comentarios
+plane-tracker get OMNIFY-197 --full                          # sin truncar descripción ni comentarios
 ```
 
 ---
