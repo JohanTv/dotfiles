@@ -1398,10 +1398,24 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/"
 
     content = args.message
+    row = conn.execute("SELECT raw_payload FROM worklogs WHERE plane_comment_id = ?", (cid,)).fetchone()
+    local_meta = json.loads(row["raw_payload"]) if row else None
     if content is not None:
         html = content if content.strip().startswith("<") and ">" in content else markdown_to_html(content)
+        if local_meta and "PLANE_WORKLOG_METADATA" not in html:
+            html += "\n" + worklog_metadata_block(local_meta)
         api_request(url, api_key, method="PATCH", data={"comment_html": html})
         print(f"✔ Comentario {cid} actualizado en {issue_ref}")
+    elif getattr(args, "embed_metadata", False):
+        if not local_meta:
+            sys.stderr.write("Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.\n")
+            sys.exit(1)
+        current = api_request(url, api_key).get("comment_html") or ""
+        if "PLANE_WORKLOG_METADATA" in current:
+            print(f"✔ El comentario {cid} ya lleva su metadata")
+        else:
+            api_request(url, api_key, method="PATCH", data={"comment_html": current + "\n" + worklog_metadata_block(local_meta)})
+            print(f"✔ Metadata del worklog añadida al comentario {cid} (sin cambiar su texto visible)")
 
     if args.duration:
         c = api_request(url, api_key)
@@ -1420,10 +1434,27 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
             conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,))
         upsert_worklog(conn, {**meta, "ticket_id": f"{proj_ident}-{issue.get('sequence_id') or seq_id}",
                               "issue_name": issue.get("name", ""), "plane_comment_id": cid, "raw_payload": meta})
+        if "PLANE_WORKLOG_METADATA" not in (c.get("comment_html") or ""):
+            api_request(url, api_key, method="PATCH", data={"comment_html": (c.get("comment_html") or "") + "\n" + worklog_metadata_block(meta)})
         print(f"✔ Worklog local vinculado a {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {track}, {bucket})")
-    elif content is None:
+    elif content is None and not getattr(args, "embed_metadata", False):
         sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
 
+
+def cmd_link(args, conn, base_url, api_key, workspace, default_project_id):
+    """Adjunta un enlace (PR, doc) al work item: aparece en su panel de enlaces, sin notificar como comentario."""
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    if not re.match(r"^https?://", args.url):
+        sys.stderr.write("Error: la URL debe empezar por http:// o https://\n")
+        sys.exit(1)
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/links/"
+    existing = api_request(url, api_key).get("results", [])
+    if any(l.get("url") == args.url for l in existing):
+        print(f"✔ {issue_ref} ya tiene ese enlace")
+        return
+    api_request(url, api_key, method="POST", data={"url": args.url, "title": args.title or args.url})
+    print(f"✔ Enlace añadido a {issue_ref}: {args.title or args.url}")
 
 def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
@@ -2324,6 +2355,12 @@ def main():
     p_comment.add_argument("--session", metavar="ID", help="ID de la sesión del agente (por defecto: variable de entorno o directorio de trabajo)")
     p_comment.add_argument("--json", action="store_true", help="Salida en JSON")
 
+    # link
+    p_link = subparsers.add_parser("link", help="Adjuntar un enlace (PR, doc) al work item")
+    p_link.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
+    p_link.add_argument("url", help="URL del enlace (https://...)")
+    p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")
+
     # propose-duration
     p_prop = subparsers.add_parser("propose-duration", help="Medir la sesión del agente y proponer una duración (no registra nada)")
     p_prop.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
@@ -2360,6 +2397,7 @@ def main():
                          choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"])
     p_cedit.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"])
     p_cedit.add_argument("--duration", type=int, metavar="MIN", help="Duración en minutos: registra el worklog usando la hora de publicación como fin")
+    p_cedit.add_argument("--embed-metadata", action="store_true", help="Añadir al comentario el bloque oculto de metadata de su worklog local (sin cambiar el texto visible)")
 
     # update
     p_update = subparsers.add_parser("update", help="Actualizar estado, prioridad o etiquetas de un ticket")
@@ -2433,6 +2471,8 @@ def main():
     try:
         if args.command == "comment":
             cmd_comment(args, conn, base_url, api_key, workspace, default_project_id)
+        elif args.command == "link":
+            cmd_link(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "propose-duration":
             cmd_propose_duration(args, conn, base_url, api_key, workspace, default_project_id)
         elif args.command == "comment-delete":
