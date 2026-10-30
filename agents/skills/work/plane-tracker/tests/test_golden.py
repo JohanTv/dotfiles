@@ -16,7 +16,7 @@ NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJ
 WORKLOG_COLS = ("ticket_id", "track", "date", "start_time", "end_time", "duration_minutes", "plane_comment_id", "project_id", "issue_name",
                 "worker_type", "capacity_bucket", "phase", "role", "notes", "stoppers_json", "raw_payload", "created_at")
 WORKLOGS = ("worklogs", "SELECT * FROM worklogs ORDER BY ticket_id, track, duration_minutes, notes, date", WORKLOG_COLS)
-NOW_FIELDS = ("date", "start_time", "end_time", "created_at", "edited_at", "updated_at")
+NOW_FIELDS = ("date", "start_time", "end_time", "created_at", "edited_at", "updated_at", "client_id", "external_id")
 STAMPS = ("created_at", "edited_at", "updated_at")
 SESS = ["--agent", "claude", "--session", gs.SESSION]
 CID1 = "c1000000-0000-4000-8000-000000000001"

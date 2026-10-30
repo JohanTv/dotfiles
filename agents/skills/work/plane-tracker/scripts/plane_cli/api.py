@@ -1,6 +1,6 @@
 """Cliente HTTP de la API de Plane: clasificación de fallos, reintentos acotados, circuito y registro de latencia.
 
-Expone: api_request(), probe_plane(), classify(), log_request(), PlaneUnavailable.
+Expone: api_request(), probe_plane(), classify(), log_request(), http_detail(), fail_http(), PlaneUnavailable.
 No hace: interpretar los datos de la API ni tocar SQLite.
 Un fallo transitorio (502/503/504, timeouts, conexión rechazada o cortada, DNS, fallo de handshake TLS, respuesta ilegible)
 lanza PlaneUnavailable y cuenta para el circuito; los errores definitivos (4xx, 500, certificado TLS no verificable) se
@@ -157,6 +157,20 @@ def probe_plane(base_url, api_key, force=False):
     return circuit.probe(_probe_runner(base_url.rstrip("/") + "/api/v1/", api_key), force=force)
 
 
+def http_detail(exc):
+    """Cuerpo de un HTTPError como texto (vacío si no se puede leer)."""
+    try:
+        return exc.read().decode("utf-8")
+    except (OSError, http.client.HTTPException, ValueError):
+        return ""
+
+
+def fail_http(url, status, detail):
+    """Imprime un error HTTP definitivo y termina con código 1."""
+    sys.stderr.write(f"Error HTTP {status} en {url}: {detail}\n")
+    sys.exit(1)
+
+
 def _rate_limit_wait(exc):
     try:
         wait = float(exc.headers.get("Retry-After", 1))
@@ -200,13 +214,9 @@ def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
                 circuit.record(True)
                 if raise_on_error:
                     raise
-                try:
-                    detail = exc.read().decode("utf-8")
-                except (OSError, http.client.HTTPException, ValueError):
-                    detail = ""
+                detail = http_detail(exc)
                 exc.close()
-                sys.stderr.write(f"Error HTTP {exc.code} en {url}: {detail}\n")
-                sys.exit(1)
+                fail_http(url, exc.code, detail)
         except _Transient as exc:
             transient = exc
         except _Definitive as exc:
