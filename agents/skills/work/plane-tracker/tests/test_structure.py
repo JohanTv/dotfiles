@@ -12,7 +12,7 @@ SCRIPTS = os.path.join(SKILL, "scripts")
 PACKAGE = os.path.join(SCRIPTS, "plane_cli")
 MAX_FILE_LINES = 450
 MAX_FUNCTION_LINES = 150
-MAX_MAIN_SCRIPT_LINES = 3400  # tope del script principal mientras conserve código
+MAX_MAIN_SCRIPT_LINES = 20  # plane.py es solo un shim de arranque
 
 
 def sources(include_scripts=True):
@@ -71,6 +71,49 @@ class Structure(unittest.TestCase):
             name = os.path.splitext(os.path.basename(path))[0]
             if name != "__init__":
                 self.assertNotIn(name, sys.stdlib_module_names, f"{name}.py sombrea un módulo de la biblioteca estándar")
+
+    def test_import_graph_is_acyclic_and_layered(self):
+        graph = package_imports()
+        self.assertTrue(graph, "no se encontró el paquete plane_cli")
+        visiting, done = [], set()
+
+        def visit(node):
+            if node in done:
+                return
+            self.assertNotIn(node, visiting, f"ciclo de imports: {' -> '.join(visiting + [node])}")
+            visiting.append(node)
+            for dep in graph[node]:
+                visit(dep)
+            visiting.pop()
+            done.add(node)
+
+        for name in graph:
+            visit(name)
+        for name, deps in graph.items():
+            for dep in deps:
+                if not name.startswith("cmd_") and name != "cli":
+                    self.assertFalse(dep.startswith("cmd_") or dep == "cli", f"la librería {name} importa {dep}")
+                if name.startswith("cmd_"):
+                    self.assertFalse(dep.startswith("cmd_") or dep == "cli", f"{name} importa {dep}")
+
+
+def package_imports():
+    """{módulo: {módulos de plane_cli que importa}} a partir del AST."""
+    names = {os.path.splitext(n)[0] for n in os.listdir(PACKAGE) if n.endswith(".py")} if os.path.isdir(PACKAGE) else set()
+    graph = {}
+    for name in sorted(names - {"__init__"}):
+        with open(os.path.join(PACKAGE, name + ".py"), encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+        deps = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "plane_cli":
+                deps |= {a.name for a in node.names if a.name in names}
+            elif isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("plane_cli."):
+                deps.add(node.module.split(".")[1])
+            elif isinstance(node, ast.Import):
+                deps |= {a.name.split(".")[1] for a in node.names if a.name.startswith("plane_cli.")}
+        graph[name] = deps
+    return graph
 
 
 if __name__ == "__main__":
