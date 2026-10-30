@@ -126,6 +126,19 @@ plane-tracker comment OMNIFY-197 -m "..." --accept-proposal                     
 
 ---
 
+### C.2 Flujo del work item: tiempo abierto vs esfuerzo efectivo
+```bash
+plane-tracker get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
+plane-tracker report --flow --week [-p OMNIFY]    # tabla por ticket del periodo + medianas
+```
+- **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.
+- **Cycle time** = suma del tiempo en estados del grupo *started* (Progreso, Revisión, Pruebas); **Pausado se excluye del activo** y se muestra en el bruto. Reaperturas suman cada tramo.
+- **Esfuerzo**: *reloj* = unión de intervalos de los worklogs (sin doble conteo) y *cómputo* = suma de `duration_minutes` (puede superar al reloj con agentes en paralelo). Fuente: worklogs locales ∪ metadata en comentarios de Plane.
+- **Banderas** (`sin_transicion`, `sin_started`, `cierre_instantaneo`, `paraguas`, `estado_desconocido`) excluyen el ticket de las medianas. Todo en calendario; lead/cycle en UTC, worklogs convertidos desde hora local.
+- Las transiciones salen de `/issues/<id>/activities/` (una llamada por ticket, cacheada en `state_transitions`; los cerrados no se vuelven a pedir si su `updated_at` no cambió).
+
+---
+
 ### D. `plane-tracker update` (Transiciones de Estado)
 Permite mover tickets entre columnas del Kanban sin abrir el navegador.
 
