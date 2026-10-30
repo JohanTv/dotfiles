@@ -12,6 +12,7 @@ import sys
 import time
 
 from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, sync_issues_cache, warn_stale
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
 from plane_cli.resolve import (
@@ -24,32 +25,47 @@ from plane_cli.resolve import (
 )
 
 
+def _fetch_comments(base_url, api_key, workspace, project_id, issue):
+    """Comentarios del ticket, o None si no se pudieron traer (el ticket se muestra igual)."""
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+    try:
+        return api_request(url, api_key).get("results", [])
+    except PlaneUnavailable:
+        sys.stderr.write("⚠ No se pudieron traer los comentarios: Plane no responde.\n")
+    except Exception:
+        pass
+    return None
+
+
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-
-    # Obtener comentarios del ticket para análisis de contexto y handoff
-    comments = []
     skip_comments = getattr(args, "no_comments", False)
-    if not skip_comments:
-        try:
-            url_c = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
-            comments_data = api_request(url_c, api_key)
-            comments = comments_data.get("results", [])
-        except Exception:
-            pass
-
-    total_comments = len(comments)
+    offline = None
+    comments = None if skip_comments else []
+    try:
+        issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+        if not skip_comments:
+            comments = _fetch_comments(base_url, api_key, workspace, project_id, issue)
+        save_snapshot(conn, issue, issue_ref, comments)
+    except PlaneUnavailable:
+        offline = offline_issue(conn, project_id, seq_id, uuid_ref, issue_ref) or fail_no_cache(f"{issue_ref}")
+        issue, comments = offline["issue"], offline["comments"]
+    total_comments = len(comments or [])
+    skip_comments = comments is None
+    comments = comments or []
     last = getattr(args, "last", None)
     if last:
         comments = comments[-last:]
     first_idx = total_comments - len(comments) + 1
     limit = None if getattr(args, "full", False) else 300
 
-    get_states_map(conn, base_url, api_key, workspace, project_id)
-    state_row = conn.execute("SELECT name FROM states WHERE id = ?", (issue.get("state"),)).fetchone()
-    state_name = state_row["name"] if state_row else "?"
+    if offline:
+        state_name = offline["state_name"] or "?"
+    else:
+        get_states_map(conn, base_url, api_key, workspace, project_id)
+        state_row = conn.execute("SELECT name FROM states WHERE id = ?", (issue.get("state"),)).fetchone()
+        state_name = state_row["name"] if state_row else "?"
 
     flow = transitions = flow_states = None
     if getattr(args, "history", False):
@@ -63,12 +79,18 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
         issue_copy["comments_skipped"] = skip_comments
         issue_copy["total_comments"] = None if skip_comments else total_comments
         issue_copy["state_name"] = None if state_name == "?" else state_name
+        if offline:
+            issue_copy.update(stale=True, fetched_at=iso_utc(offline["fetched_at"]), **({"metadata_only": True} if offline["metadata_only"] else {}))
         if getattr(args, "no_description", False):
             issue_copy.pop("description_html", None)
             issue_copy.pop("description", None)
         print(json.dumps(issue_copy, indent=2))
         return
 
+    if offline:
+        print(f"\n⚠ Datos locales de hace {age_text(time.time() - offline['fetched_at'])}; Plane no responde."
+              + (" Solo metadatos del listado: sin descripción ni comentarios." if offline["metadata_only"]
+                 else " Esta copia no incluye comentarios." if skip_comments else ""), end="")
     print(f"\n📌 {args.issue}: {issue.get('name')}")
     print(f"   • Estado    : {state_name}")
     print(f"   • Prioridad : {issue.get('priority', 'none').upper()}")
@@ -118,13 +140,20 @@ def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
             sys.exit(1)
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=50"
-    data = api_request(url, api_key)
-    results = data.get("results", [])
+    offline = False
+    try:
+        results = api_request(url, api_key).get("results", [])
+    except PlaneUnavailable:
+        results, cached_at = cached_issues(conn, project_id)
+        if not results:
+            fail_no_cache("los tickets del proyecto")
+        warn_stale(cached_at)
+        offline = True
 
     if getattr(args, "json", False):
         print(json.dumps(results, indent=2))
     else:
-        print(f"\n📋 Tickets recientes ({len(results)} obtenidos):")
+        print(f"\n📋 Tickets {'en caché local' if offline else 'recientes'} ({len(results)} {'disponibles' if offline else 'obtenidos'}):")
         for iss in results[:15]:
             prio = f"[{iss.get('priority', 'none').upper()}]"
             seq = iss.get("sequence_id", "?")
@@ -184,50 +213,6 @@ def cmd_projects(args, conn, base_url, api_key, workspace, default_project_id):
     print(f"   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.\n")
 
 
-def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
-    """Sincroniza issues del proyecto en SQLite para búsquedas instantáneas (< 2ms) con FTS5."""
-    now = time.time()
-    if not force_refresh:
-        row = conn.execute("SELECT MAX(updated_at) as last_sync FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()
-        if row and row["last_sync"] and (now - row["last_sync"]) < 1800:
-            return
-
-    states_map_by_id = {}
-    try:
-        url_states = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/"
-        s_data = api_request(url_states, api_key)
-        for s in s_data.get("results", []):
-            states_map_by_id[s["id"]] = (s["name"], s.get("group", ""))
-    except Exception:
-        pass
-
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=100"
-    data = api_request(url, api_key)
-    results = data.get("results", [])
-
-    with conn:
-        conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
-        for iss in results:
-            seq = iss.get("sequence_id")
-            if not seq:
-                continue
-            t_id = f"{project_ident}-{seq}"
-            s_info = states_map_by_id.get(iss.get("state"), ("Pendiente", "unstarted"))
-            conn.execute("""
-                INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at,
-                                          created_at, completed_at, start_date, target_date, archived_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (iss["id"], seq, t_id, project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"), "", now,
-                  iss.get("created_at"), iss.get("completed_at"), iss.get("start_date"), iss.get("target_date"), iss.get("archived_at")))
-
-        # Sincronizar tabla FTS5
-        conn.execute("DELETE FROM issues_fts;")
-        conn.execute("""
-            INSERT INTO issues_fts (ticket_id, title, labels_csv)
-            SELECT ticket_id, title, labels_csv FROM issues_cache;
-        """)
-
-
 def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
     """Búsqueda ultra-rápida FTS5 (< 2ms) en el Momento Cero para detectar tickets existentes."""
     project_id = default_project_id
@@ -248,13 +233,7 @@ def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
                 project_ident = k
                 break
 
-    force_refresh = getattr(args, "refresh", False)
-    try:
-        sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
-    except PlaneUnavailable as exc:
-        if not conn.execute("SELECT 1 FROM issues_cache WHERE project_id = ? LIMIT 1", (project_id,)).fetchone():
-            raise
-        sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); consultando la caché local.\n")
+    sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=getattr(args, "refresh", False))
 
     raw_query = args.query.strip()
     matches = []
