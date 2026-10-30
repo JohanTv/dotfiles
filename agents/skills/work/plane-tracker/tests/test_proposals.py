@@ -133,6 +133,39 @@ class Window(Base):
         self.assertTrue(any("excluyeron" in w for w in p["warnings"]))
 
 
+class PastDays(Base):
+    def test_date_measures_a_previous_day(self):
+        past = [t - timedelta(days=1) for t in STAMPS]
+        sc.timestamps = lambda agent, sid, **kw: past
+        p = self.propose(date="2026-10-28")
+        self.assertTrue(p["ok"])
+        self.assertEqual((p["minutes"], p["date"]), (80, "2026-10-28"))
+        self.assertFalse(self.propose().get("ok") and self.propose()["minutes"] == 80)  # hoy no ve lo de ayer
+
+    def test_previous_day_has_its_own_coverage(self):
+        past = [t - timedelta(days=1) for t in STAMPS]
+        sc.timestamps = lambda agent, sid, **kw: past
+        first = self.propose(date="2026-10-28")
+        self.register("OMNIFY-1", first)
+        self.assertFalse(self.propose("OMNIFY-2", date="2026-10-28")["ok"])
+
+    def test_since_until_are_relative_to_the_requested_day(self):
+        past = [t - timedelta(days=1) for t in STAMPS]
+        sc.timestamps = lambda agent, sid, **kw: past
+        p = self.propose(date="2026-10-28", since="09:30", until="10:00")
+        self.assertEqual((p["minutes"], p["date"]), (30, "2026-10-28"))
+
+    def test_invalid_and_future_dates(self):
+        self.assertIn("YYYY-MM-DD", self.propose(date="28/10/2026")["reason"])
+        self.assertIn("futura", self.propose(date="2026-10-30")["reason"])
+
+    def test_focus_marks_of_a_past_day(self):
+        past = [t - timedelta(days=1) for t in STAMPS]
+        sc.timestamps = lambda agent, sid, **kw: past
+        self.mark("OMNIFY-1", local(9) - timedelta(days=1), local(9, 30) - timedelta(days=1))
+        self.assertEqual(self.propose("OMNIFY-1", date="2026-10-28")["minutes"], 30)
+
+
 class Focus(Base):
     def test_each_ticket_gets_only_its_own_intervals(self):
         self.mark("OMNIFY-1", local(9), local(9, 30))
