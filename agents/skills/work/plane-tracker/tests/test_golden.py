@@ -230,7 +230,9 @@ class Golden(unittest.TestCase):
                  ["focus", "set", *SESS], ["focus", "set", "OMNIFY-1"], ["focus", "set", "OMNIFY-1", "--agent", "claude", "--session", "no-existe"],
                  ["focus", "clear", "--agent", "claude", "--session", "no-existe"], ["focus", "status", "--agent", "claude", "--session", "no-existe"],
                  ["focus"]]
-        self.golden("focus", steps, sandbox_kwargs={"with_session": True})
+        # Una marca abierta y cerrada en segundos distintos deja un intervalo de 1 s sin actividad de sesión: aparece como
+        # "0 min atribuidos" según el reloj de pared, así que esa línea no se compara.
+        self.golden("focus", steps, sandbox_kwargs={"with_session": True}, drop=(r"^   • \S+\s+0 min atribuidos\n",))
 
 
 if __name__ == "__main__":

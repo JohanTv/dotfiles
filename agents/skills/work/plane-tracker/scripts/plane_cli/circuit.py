@@ -27,7 +27,7 @@ FRESH_OK = 60
 CAUSES = {
     "timeout": "tiempo de espera agotado", "read_timeout": "tiempo de espera agotado", "refused": "conexión rechazada",
     "dns": "DNS no resuelve", "http_502": "HTTP 502", "http_503": "HTTP 503", "http_504": "HTTP 504",
-    "reset": "conexión cortada", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)", "no_cache": "sin caché local",
+    "reset": "conexión cortada", "tls": "error TLS", "bad_response": "respuesta no válida", "offline": "modo sin conexión (PLANE_OFFLINE=1)", "no_cache": "sin caché local",
 }
 
 
@@ -37,12 +37,14 @@ def cause_text(kind):
 
 class PlaneUnavailable(urllib.error.URLError):
     """Plane no se pudo alcanzar. `delivered` es "no" si la petición no llegó a enviarse y "unknown" si pudo procesarse.
+    `method` es el método HTTP de la petición fallida (lo rellena api_request).
 
     Hereda de URLError para que los sitios que ya capturan fallos de red la traten igual.
     """
 
-    def __init__(self, kind, delivered, since=None, cause_kind=None, message=None):
+    def __init__(self, kind, delivered, since=None, cause_kind=None, message=None, method=None):
         super().__init__(kind)
+        self.method = method
         self.kind = kind
         self.delivered = delivered
         self.since = since
@@ -206,4 +208,7 @@ def format_unavailable(exc):
     if exc.kind == "offline":
         return "Modo sin conexión (PLANE_OFFLINE=1). No se envió nada.\n"
     since = exc.since or hhmm(_now())
+    if exc.delivered == "unknown" and exc.method != "GET":
+        return (f"Plane no responde desde las {since} ({exc.cause}). "
+                "Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.\n")
     return f"Plane no responde desde las {since} ({exc.cause}). No se envió nada; reintenta en {retry_in()} s.\n"

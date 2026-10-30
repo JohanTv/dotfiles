@@ -2,9 +2,9 @@
 
 Expone: api_request(), probe_plane(), classify(), log_request(), PlaneUnavailable.
 No hace: interpretar los datos de la API ni tocar SQLite.
-Un fallo transitorio (502/503/504, timeouts, conexión rechazada o cortada, DNS, respuesta ilegible) lanza PlaneUnavailable
-y cuenta para el circuito; los errores definitivos (4xx, 500) se imprimen y terminan con código 1, o se relanzan como
-HTTPError con raise_on_error. Solo los GET se reintentan ante un fallo transitorio, y los timeouts nunca; el 429 se
+Un fallo transitorio (502/503/504, timeouts, conexión rechazada o cortada, DNS, fallo de handshake TLS, respuesta ilegible)
+lanza PlaneUnavailable y cuenta para el circuito; los errores definitivos (4xx, 500, certificado TLS no verificable) se
+imprimen y terminan con código 1 sin contar para el circuito, o se relanzan como HTTPError con raise_on_error. Solo los GET se reintentan ante un fallo transitorio, y los timeouts nunca; el 429 se
 reintenta con cualquier método porque la petición no se procesó. PLANE_OFFLINE=1 impide cualquier acceso a la red.
 """
 
@@ -12,6 +12,7 @@ import http.client
 import json
 import os
 import socket
+import ssl
 import sys
 import time
 import urllib.error
@@ -50,16 +51,31 @@ def log_request(method, url, status, elapsed_ms, attempt, error=None):
         pass
 
 
+def _classify_tls(exc, handshake):
+    """Clasificación de un ssl.SSLError; handshake=True si ocurrió al conectar (antes de enviar la petición)."""
+    if isinstance(exc, ssl.SSLCertVerificationError):
+        return None
+    if isinstance(exc, (ssl.SSLEOFError, ssl.SSLZeroReturnError)):
+        return "reset", "unknown"
+    return ("tls", "no") if handshake else ("tls", "unknown")
+
+
 def classify(exc):
     """(kind, delivered) de un fallo transitorio; None si el error es definitivo (4xx, 500).
 
     delivered="no": la petición no llegó a enviarse (conexión rechazada, DNS, timeout de conexión).
     delivered="unknown": pudo llegar al servidor (timeout de lectura, conexión cortada, 502/503/504, respuesta ilegible).
+    TLS: un fallo de handshake (SSLError envuelto en URLError) es ("tls", "no"); un EOF o cierre TLS es ("reset", "unknown");
+    un certificado no verificable es un error de configuración (None).
     """
     if isinstance(exc, urllib.error.HTTPError):
         return (f"http_{exc.code}", "unknown") if exc.code in TRANSIENT_HTTP else None
+    if isinstance(exc, ssl.SSLError):
+        return _classify_tls(exc, handshake=False)
     if isinstance(exc, urllib.error.URLError):
         reason = exc.reason
+        if isinstance(reason, ssl.SSLError):
+            return _classify_tls(reason, handshake=True)
         if isinstance(reason, socket.gaierror):
             return "dns", "no"
         if isinstance(reason, TimeoutError):
@@ -92,10 +108,12 @@ def _send(url, method, payload, headers, timeout, attempt):
         exc.elapsed = elapsed() / 1000
         raise
     except (OSError, http.client.HTTPException) as exc:
-        kind, delivered = classify(exc)
+        found = classify(exc)
         reason = str(getattr(exc, "reason", exc))[:80]
         log_request(method, url, None, elapsed(), attempt, error=f"{type(exc).__name__}: {reason}")
-        raise _Transient(kind, delivered, elapsed() / 1000) from exc
+        if found is None:
+            raise _Definitive(str(getattr(exc, "reason", exc))) from exc
+        raise _Transient(*found, elapsed() / 1000) from exc
     try:
         result = json.loads(raw.decode("utf-8")) if raw else {}
     except ValueError as exc:
@@ -103,6 +121,10 @@ def _send(url, method, payload, headers, timeout, attempt):
         raise _Transient("bad_response", "unknown", elapsed() / 1000) from exc
     log_request(method, url, status, elapsed(), attempt)
     return result
+
+
+class _Definitive(Exception):
+    """Fallo de red que no es de disponibilidad (certificado TLS no verificable): error de configuración."""
 
 
 class _Transient(Exception):
@@ -124,6 +146,8 @@ def _probe_runner(url, api_key):
             return (False, found[0]) if found else (True, None)
         except _Transient as exc:
             return False, exc.kind
+        except _Definitive:
+            return False, "tls"
         return True, None
     return run
 
@@ -142,7 +166,15 @@ def _rate_limit_wait(exc):
 
 
 def api_request(url, api_key, method="GET", data=None, timeout=REQUEST_TIMEOUT, max_retries=3, raise_on_error=False):
-    """Ejecuta una petición a la API de Plane. Lanza PlaneUnavailable ante fallos transitorios (ver el docstring del módulo)."""
+    """Ejecuta una petición a la API de Plane. Lanza PlaneUnavailable (con el método de la petición) ante fallos transitorios."""
+    try:
+        return _perform(url, api_key, method, data, timeout, max_retries, raise_on_error)
+    except PlaneUnavailable as exc:
+        exc.method = method
+        raise
+
+
+def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
     if os.environ.get("PLANE_OFFLINE") == "1":
         raise PlaneUnavailable("offline", "no")
     circuit.gate(_probe_runner(url, api_key))
@@ -177,6 +209,9 @@ def api_request(url, api_key, method="GET", data=None, timeout=REQUEST_TIMEOUT, 
                 sys.exit(1)
         except _Transient as exc:
             transient = exc
+        except _Definitive as exc:
+            sys.stderr.write(f"Error TLS en {url}: {exc}\n")
+            sys.exit(1)
         else:
             circuit.record(True)
             return result
