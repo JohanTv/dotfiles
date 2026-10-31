@@ -16,6 +16,7 @@ plane-tracker search "<términos de búsqueda>"
 
 # 2. Creación de ticket con sugerencia automática de rama Git
 plane-tracker create "[FEAT] Título descriptivo" -p OMNIFY --priority high --labels "backend,sms"
+# (rechaza un título repetido de las últimas 24 h: --allow-duplicate lo permite)
 
 # 3. Consulta de detalles de ticket con notas de handoff y comentarios
 plane-tracker get <TICKET-ID>

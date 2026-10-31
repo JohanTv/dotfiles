@@ -246,6 +246,9 @@ plane-tracker link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "P
 ```
 Prefiere `link add` para PRs y documentos: queda estructurado y no notifica como comentario.
 
+### Duplicados al crear
+`plane-tracker create` rechaza (exit 1) un ticket con el mismo título creado en el proyecto en las últimas 24 h; tras un error de red con resultado incierto, comprueba con `plane-tracker search` antes de reintentar. Para crear otro igual a propósito usa `--allow-duplicate`.
+
 ### K. Plane caído: exit 3 y cola de salida
 Exit 3 = Plane no responde: no insistas, sigue trabajando. Las lecturas (`search`, `get`, `list`, `labels`, `projects`) responden con lo local y avisan su antigüedad; `comment add` guarda el comentario y el tiempo y lo encola (`⏳ En cola`, exit 0). Lo demás (`update`, `create`, `link add`, `attachment`, `comment edit|delete`) falla con exit 3: repítelo luego.
 ```bash

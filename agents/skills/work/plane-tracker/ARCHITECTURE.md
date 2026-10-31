@@ -26,6 +26,7 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 | `plane_cli/worklog.py` | 230 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
 | `plane_cli/outbox.py` | 360 | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
 | `plane_cli/outbox_flush.py` | 125 | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
+| `plane_cli/create_guard.py` | 63 | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
 | `plane_cli/sync.py` | 165 | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
 | `plane_cli/proposal_store.py` | 100 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | 290 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
@@ -45,7 +46,7 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 
 1. `config`: no importa nada del paquete.
 2. `db`, `circuit`, `api`: dependen de `config` (`api` también de `circuit`).
-3. Lógica reutilizable (`mdhtml`, `cache`, `resolve`, `timeutil`, `worklog`, `outbox`, `outbox_flush`, `sync`,
+3. Lógica reutilizable (`mdhtml`, `cache`, `resolve`, `timeutil`, `worklog`, `outbox`, `outbox_flush`, `create_guard`, `sync`,
    `proposal_store`, `proposals`, `flow`, `attachments`, `renamed`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (grupo
    `attachment`) y `flow` (`report flow`), que además contienen el comando que los usa, no definen parsers.
 4. `cmd_*`: importan de las capas 1 a 3; **nunca** se importan entre sí ni importan `cli`.
@@ -113,6 +114,8 @@ fallidas), cuando un solo proceso sondea `GET /users/me/`. `outbox flush` sondea
 **Lecturas (`cache`).** Con red, los TTL siguen mandando. Ante `PlaneUnavailable`, `search`, `list`, `get`, `labels` y
 `projects` responden con lo local aunque haya vencido, con el aviso de antigüedad en stderr; sin nada local terminan con
 código 3.
+
+**Guarda de duplicados en `create`.** Antes de enviar, `create` compara el título (sin distinguir mayúsculas ni espacios repetidos) con los tickets del proyecto creados en las últimas 24 h, usando solo la caché local. El envío deja una marca en `sync_metadata` que se borra al confirmarse el resultado (éxito, error definitivo o petición que no salió); si el POST queda sin confirmar, la marca sobrevive y el siguiente `create` del mismo título refresca la caché antes de comparar: si el ticket existe lo rechaza, y si no existe borra la marca y permite el reintento. `--allow-duplicate` omite la comparación.
 
 **Cola de salida (`outbox`, `outbox_flush`).** Solo `comment add` se encola; `update`, `create`, `link add`,
 `comment edit|delete` y `attachment *` fallan con código 3. La cola vive en la tabla SQLite `outbox` (texto de
