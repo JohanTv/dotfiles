@@ -21,7 +21,7 @@ plane-tracker create "[FEAT] Título descriptivo" -p OMNIFY --priority high --la
 # 3. Consulta de detalles de ticket con notas de handoff y comentarios
 plane-tracker get <TICKET-ID>
 
-# 4. Actualización de estado, prioridad o etiquetas
+# 4. Actualización de estado, prioridad, etiquetas o título
 plane-tracker update <TICKET-ID> --state "Progreso" --priority "urgent"
 
 # 5. Publicación de bitácora dual-layer (humano + telemetría v2.2)
@@ -229,12 +229,15 @@ plane-tracker outbox drop ID [--force] [--keep-worklog] [--json]   # descarta un
 
 ---
 
-### D. `plane-tracker update` (Transiciones de Estado)
-Permite mover tickets entre columnas del Kanban sin abrir el navegador.
+### D. `plane-tracker update` (Transiciones de Estado y Renombrado)
+Permite mover tickets entre columnas del Kanban y corregir su título sin abrir el navegador.
 
 ```bash
 # Mover a Progreso
 plane-tracker update OMNIFY-175 --state "Progreso"
+
+# Renombrar el ticket (útil al cambiar de fase, ej. RFC → FEAT)
+plane-tracker update OMNIFY-175 --title "[FEAT] Validaciones de formulario en campañas SMS"
 
 # Mover a Pruebas y cambiar prioridad
 plane-tracker update OMNIFY-175 --state "Pruebas" --priority "high"

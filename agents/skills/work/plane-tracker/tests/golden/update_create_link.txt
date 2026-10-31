@@ -5,6 +5,20 @@ $ plane.py update OMNIFY-1 --state Revisión --priority HIGH --labels backend,no
 --- stderr ---
 Advertencia: Etiqueta 'nope' no existe en el proyecto. Ignorada.
 
+$ plane.py update OMNIFY-1 --title [FEAT] Título renombrado --priority low
+[exit 0]
+--- stdout ---
+✔ Ticket OMNIFY-1 actualizado con éxito: [Título ➔ [FEAT] Título renombrado, Prioridad ➔ low]
+--- stderr ---
+
+
+$ plane.py update OMNIFY-1 --title    
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: El título no puede estar vacío.
+
 $ plane.py update OMNIFY-1 --state completado --json
 [exit 0]
 --- stdout ---
@@ -38,7 +52,7 @@ $ plane.py update OMNIFY-1
 --- stdout ---
 
 --- stderr ---
-Advertencia: No se indicaron cambios para actualizar (--state, --priority, --labels, --start-date o --due-date).
+Advertencia: No se indicaron cambios para actualizar (--title, --state, --priority, --labels, --start-date o --due-date).
 
 $ plane.py update 1 --labels sms
 [exit 0]
@@ -155,6 +169,9 @@ GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b000000-0000-4000-8000-11111111-111", "1b100000-0000-4000-8000-11111111-111"], "priority": "high", "start_date": "2026-10-01", "state": "11004844-0000-4000-8000-11111111-111", "target_date": "2026-11-01"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"name": "[FEAT] Título renombrado", "priority": "low"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"state": "11005808-0000-4000-8000-11111111-111"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/

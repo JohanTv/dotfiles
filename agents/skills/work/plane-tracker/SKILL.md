@@ -100,7 +100,7 @@ El script auto-detecta proyectos según el prefijo del ticket (`OMNIFY-162` o `O
 | :--- | :--- |
 | Buscar antes de crear | `plane-tracker search "<intención>"` |
 | Ver ticket | `plane-tracker get T [--last N] [--history]` |
-| Cambiar estado/prioridad/etiquetas | `plane-tracker update T --state ... --priority ... --labels ...` |
+| Cambiar título/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --state ... --priority ... --labels ...` |
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--attach ARCH...]` |
 | Publicar bitácora | `plane-tracker comment add T -f f.md --duration N` |
 | Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N]` |

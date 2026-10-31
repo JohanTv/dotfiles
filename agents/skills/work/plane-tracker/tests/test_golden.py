@@ -202,6 +202,8 @@ class Golden(unittest.TestCase):
 
     def test_update_create_link(self):
         steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-11-01"],
+                 ["update", "OMNIFY-1", "--title", "[FEAT] Título renombrado", "--priority", "low"],
+                 ["update", "OMNIFY-1", "--title", "   "],
                  ["update", "OMNIFY-1", "--state", "completado", "--json"],
                  ["update", "OMNIFY-1", "--state", "inexistente"], ["update", "OMNIFY-1", "--priority", "enorme"],
                  ["update", "OMNIFY-1", "--due-date", "31/12/2026"], ["update", "OMNIFY-1"],

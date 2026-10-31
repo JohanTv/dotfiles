@@ -40,6 +40,13 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     patch_data = {}
 
+    if args.title is not None:
+        title = args.title.strip()
+        if not title:
+            sys.stderr.write("Error: El título no puede estar vacío.\n")
+            sys.exit(1)
+        patch_data["name"] = title
+
     if args.state:
         states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
         target_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
@@ -78,7 +85,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
             patch_data[field] = val
 
     if not patch_data:
-        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--state, --priority, --labels, --start-date o --due-date).\n")
+        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--title, --state, --priority, --labels, --start-date o --due-date).\n")
         return
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/"
@@ -88,6 +95,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         print(json.dumps({"status": "ok", "action": "update", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "patched": patch_data}))
     else:
         changes = []
+        if "name" in patch_data: changes.append(f"Título ➔ {patch_data['name']}")
         if "state" in patch_data: changes.append(f"Estado ➔ {args.state}")
         if "priority" in patch_data: changes.append(f"Prioridad ➔ {args.priority}")
         if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
@@ -269,8 +277,9 @@ def register_link_add(sub):
 
 
 def register_update(sub):
-    p_update = sub.add_parser("update", help="Cambiar estado, prioridad, etiquetas o fechas")
+    p_update = sub.add_parser("update", help="Cambiar título, estado, prioridad, etiquetas o fechas")
     p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
+    p_update.add_argument("--title", help="Nuevo título del ticket")
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")
