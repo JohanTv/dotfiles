@@ -95,7 +95,6 @@ attach_to_session true
 session_serialization true
 serialize_pane_viewport true
 
-// Portapapeles con Windows en WSL
-copy_command "clip.exe"
-copy_clipboard "primary"
+// Portapapeles: OSC52 (default de Zellij), portable entre Ubuntu nativo y WSL
+copy_clipboard "system"
 copy_on_select true
