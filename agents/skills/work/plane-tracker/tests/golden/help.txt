@@ -367,7 +367,7 @@ $ plane.py comment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPAC
 usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                            [--duration MIN] [--accept-proposal]
+                            [--duration MIN] [--accept-proposal] [--long]
                             [--agent {claude,opencode,agy}] [--session ID]
                             [--json]
                             [issue]
@@ -392,6 +392,8 @@ options:
                         --duration 5
   --accept-proposal     Registrar la duración propuesta (solo vale si se
                         mostró hace menos de 30 min para este ticket)
+  --long                Permite más de 700 caracteres visibles (solo relevos o
+                        informes que el usuario pidió)
   --agent {claude,opencode,agy}
                         Agente cuya sesión se mide (por defecto: según
                         --worker-type o el entorno)

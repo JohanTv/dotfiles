@@ -6,7 +6,6 @@ No hace: publicar comentarios nuevos.
 """
 
 import json
-import re
 import sys
 from datetime import datetime, timedelta
 
@@ -22,6 +21,7 @@ from plane_cli.worklog import (
     corrected_metadata,
     extract_metadata_from_comment,
     find_metadata_block,
+    note_from,
     reject_placeholders,
     replace_metadata_block,
     upsert_worklog,
@@ -142,7 +142,7 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
             # Comentario sin telemetría: su hora de publicación (local) es el fin; inicio = fin - duración
             end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
             start = end - timedelta(minutes=args.duration)
-            notes = re.sub(r"<[^>]+>", "", current_html).strip()[:120] or issue.get("name", "")
+            notes = note_from(current_html, issue.get("name", ""))
             meta = {"schema_version": "2.2", "date": start.strftime("%Y-%m-%d"), "start_time": start.strftime("%H:%M"),
                     "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": args.track or "main",
                     "worker_type": args.worker_type or "human", "capacity_bucket": args.capacity_bucket or "deep_work",

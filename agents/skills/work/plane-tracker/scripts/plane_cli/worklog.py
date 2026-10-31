@@ -1,7 +1,8 @@
 """Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación.
 
 Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), strip_metadata_block(), replace_metadata_block(),
-corrected_metadata(), derived_start(), upsert_worklog(), check_worklogs(), reject_placeholders(), PLACEHOLDER.
+corrected_metadata(), derived_start(), upsert_worklog(), check_worklogs(), reject_placeholders(), reject_long_comment(),
+note_from(), PLACEHOLDER, MAX_COMMENT_CHARS.
 No hace: llamadas a Plane.
 """
 
@@ -183,6 +184,35 @@ def reject_placeholders(text):
     if PLACEHOLDER in re.sub(r"<!--[\s\S]*?-->", "", text or ""):
         sys.stderr.write(f"Error: el texto aún tiene marcadores {PLACEHOLDER}; complétalos antes de publicar.\n")
         sys.exit(1)
+
+
+MAX_COMMENT_CHARS = 700
+
+
+def visible_text(text):
+    """Texto que ve una persona: sin comentarios HTML (bloque de metadata) ni etiquetas."""
+    return re.sub(r"<[^>]+>", "", re.sub(r"<!--[\s\S]*?-->", "", text or "")).strip()
+
+
+def reject_long_comment(text, allow_long):
+    """Una bitácora de cierre es corta: sobre MAX_COMMENT_CHARS visibles solo se publica con --long (relevos, informes pedidos)."""
+    size = len(visible_text(text))
+    if size > MAX_COMMENT_CHARS and not allow_long:
+        sys.stderr.write(f"Error: el comentario tiene {size} caracteres visibles (máximo {MAX_COMMENT_CHARS}). "
+                         "Acórtalo o usa --long solo para un relevo o un informe que el usuario pidió.\n")
+        sys.exit(1)
+
+
+def note_from(text, fallback=""):
+    """Nota del reporte: primera línea con contenido (sin encabezados ni filas de tabla), sin viñeta ni negritas, máx. 120."""
+    for line in visible_text(text).splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", "|")):
+            continue
+        line = re.sub(r"^[-*]\s+", "", line).replace("**", "").replace("__", "").strip()
+        if line:
+            return line[:120]
+    return fallback
 
 
 CHECK_FIELDS = ("date", "start_time", "end_time", "duration_minutes", "track", "capacity_bucket", "worker_type")

@@ -6,7 +6,6 @@ No hace: editar ni borrar comentarios, ni la entrega a Plane (outbox.publish_com
 
 import json
 import os
-import re
 import sys
 from datetime import datetime
 
@@ -20,7 +19,7 @@ from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, local_ticket_label, resolve_issue, resolve_project_and_seq
-from plane_cli.worklog import derived_start, extract_metadata_from_comment, reject_placeholders
+from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders
 
 
 def _resolve_duration(args, conn, meta, issue_ref):
@@ -139,6 +138,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         sys.stderr.write("Error: El comentario está vacío.\n")
         sys.exit(1)
     reject_placeholders(content)
+    reject_long_comment(content, getattr(args, "long", False))
 
     if unavailable is None:
         try:
@@ -174,7 +174,6 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     capacity_bucket = getattr(args, "capacity_bucket", None) or (meta.get("capacity_bucket") if meta else None) or "deep_work"
 
     if not meta:
-        clean_text = re.sub(r"<[^>]+>", "", content).strip()
         meta = {
             "schema_version": "2.2",
             "date": now.strftime("%Y-%m-%d"),
@@ -184,7 +183,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
             "track": track,
             "worker_type": worker_type,
             "capacity_bucket": capacity_bucket,
-            "notes": clean_text[:120] if clean_text else issue.get("name", ""),
+            "notes": note_from(content, issue.get("name", "")),
             "stoppers": [],
             "phase": "dev"
         }
@@ -244,6 +243,8 @@ def register_comment_add(sub):
                            help="Duración neta de la sesión en minutos (requerido si el contenido no lleva metadata telemétrica). Ej: --duration 5")
     p_comment.add_argument("--accept-proposal", action="store_true",
                            help="Registrar la duración propuesta (solo vale si se mostró hace menos de 30 min para este ticket)")
+    p_comment.add_argument("--long", action="store_true",
+                           help="Permite más de 700 caracteres visibles (solo relevos o informes que el usuario pidió)")
     p_comment.add_argument("--agent", choices=list(session_clock.AGENTS), help="Agente cuya sesión se mide (por defecto: según --worker-type o el entorno)")
     p_comment.add_argument("--session", metavar="ID", help="ID de la sesión del agente (por defecto: variable de entorno o directorio de trabajo)")
     add_json_flag(p_comment)

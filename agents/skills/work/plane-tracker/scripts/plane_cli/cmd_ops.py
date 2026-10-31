@@ -217,7 +217,7 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
     print(format_handoff(facts))
     ticket = args.issue or detect_ticket_from_git() or "<TICKET>"
     sys.stderr.write(f"\nCompleta los {PLACEHOLDER}, guarda el texto en un archivo y publícalo con:\n"
-                     f"  plane-tracker comment add {ticket} -f relevo.md --duration <min>   (o --accept-proposal)\n")
+                     f"  plane-tracker comment add {ticket} -f relevo.md --duration <min> --long   (o --accept-proposal)\n")
 
 
 def register_health(sub):

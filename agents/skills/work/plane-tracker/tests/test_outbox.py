@@ -146,7 +146,7 @@ class Cli(unittest.TestCase):
 
     # --- límites ----------------------------------------------------------------
     def test_text_over_64_kb_is_rejected(self):
-        _, err = self.cli(*ADD, "-m", "x" * (65 * 1024), code=1)
+        _, err = self.cli(*ADD, "-m", "x" * (65 * 1024), "--long", code=1)
         self.assertIn("64 KB", err)
         self.assertEqual(self.rows(), [])
 

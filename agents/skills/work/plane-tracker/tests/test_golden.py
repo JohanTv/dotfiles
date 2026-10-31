@@ -135,6 +135,9 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-1", "-m", "sin duración", "--accept-proposal", *SESS],
                  ["comment", "add", "OMNIFY-1", "-m", "sin duración", "--capacity", "coordination", "--accept-proposal"],
                  ["comment", "add", "OMNIFY-1", "-m", "sin duración", *SESS],
+                 ["comment", "add", "OMNIFY-1", "-m", "L" * 701, "--duration", "4"],
+                 ["comment", "add", "OMNIFY-1", "-m", "L" * 701, "--duration", "4", "--long"],
+                 ["comment", "add", "OMNIFY-1", "-m", "### Bitácora\n\n- **Hecho:** nota limpia", "--duration", "4"],
                  ["comment", "add", "OMNIFY-999", "-m", "x", "--duration", "5"]]
         self.golden("comment", steps, files={"cuerpo.md": "# Título\n\nTexto con `código` y [enlace](https://x.example)\n"},
                     scrub=NOW_FIELDS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
