@@ -233,7 +233,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`create`** | `plane-tracker create "[FIX] Titulo" -p OMNIFY -d "..."` | Crea issue en Plane y autogenera rama Git según la fase. |
 | **`get`** | `plane-tracker get OMNIFY-197` | Muestra metadata, descripción y **contexto de comentarios / handoff**. |
 | **`update`** | `plane-tracker update OMNIFY-162 --state "Progreso"` | Actualiza estado, prioridad o etiquetas en Plane. |
-| **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica bitácora dual-layer con telemetría v2.2. |
+| **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica la bitácora corta (`SKILL.md` §4); la CLI agrega la telemetría. |
 | **`labels`** | `plane-tracker labels [-p OMNIFY] [--refresh]` | Lista etiquetas indexadas desde caché local (**< 2ms**). |
 | **`projects`**| `plane-tracker projects [--refresh]` | Lista proyectos dinámicos del workspace (`mi-workspace`). |
 | **`report`** | `plane-tracker report --today [--week] [--refresh] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |

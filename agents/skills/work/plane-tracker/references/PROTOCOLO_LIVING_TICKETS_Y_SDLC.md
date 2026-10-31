@@ -122,7 +122,7 @@ Explicación técnica precisa del fallo estructural o bug identificado tras la a
 - Pull Request: PR #42 (esperando revisión técnica de [líder técnico])
 ```
 
-Al marcar la Fase 3, se publica el comentario final con la **Bitácora Dual-Layer**:
+Al marcar la Fase 3, se publica el comentario final con la bitácora corta (formato en `SKILL.md` §4):
 ```bash
 plane-tracker comment add OMNIFY-180 -f /tmp/worklog_cierre.md --duration 95
 plane-tracker update OMNIFY-180 --state "Completado"

@@ -115,6 +115,8 @@ Crea un segundo ticket semanal, también en `OPS` (el proyecto `OMNIFY` queda li
 
 Dado que Plane CE v1.2.3 no tiene time-tracking granular nativo, los comentarios son la **fuente de la verdad append-only**.
 
+> **Vigente:** el texto del comentario es corto y lo define `SKILL.md` §4; la CLI genera el bloque oculto. La estructura de abajo es histórica (esquema v1.0).
+
 ### Estructura Universal de Comentario
 
 ````markdown

@@ -8,6 +8,27 @@
 
 ---
 
+## 0. Setup inicial (primera vez)
+
+Antes de ejecutar `plane-tracker`, verifica que las variables de entorno estén en `~/.zshrc.local`; si falta alguna, pídele los valores al usuario.
+
+```bash
+export PLANE_BASE_URL="https://plane.tudominio.com"   # URL base de la instancia, sin barra final
+export PLANE_WORKSPACE="tu-workspace"                 # slug del workspace (visible en la URL)
+export PLANE_API_KEY="tu-api-key"                     # Plane → Perfil → API Tokens
+export PLANE_USERNAME="tu@email.com"                  # email o display_name: filtra tu reporte y no mezcla horas ajenas
+# export PLANE_ACTOR_UUID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # opcional y más robusto; obtenlo con `plane-tracker whoami`
+```
+
+Onboarding del agente (primera invocación o error de configuración):
+
+1. Verifica con `plane-tracker whoami 2>&1`.
+2. Si falta una variable, pregunta la URL de la instancia, la API Key y el username o email en Plane.
+3. Escribe los valores en `~/.zshrc.local` (`echo 'export VAR=...' >> ~/.zshrc.local`), recarga con `source ~/.zshrc.local` y verifica con `plane-tracker whoami`.
+4. Nunca expongas la API Key en logs, artefactos ni chat.
+
+---
+
 ## 1. Resumen de Comandos Principales
 
 ```bash
@@ -24,7 +45,7 @@ plane-tracker get <TICKET-ID>
 # 4. Actualización de estado, prioridad, etiquetas o título
 plane-tracker update <TICKET-ID> --state "Progreso" --priority "urgent"
 
-# 5. Publicación de bitácora dual-layer (humano + telemetría v2.2)
+# 5. Publicación de bitácora corta (formato en SKILL.md §4; la CLI agrega la telemetría)
 plane-tracker comment add <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
 
 # 6. Inspección de taxonomía de etiquetas del proyecto (< 2ms)
@@ -254,6 +275,8 @@ plane-tracker update OMNIFY-175 --state "Completado"
 
 ### E. `plane-tracker comment add` (Bitácora Dual-Layer)
 Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite local para los reportes diarios.
+
+> **Formato vigente:** texto corto (máx. 700 caracteres visibles, sin tablas ni JSON; `--long` solo para relevos o informes pedidos) y telemetría por flags (`--track`, `--capacity`, `--worker-type`, `--duration`). El bloque `PLANE_WORKLOG_METADATA` lo agrega la CLI; el agente no lo escribe. Reglas completas: `SKILL.md` §4.
 
 > ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale a [persona] cuánto demoró antes de comentar.
 

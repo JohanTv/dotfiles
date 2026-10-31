@@ -93,7 +93,7 @@ El asistente debe destilar la información ignorando logs crudos extensos y resp
 
 ## 5. El Relevo Inverso: Plantilla de Handoff Snapshot
 
-Si [persona] no concluye la tarea durante su turno y debe suspenderla o devolvérsela a [líder técnico], debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión:
+Si [persona] no concluye la tarea durante su turno y debe suspenderla o devolvérsela a [líder técnico], debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión (si supera los 700 caracteres visibles, publícalo con `--long`):
 
 ```bash
 plane-tracker comment add OMNIFY-197 --duration 10 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)
