@@ -122,6 +122,15 @@ sync-binaries:
 			fi \
 		done \
 	fi
+	@# 2b. Enlazar binarios exclusivos de WSL (solo si es WSL)
+	@if [ "$(IS_WSL)" = "true" ] && [ -d "$(DOTFILES_DIR)/bin/wsl" ]; then \
+		for b in $(DOTFILES_DIR)/bin/wsl/*; do \
+			if [ -f "$$b" ]; then \
+				chmod +x "$$b"; \
+				ln -sf "$$b" "$$HOME/.local/bin/$$(basename "$$b")"; \
+			fi \
+		done \
+	fi
 	@# 3. Enlazar binarios de trabajo si perfil es work
 	@if [ "$(PROFILE)" = "work" ] && [ -d "$(DOTFILES_DIR)/bin/work" ]; then \
 		for b in $(DOTFILES_DIR)/bin/work/*; do \
@@ -147,6 +156,11 @@ sync-binaries:
 					if [ "$$target" = "$(DOTFILES_DIR)/bin/desktop-linux/$$base" ] && [ "$(IS_WSL)" = "true" ]; then \
 						rm "$$link"; \
 						echo "○ Poda de binario desktop en WSL: $$base"; \
+					fi; \
+					# Si es exclusivo de WSL y no estamos en WSL, remover \
+					if [ "$$target" = "$(DOTFILES_DIR)/bin/wsl/$$base" ] && [ "$(IS_WSL)" = "false" ]; then \
+						rm "$$link"; \
+						echo "○ Poda de binario WSL en Linux nativo: $$base"; \
 					fi; \
 					# Si el destino no existe (broken link), remover \
 					if [ ! -e "$$target" ]; then \

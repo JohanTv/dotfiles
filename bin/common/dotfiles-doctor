@@ -80,15 +80,15 @@ def build_managed_targets(wsl_active):
     active_profile = get_active_profile()
     targets = [
         # Static core mappings: (Category, Home Path, Repo Rel Path, DesktopOnly)
-        ("Terminal", "~/.config/alacritty", "terminal/alacritty", False),
-        ("Terminal", "~/.config/zellij", "terminal/zellij", False),
-        ("Shell", "~/.zshrc", "shell/.zshrc", False),
-        ("Shell", "~/.oh-my-zsh/custom/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", False),
-        ("Shell", "~/.oh-my-zsh/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", False),
-        ("Agents Rules", "~/.gemini/GEMINI.md", "agents/rules/dist/active-rules.md", False),
-        ("Agents Rules", "~/.claude/CLAUDE.md", "agents/rules/dist/active-rules.md", False),
-        ("Agents Rules", "~/.config/opencode/AGENTS.md", "agents/rules/dist/active-rules.md", False),
-        ("Agents MCP", "~/.config/opencode/opencode.json", "agents/mcp/opencode.json", False),
+        ("Terminal", "~/.config/alacritty", "terminal/alacritty", "always"),
+        ("Terminal", "~/.config/zellij", "terminal/zellij", "always"),
+        ("Shell", "~/.zshrc", "shell/.zshrc", "always"),
+        ("Shell", "~/.oh-my-zsh/custom/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", "always"),
+        ("Shell", "~/.oh-my-zsh/themes/xxf.zsh-theme", "shell/themes/xxf.zsh-theme", "always"),
+        ("Agents Rules", "~/.gemini/GEMINI.md", "agents/rules/dist/active-rules.md", "always"),
+        ("Agents Rules", "~/.claude/CLAUDE.md", "agents/rules/dist/active-rules.md", "always"),
+        ("Agents Rules", "~/.config/opencode/AGENTS.md", "agents/rules/dist/active-rules.md", "always"),
+        ("Agents MCP", "~/.config/opencode/opencode.json", "agents/mcp/opencode.json", "always"),
     ]
 
     # Dynamic discovery for common skills (WSL + Ubuntu)
@@ -97,7 +97,7 @@ def build_managed_targets(wsl_active):
         for entry in sorted(os.listdir(common_skills)):
             full_p = os.path.join(common_skills, entry)
             if os.path.isdir(full_p):
-                targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/common/{entry}", False))
+                targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/common/{entry}", "always"))
 
     # Dynamic discovery for desktop-linux skills (GNOME/X11)
     desk_skills = os.path.join(DOTFILES_DIR, "agents/skills/desktop-linux")
@@ -105,7 +105,7 @@ def build_managed_targets(wsl_active):
         for entry in sorted(os.listdir(desk_skills)):
             full_p = os.path.join(desk_skills, entry)
             if os.path.isdir(full_p):
-                targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/desktop-linux/{entry}", True))
+                targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/desktop-linux/{entry}", "desktop"))
 
     # Dynamic discovery for work skills (if active profile is 'work' or 'all')
     if active_profile in ("work", "all"):
@@ -114,7 +114,7 @@ def build_managed_targets(wsl_active):
             for entry in sorted(os.listdir(work_skills)):
                 full_p = os.path.join(work_skills, entry)
                 if os.path.isdir(full_p):
-                    targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/work/{entry}", False))
+                    targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/work/{entry}", "always"))
 
     # Dynamic discovery for common binaries
     common_bin = os.path.join(DOTFILES_DIR, "bin/common")
@@ -122,7 +122,7 @@ def build_managed_targets(wsl_active):
         for entry in sorted(os.listdir(common_bin)):
             full_p = os.path.join(common_bin, entry)
             if os.path.isfile(full_p):
-                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/common/{entry}", False))
+                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/common/{entry}", "always"))
 
     # Dynamic discovery for desktop-linux binaries
     desk_bin = os.path.join(DOTFILES_DIR, "bin/desktop-linux")
@@ -130,7 +130,15 @@ def build_managed_targets(wsl_active):
         for entry in sorted(os.listdir(desk_bin)):
             full_p = os.path.join(desk_bin, entry)
             if os.path.isfile(full_p):
-                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/desktop-linux/{entry}", True))
+                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/desktop-linux/{entry}", "desktop"))
+
+    # Dynamic discovery for WSL-only binaries (Windows integration)
+    wsl_bin = os.path.join(DOTFILES_DIR, "bin/wsl")
+    if os.path.isdir(wsl_bin):
+        for entry in sorted(os.listdir(wsl_bin)):
+            full_p = os.path.join(wsl_bin, entry)
+            if os.path.isfile(full_p):
+                targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/wsl/{entry}", "wsl"))
 
     # Dynamic discovery for work binaries (if active profile is 'work' or 'all')
     if active_profile in ("work", "all"):
@@ -139,7 +147,7 @@ def build_managed_targets(wsl_active):
             for entry in sorted(os.listdir(work_bin)):
                 full_p = os.path.join(work_bin, entry)
                 if os.path.isfile(full_p):
-                    targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/work/{entry}", False))
+                    targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/work/{entry}", "always"))
 
     return targets
 
@@ -230,15 +238,22 @@ def get_file_diff(h_path, r_path):
         return None
 
 
-def audit_target(home_path, repo_rel_path, is_desktop_only, wsl_active):
+def audit_target(home_path, repo_rel_path, scope, wsl_active):
     h = os.path.expanduser(home_path)
     r = os.path.join(DOTFILES_DIR, repo_rel_path)
 
-    if is_desktop_only and wsl_active:
+    if scope == "desktop" and wsl_active:
         return {
             "path": home_path,
             "status": "SKIPPED_WSL",
             "message": "Omitido (requiere entorno X11/GNOME nativo)"
+        }
+
+    if scope == "wsl" and not wsl_active:
+        return {
+            "path": home_path,
+            "status": "SKIPPED_WSL",
+            "message": "Omitido (exclusivo de WSL)"
         }
 
     if not os.path.exists(r) and not os.path.islink(r):
@@ -406,8 +421,8 @@ def main():
     issues_found = []
     diff_outputs = []
 
-    for cat, h_path, r_path, is_desk in managed_targets:
-        res = audit_target(h_path, r_path, is_desk, wsl_active)
+    for cat, h_path, r_path, scope in managed_targets:
+        res = audit_target(h_path, r_path, scope, wsl_active)
         res["category"] = cat
         res["repo_path"] = r_path
         results_by_cat.setdefault(cat, []).append(res)

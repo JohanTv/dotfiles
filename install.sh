@@ -144,6 +144,19 @@ else
     log_info "Omitiendo scripts de escritorio X11/GNOME (modo WSL activo)."
 fi
 
+# Scripts exclusivos de WSL (integraciones con Windows)
+if [[ "$IS_WSL" == true ]]; then
+    log_info "Instalando scripts exclusivos de WSL..."
+    for script in "$DOTFILES_DIR"/bin/wsl/*; do
+        if [[ -f "$script" ]]; then
+            chmod +x "$script"
+            link_file "$script" "$HOME/.local/bin/$(basename "$script")"
+        fi
+    done
+else
+    log_info "Omitiendo scripts exclusivos de WSL (Linux nativo)."
+fi
+
 # Scripts específicos de perfil de trabajo (Plane / Omnify)
 ACTIVE_PROFILE="$(cat "$DOTFILES_DIR/.active-profile" 2>/dev/null || echo "${DOTFILES_PROFILE:-work}")"
 if [[ "$ACTIVE_PROFILE" == "work" && -d "$DOTFILES_DIR/bin/work" ]]; then
