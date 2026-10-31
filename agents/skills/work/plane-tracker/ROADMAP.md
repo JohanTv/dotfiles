@@ -10,3 +10,10 @@ La cola de salida envía `external_id` en cada comentario y, antes de reenviar u
 - un POST repetido con el mismo par responde 409 con el `id` del comentario existente;
 - los GET de comentarios devuelven `external_id`;
 - la paginación de comentarios (`cursor`, `next_cursor`, `next_page_results`) tiene la misma forma que la de los tickets.
+
+## Gestión de worktrees multi-repo por ticket
+
+Analizado el 2026-10-31; no implementado. Detalle completo en [`issues/0002-worktrees-multi-repo-por-ticket.md`](./issues/0002-worktrees-multi-repo-por-ticket.md).
+
+- **Decisión:** script `bin/work/plane-worktree` de ~70 líneas, fuera del CLI (el comando no necesita ningún dato de Plane y hereda su gate de credenciales).
+- **Se activa cuando:** se cree un segundo worktree multi-repo a mano, o se reescriba el layout dos veces.
