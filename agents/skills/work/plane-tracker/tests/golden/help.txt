@@ -11,7 +11,7 @@ positional arguments:
     get         Ver un ticket con sus comentarios
     list        Listar los tickets del proyecto
     create      Crear un ticket
-    update      Cambiar título, estado, prioridad, etiquetas o fechas
+    update      Editar título, descripción, estado y demás campos
     comment     Comentarios: add | edit | delete
     attachment  Adjuntos: add | list | delete | replace
     link        Enlaces: add
@@ -128,7 +128,8 @@ options:
 $ plane.py update --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py update [-h] [--title TITLE] [--state STATE]
+usage: plane.py update [-h] [--title TITLE] [-d DESCRIPTION]
+                       [-f DESCRIPTION_FILE] [--state STATE]
                        [--priority PRIORITY] [--labels LABELS]
                        [--start-date START_DATE] [--due-date DUE_DATE]
                        [--json]
@@ -141,6 +142,12 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   --title TITLE         Nuevo título del ticket
+  -d, --description DESCRIPTION
+                        Nueva descripción (Markdown o HTML); reemplaza la
+                        actual
+  -f, --description-file DESCRIPTION_FILE
+                        Archivo con la nueva descripción (Markdown o HTML);
+                        reemplaza la actual
   --state STATE         Nuevo estado: Backlog, Pendiente, Progreso, Pruebas,
                         Revisión, Completado, Pausado, Cancelado
   --priority PRIORITY   Prioridad: urgent, high, medium, low, none

@@ -211,6 +211,12 @@ class Golden(unittest.TestCase):
                  ["update", "OMNIFY-1", "--state", "inexistente"], ["update", "OMNIFY-1", "--priority", "enorme"],
                  ["update", "OMNIFY-1", "--due-date", "31/12/2026"], ["update", "OMNIFY-1"],
                  ["update", "1", "--labels", "sms"],
+                 ["update", "OMNIFY-1", "--description", "## Contexto\n- punto uno\n- punto dos"],
+                 ["update", "OMNIFY-1", "--description-file", "desc.md", "--priority", "high"],
+                 ["update", "OMNIFY-1", "-d", "<p>ya html</p>", "--json"],
+                 ["update", "OMNIFY-1", "-d", "x", "-f", "desc.md"],
+                 ["update", "OMNIFY-1", "--description", "   "],
+                 ["update", "OMNIFY-1", "--description-file", "no-existe.md"],
                  ["create", "[FIX] Corregir validación del campo teléfono en formularios de campaña", "-d", "Texto **md**\n\n1. uno\n2. dos",
                   "-p", "OPS", "--priority", "urgent", "--state", "Pendiente", "--labels", "backend,bug,zzz", "--start-date", "2026-10-26", "--due-date", "2026-11-01"],
                  ["create", "[QA] Probar flujo", "--json", "--attach", "adj.txt"],
@@ -218,7 +224,7 @@ class Golden(unittest.TestCase):
                  ["create", "[RFC] Algo", "-p", "nope"], ["create", "[FEAT] Algo", "--state", "nope"], ["create", "[FEAT] Algo", "--attach", "no-existe.txt"],
                  ["link", "add", "OMNIFY-1", "https://example.com/pr/1", "--title", "PR 1"], ["link", "add", "OMNIFY-1", "https://example.com/pr/1"],
                  ["link", "add", "OMNIFY-1", "ftp://mal"], ["link", "add", "OMNIFY-1", "https://example.com/doc"]]
-        self.golden("update_create_link", steps, files={"adj.txt": "hola adjunto\n"}, sort_requests=False)
+        self.golden("update_create_link", steps, files={"adj.txt": "hola adjunto\n", "desc.md": "## Descripción\n\n- desde archivo\n"}, sort_requests=False)
 
     def test_attachments(self):
         steps = [["attachment", "add", "OMNIFY-1", "adj.txt"], ["attachment", "add", "OMNIFY-1", "adj.txt", "adj.txt"],

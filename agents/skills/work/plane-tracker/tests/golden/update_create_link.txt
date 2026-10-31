@@ -52,7 +52,7 @@ $ plane.py update OMNIFY-1
 --- stdout ---
 
 --- stderr ---
-Advertencia: No se indicaron cambios para actualizar (--title, --state, --priority, --labels, --start-date o --due-date).
+Advertencia: No se indicaron cambios para actualizar (--title, --description, --state, --priority, --labels, --start-date o --due-date).
 
 $ plane.py update 1 --labels sms
 [exit 0]
@@ -60,6 +60,50 @@ $ plane.py update 1 --labels sms
 ✔ Ticket OMNIFY-1 actualizado con éxito: [Etiquetas ➔ sms]
 --- stderr ---
 
+
+$ plane.py update OMNIFY-1 --description ## Contexto
+- punto uno
+- punto dos
+[exit 0]
+--- stdout ---
+✔ Ticket OMNIFY-1 actualizado con éxito: [Descripción ➔ actualizada]
+--- stderr ---
+
+
+$ plane.py update OMNIFY-1 --description-file desc.md --priority high
+[exit 0]
+--- stdout ---
+✔ Ticket OMNIFY-1 actualizado con éxito: [Descripción ➔ actualizada, Prioridad ➔ high]
+--- stderr ---
+
+
+$ plane.py update OMNIFY-1 -d <p>ya html</p> --json
+[exit 0]
+--- stdout ---
+{"status": "ok", "action": "update", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "patched": {"description_html": "<p>ya html</p>"}}
+--- stderr ---
+
+
+$ plane.py update OMNIFY-1 -d x -f desc.md
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: usa --description o --description-file, no ambos.
+
+$ plane.py update OMNIFY-1 --description    
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: La descripción no puede estar vacía.
+
+$ plane.py update OMNIFY-1 --description-file no-existe.md
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no se pudo leer 'no-existe.md': [Errno 2] No such file or directory: 'no-existe.md'
 
 $ plane.py create [FIX] Corregir validación del campo teléfono en formularios de campaña -d Texto **md**
 
@@ -180,6 +224,15 @@ GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b200000-0000-4000-8000-11111111-111"]}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<h2>Contexto</h2>\n<ul><li>punto uno</li><li>punto dos</li></ul>"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<h2>Descripción</h2>\n<ul><li>desde archivo</li></ul>", "priority": "high"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<p>ya html</p>"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
 POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/ {"description_html": "<p>Texto <strong>md</strong></p>\n<ol><li>uno</li><li>dos</li></ol>", "labels": ["1b000000-0000-4000-8000-22222222-222", "1b100000-0000-4000-8000-22222222-222"], "name": "[FIX] Corregir validación del campo teléfono en formularios de campaña", "priority": "urgent", "start_date": "2026-10-26", "state": "22004750-0000-4000-8000-22222222-222", "target_date": "2026-11-01"}

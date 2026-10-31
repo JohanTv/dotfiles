@@ -34,6 +34,36 @@ def cmd_link(args, conn, base_url, api_key, workspace, default_project_id):
     print(f"✔ Enlace añadido a {issue_ref}: {args.title or args.url}")
 
 
+def _description_html(text):
+    """Convierte la descripción a HTML: si ya empieza como HTML se respeta, si no se trata como Markdown."""
+    desc = text.strip()
+    if desc.startswith("<") and ">" in desc:
+        return desc
+    return markdown_to_html(desc)
+
+
+def _read_description(args):
+    """Lee la descripción de `-d/--description` o `-f/--description-file`; None si no se indicó ninguna."""
+    if getattr(args, "description", None) and getattr(args, "description_file", None):
+        sys.stderr.write("Error: usa --description o --description-file, no ambos.\n")
+        sys.exit(1)
+    if getattr(args, "description_file", None):
+        try:
+            with open(args.description_file, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError as exc:
+            sys.stderr.write(f"Error: no se pudo leer '{args.description_file}': {exc}\n")
+            sys.exit(1)
+    else:
+        text = getattr(args, "description", None)
+    if text is None:
+        return None
+    if not text.strip():
+        sys.stderr.write("Error: La descripción no puede estar vacía.\n")
+        sys.exit(1)
+    return text
+
+
 def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
@@ -46,6 +76,10 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
             sys.stderr.write("Error: El título no puede estar vacío.\n")
             sys.exit(1)
         patch_data["name"] = title
+
+    description = _read_description(args)
+    if description is not None:
+        patch_data["description_html"] = _description_html(description)
 
     if args.state:
         states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
@@ -85,7 +119,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
             patch_data[field] = val
 
     if not patch_data:
-        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--title, --state, --priority, --labels, --start-date o --due-date).\n")
+        sys.stderr.write("Advertencia: No se indicaron cambios para actualizar (--title, --description, --state, --priority, --labels, --start-date o --due-date).\n")
         return
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/"
@@ -96,6 +130,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     else:
         changes = []
         if "name" in patch_data: changes.append(f"Título ➔ {patch_data['name']}")
+        if "description_html" in patch_data: changes.append("Descripción ➔ actualizada")
         if "state" in patch_data: changes.append(f"Estado ➔ {args.state}")
         if "priority" in patch_data: changes.append(f"Prioridad ➔ {args.priority}")
         if "labels" in patch_data: changes.append(f"Etiquetas ➔ {args.labels}")
@@ -160,13 +195,7 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     }
 
     if getattr(args, "description", None):
-        desc = args.description.strip()
-        if desc.startswith("<") and ">" in desc:
-            # Ya viene como HTML explícito
-            payload["description_html"] = desc
-        else:
-            # Markdown → HTML
-            payload["description_html"] = markdown_to_html(desc)
+        payload["description_html"] = _description_html(args.description)
 
     if getattr(args, "priority", None):
         payload["priority"] = args.priority.lower()
@@ -277,9 +306,11 @@ def register_link_add(sub):
 
 
 def register_update(sub):
-    p_update = sub.add_parser("update", help="Cambiar título, estado, prioridad, etiquetas o fechas")
+    p_update = sub.add_parser("update", help="Editar título, descripción, estado y demás campos")
     p_update.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_update.add_argument("--title", help="Nuevo título del ticket")
+    p_update.add_argument("-d", "--description", help="Nueva descripción (Markdown o HTML); reemplaza la actual")
+    p_update.add_argument("-f", "--description-file", help="Archivo con la nueva descripción (Markdown o HTML); reemplaza la actual")
     p_update.add_argument("--state", help="Nuevo estado: Backlog, Pendiente, Progreso, Pruebas, Revisión, Completado, Pausado, Cancelado")
     p_update.add_argument("--priority", help="Prioridad: urgent, high, medium, low, none")
     p_update.add_argument("--labels", help="Etiquetas separadas por comas (ej: sms,backend,bug)")

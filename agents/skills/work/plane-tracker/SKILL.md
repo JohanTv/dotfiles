@@ -41,7 +41,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Buscar antes de crear | `plane-tracker search "<intención>"` |
 | Ver ticket | `plane-tracker get T [--last N] [--history]` |
 | Listar tickets | `plane-tracker list -p OMNIFY` |
-| Cambiar título/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --state ... --priority ... --labels ...` |
+| Cambiar título/descripción/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` (la descripción reemplaza la actual) |
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--attach ARCH...]` |
 | Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`) |
 | Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N]` |
