@@ -10,7 +10,8 @@ import sys
 import urllib.error
 from datetime import datetime
 
-from plane_cli.api import api_request
+from plane_cli import create_guard
+from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag
 from plane_cli.attachments import upload_attachment, validate_attachment_paths
 from plane_cli.mdhtml import markdown_to_html
@@ -95,6 +96,32 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         print(f"✔ Ticket {args.issue} actualizado con éxito: [{', '.join(changes)}]")
 
 
+def _submit_issue(args, conn, base_url, api_key, workspace, project_id, project_ident, payload):
+    """Envía la creación evitando duplicados: compara el título con los tickets recientes y marca el envío hasta confirmarlo."""
+    title = payload["name"]
+    if not getattr(args, "allow_duplicate", False):
+        duplicates = create_guard.recent_duplicates(conn, base_url, api_key, workspace, project_id, project_ident, title)
+        if duplicates:
+            ticket, age = duplicates[0]
+            sys.stderr.write(f"Error: ya existe un ticket con ese título en {project_ident}: {ticket} (creado hace {age}). "
+                             "Si es un reintento tras un error de red no lo repitas; para crear otro igual usa --allow-duplicate.\n")
+            sys.exit(1)
+
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
+    create_guard.mark_unconfirmed(conn, project_id, title)
+    try:
+        res = api_request(url, api_key, method="POST", data=payload)
+    except PlaneUnavailable as exc:
+        if exc.delivered == "no":
+            create_guard.clear_mark(conn, project_id, title)
+        raise
+    except SystemExit:
+        create_guard.clear_mark(conn, project_id, title)
+        raise
+    create_guard.clear_mark(conn, project_id, title)
+    return res
+
+
 def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     """Crea un nuevo ticket en Plane y devuelve su identificador para ramas Git."""
     project_id = default_project_id
@@ -166,8 +193,7 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     attach_paths = getattr(args, "attach", None) or []
     validate_attachment_paths(attach_paths)
 
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
-    res = api_request(url, api_key, method="POST", data=payload)
+    res = _submit_issue(args, conn, base_url, api_key, workspace, project_id, project_ident, payload)
 
     # Plane no admite adjuntos en la creación: se suben justo después (el ticket ya existe si alguno falla).
     attached, attach_errors = [], []
@@ -264,6 +290,7 @@ def register_create(sub):
     p_create.add_argument("--labels", help="Etiquetas separadas por comas (ej: backend,bug,spike)")
     p_create.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
     p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
+    p_create.add_argument("--allow-duplicate", action="store_true", help="Crear aunque haya un ticket reciente con el mismo título")
     p_create.add_argument("--attach", nargs="+", metavar="FILE", help="Archivo(s) a adjuntar al crear el ticket (máx. 50 MB cada uno)")
     add_json_flag(p_create)
     p_create.set_defaults(handler=cmd_create)

@@ -3,7 +3,7 @@
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
   1. config        rutas de caché, reloj, variables de entorno
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
-  3. mdhtml, cache, resolve, timeutil, worklog, outbox, outbox_flush, sync, proposal_store, proposals, flow, attachments, renamed
+  3. mdhtml, cache, resolve, timeutil, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -20,6 +20,7 @@ Módulos:
   worklog         metadata oculta de los comentarios, upsert local y check_worklogs()
   outbox          cola de salida de `comment add`: guardado previo, reclamo atómico, entrega idempotente, list y drop
   outbox_flush    publicación de la cola (`outbox flush`)
+  create_guard    guarda de duplicados de `create` (título reciente, envíos sin confirmar)
   sync            sincroniza worklogs de los comentarios de Plane a SQLite
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)

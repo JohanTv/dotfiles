@@ -97,7 +97,7 @@ usage: plane.py create [-h] [-d DESCRIPTION] [-p PROJECT]
                        [--priority {urgent,high,medium,low,none}]
                        [--state STATE] [--labels LABELS]
                        [--start-date START_DATE] [--due-date DUE_DATE]
-                       [--attach FILE [FILE ...]] [--json]
+                       [--allow-duplicate] [--attach FILE [FILE ...]] [--json]
                        title
 
 positional arguments:
@@ -116,6 +116,8 @@ options:
   --start-date START_DATE
                         Fecha de inicio YYYY-MM-DD
   --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
+  --allow-duplicate     Crear aunque haya un ticket reciente con el mismo
+                        título
   --attach FILE [FILE ...]
                         Archivo(s) a adjuntar al crear el ticket (máx. 50 MB
                         cada uno)
