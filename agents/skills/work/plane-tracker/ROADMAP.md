@@ -17,3 +17,10 @@ Analizado el 2026-10-31; no implementado. Detalle completo en [`issues/0002-work
 
 - **Decisión:** script `bin/work/plane-worktree` de ~70 líneas, fuera del CLI (el comando no necesita ningún dato de Plane y hereda su gate de credenciales).
 - **Se activa cuando:** se cree un segundo worktree multi-repo a mano, o se reescriba el layout dos veces.
+
+## Standby externo sin fuente de datos
+
+Detectado el 2026-10-31 y pendiente de evaluar a fondo; no implementado. Detalle en [`issues/0003-standby-externo-sin-fuente-de-datos.md`](./issues/0003-standby-externo-sin-fuente-de-datos.md).
+
+- **Hecho:** el reporte siempre lista `stoppers`, pero ningún flag ni código los alimenta, y sin datos imprime "0h 00m (Sin bloqueos reportados)".
+- **Decisión pendiente:** quitar la línea o alimentarla (`--stopper`, o tiempo en `Pausado` desde las transiciones).
