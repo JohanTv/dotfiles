@@ -10,7 +10,7 @@
 
 ### Registro de Tiempos y Telemetría en Plane:
 - **Skill Obligatoria:** Utiliza la skill `plane-tracker` para interactuar con la API de Plane (definida en `$PLANE_BASE_URL`).
-- **Hitos de Activación:** Al concluir un artefacto diagnóstico (informe/scripts) o al finalizar una sesión de trabajo, redacta la bitácora dual (tabla ejecutiva + metadata oculta `PLANE_WORKLOG_METADATA`) y sugiere registrarla en el ticket respectivo.
+- **Hitos de Activación:** Al concluir un artefacto diagnóstico (informe/scripts) o al finalizar una sesión de trabajo, propón registrar una bitácora corta (≤700 caracteres, sin tabla ni JSON; formato y duración según la skill `plane-tracker` §4) y publícala solo tras un OK.
 - **Toil y Reuniones (Tickets Paraguas):** Soporte ad-hoc a usuarios y reuniones se registran en tickets semanales consolidados en `OPS`; nunca crees micro-tickets para tareas de menos de 15 minutos.
 
 ### Convención de Ramas Git (Work Context vs Personal):
