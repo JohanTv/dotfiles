@@ -1,12 +1,14 @@
 ---
 id: "0015"
 title: Reloj controlado en las pruebas desde el lanzador, sin tocar producción
-status: propuesto
+status: implementado
 created: 2026-11-01
-summary: Congelar la hora real en un lanzador de pruebas (parchear datetime y time.time antes de importar el CLI) para que las pruebas golden no dependan de la fecha ni de la hora.
+summary: Implementado. Un lanzador congela la hora real del CLI en las pruebas golden (sin tocar producción), los golden dejan de enmascarar fechas y horas y un trinquete impide que crezcan las lecturas del reloj real.
 ---
 
 # 0015 · Reloj controlado en las pruebas desde el lanzador
+
+> **Estado: implementado el 2026-11-01** (pasos 1, 2 y 4; el paso 3, migrar producción a `config.now()`, se descarta por ahora). Resultados en [Implementación y resultados](#implementación-y-resultados).
 
 - **Contexto:** [decisión 0012](../decisions/0012-estrategia-de-pruebas-rapidas/README.md) y su [`mediciones.md`](../decisions/0012-estrategia-de-pruebas-rapidas/mediciones.md), donde se registró la bomba de fecha.
 
@@ -17,7 +19,7 @@ El 2026-11-01 fallaron tres pruebas golden solo ese día: un fixture tenía una 
 ## Hallazgos (verificados salvo indicación)
 
 - **La hora real se lee ~44 veces en producción**; unas 35 fuera de `config.now()`, repartidas en 12-13 archivos. Ninguna usa funciones de tiempo de SQL (`db.py` no las tiene), ni `isinstance` sobre fechas, ni `from time import`, ni `date.today`. Además hay 2 lecturas de `time.monotonic` (`api.py`), 3 sitios de `sleep` y 1 `getmtime` que no afectan a la salida.
-- **Los golden no verifican las marcas de tiempo del worklog.** `NOW_FIELDS` (`tests/test_golden.py:20`) y `VOLATILE_KEYS` (`tests/golden_support.py:475`) sustituyen `date`, `start_time`, `end_time` y `created_at` por un valor volátil. **Un error en las horas que registra el worklog no lo detecta ninguna prueba.** Con un reloj fijo se pueden comparar valores exactos.
+- **Los golden no verificaban las horas de los worklogs con duración declarada.** `NOW_FIELDS` (`tests/test_golden.py`) sustituía `date`, `start_time`, `end_time` y `created_at` por un valor volátil en los escenarios `comment`, `outbox` y `errors_http`, que son los que registran con `--duration` y cuyas horas salen del reloj. **Matiz:** las pruebas de propuestas, reparto y edición (`proposals`, `split`, `comment_edit_delete`) sí comparaban `date`, `start_time` y `end_time`, porque salen de transcripts con marcas fijas; solo enmascaraban `created_at`, `edited_at` y `updated_at`. El agujero era, por tanto, solo el de la duración declarada.
 - **`<HOY>` no aparece en ningún golden**: la normalización de la fecha de hoy no enmascaraba nada, salvo el caso del 2026-11-01.
 - **Ventana de medianoche (sin ejecutar):** `derived_start` (`worklog.py:170-176`) escribe un aviso si `ahora − duración` cruza las 00:00 y el golden `comment` no lo contiene. Entre las 00:00 y las 00:15 la prueba debería fallar (≈1 % del día).
 - **`today_placeholder` y la zona horaria (sin ejecutar):** usa la fecha local del proceso de prueba y el CLI corre con `TZ=UTC`; en horas en que el día local y el UTC difieren, pueden no coincidir.
@@ -63,6 +65,30 @@ La opción C se comprobó en una prueba de humo fuera del repositorio (Python 3.
 - Una fecha igual a una del fixture sirve como prueba negativa: **no** debe dar el mismo resultado, porque `report` y las propuestas dependen legítimamente de "hoy"; eso muestra qué pruebas son sensibles a la fecha.
 - `--help` idéntico y ningún cambio en `scripts/`.
 
+## Implementación y resultados
+
+Hecho el 2026-11-01, solo en `tests/` (`scripts/` sin ningún cambio):
+
+- **`tests/plane_clock.py`:** parchea `datetime.datetime` (`now`, `today`, `utcnow`) y `time.time` antes de importar el CLI y ejecuta el script con `runpy`; compone con `plane_fast.py`. Rechaza un instante sin zona horaria.
+- **`Sandbox`:** el CLI ve un reloj congelado por defecto (lunes 2026-11-02 a las 12:00 UTC). `advance(segundos)` lo mueve de forma explícita, `command(args)` da la línea de comando con el reloj del sandbox (para procesos lanzados con `Popen`), `write_circuit` usa `sb.now` y `Sandbox(clock=None)` usa la hora real. `PLANE_TEST_NOW=<ISO con zona>` lo cambia **solo en el arnés de pruebas**; la producción no tiene ninguna variable equivalente.
+- **Golden:** dejan de enmascarar fechas y horas (solo ids al azar y latencias) y se regeneraron. Se comprobó cada línea cambiada, 61 líneas en 10 archivos: **todas son solo valores de fecha u hora**, ninguna otra parte de la salida.
+- **Eliminado:** `today_placeholder`, los marcadores `<HOY>`, `<TS>`, `<HH:MM>` y "abierto desde hace <N>", y el reintento de `test_comment`.
+- **Una prueba tuvo que adaptarse:** `test_killed_flush_is_resolved_after_its_lease_expires` lanzaba el CLI con `Popen` sin el lanzador, así que el proceso interrumpido escribía un lease con la hora real y el siguiente `flush`, congelado y posterior, lo veía vencido. Ahora usa `sb.command(...)`.
+- **Salvaguardas nuevas** (`tests/test_golden_support.py`, `tests/test_structure.py`): el lanzador (todas las formas de leer la hora ven el instante, las lecturas repetidas son idénticas, el código de salida y el nombre del script pasan, rechaza un instante sin zona y `--help` es idéntico con y sin lanzador); el `Sandbox` (congelado por defecto, `advance` y `clock=None`, el CLI ve la fecha del sandbox); los golden no usan marcadores de fecha; las fechas de fixtures son anteriores al instante congelado; el arnés no lee la hora real; y un **trinquete por AST** que fija en 35 las lecturas de la hora real en producción fuera de `config.now()`.
+
+**Fragilidades que quedan resueltas:** el reintento de `test_comment` (el escenario ya no depende del minuto real), la ventana de medianoche (el instante es a mediodía), la sustitución de "hoy" en zona local frente a UTC (ya no existe) y el margen de 25 s del circuito (los ayudantes usan el reloj del sandbox).
+
+**Resultados:**
+
+- 10 ejecuciones seguidas del runner paralelo: 277 pruebas, 0 fallos, entre 24 y 30 s cada una.
+- **Prueba negativa con otros instantes** (`PLANE_TEST_NOW`): con 2027-01-05 a las 12:00 fallan 9 pruebas golden y con 2028-02-29 a las 00:05 fallan 10; **solo golden**, el resto de la suite (unitarias, cola, transporte, circuito) pasa en ambas. Los golden contienen el instante congelado (por ejemplo, "Plane no responde desde las 12:00", que a las 00:05 dice 00:05), así que **el criterio original "el mismo resultado en dos fechas" no se cumple ni debe cumplirse**; lo que se verifica es que ninguna prueba depende de la fecha real y que el resultado depende solo del instante congelado.
+- **Error en la primera medición:** el runner descartaba `PLANE_TEST_NOW` junto con el resto de las variables `PLANE_*`, así que las dos primeras ejecuciones con otra fecha corrieron en realidad con el reloj por defecto y pasaron todas, sin probar nada. Se detectó porque el resultado era implausible, se corrigió el runner para dejar pasar solo esa variable y se repitió.
+- `--help` idéntico con y sin el lanzador: cubierto por una prueba.
+
+**Decisión sobre el paso 3 (migrar producción a `config.now()`): no por ahora.** Las pruebas ya son deterministas sin tocar producción. Migrar cambiaría las marcas de tiempo del worklog, y recién ahora hay una red de seguridad (golden con horas exactas) para hacerlo con garantías. El trinquete queda en 35; si se migra un módulo, se baja. Compensa solo si molesta la duplicación de lecturas.
+
+**Limitaciones conocidas:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` siguen en tiempo real, y las pausas de 1 s de la publicación de la cola se mantienen); las pruebas unitarias que ejecutan código en proceso no pasan por el lanzador (parchean `config.now` o no dependen de la hora).
+
 ## Riesgos
 
 - **Los golden pueden cambiar** al congelar el reloj: algunas salidas con edades ("hace X") podrían pasar de `<N>` a un valor concreto. No verificado.
@@ -75,5 +101,4 @@ Antes del defecto [0010](../defects/0010-reporte-no-sincroniza-periodos-con-regi
 
 ## Criterio de cierre
 
-- Pasos 1 y 2 hechos, con los criterios de aceptación cumplidos.
-- Decisión registrada sobre el paso 3 (migrar o no a `config.now()`).
+Cumplido el 2026-11-01: pasos 1, 2 y 4 hechos, 10 ejecuciones seguidas sin fallos, prueba negativa con otros instantes (que muestra qué pruebas dependen del instante congelado) y decisión registrada sobre el paso 3.
