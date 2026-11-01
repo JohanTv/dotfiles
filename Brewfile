@@ -4,3 +4,4 @@ brew "ripgrep"     # core.md
 brew "sd"          # core.md
 brew "lazygit"     # alias lzg
 brew "lazydocker"  # alias lzd
+brew "zellij"      # alias zj

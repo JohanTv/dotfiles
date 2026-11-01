@@ -70,7 +70,7 @@ for arg in "$@"; do
     esac
 done
 
-APT_BASE=(openssh-client curl git build-essential procps file jq fd-find bat fzf zoxide eza)
+APT_BASE=(openssh-client curl git unzip build-essential procps file jq fd-find bat fzf zoxide eza zsh gh tree btop)
 BREW_BIN="/home/linuxbrew/.linuxbrew/bin/brew"
 
 install_tools() {
@@ -97,14 +97,50 @@ install_tools() {
     if command -v brew >/dev/null 2>&1; then
         HOMEBREW_NO_ANALYTICS=1 brew bundle --file="$DOTFILES_DIR/Brewfile"
     fi
+
+    # zsh como shell de login (lee /etc/passwd: $SHELL no refleja el cambio hasta reloguear)
+    local login_shell zsh_path
+    login_shell="$(getent passwd "$USER" | cut -d: -f7)"
+    zsh_path="$(command -v zsh || true)"
+    if [[ -n "$zsh_path" && "$login_shell" != "$zsh_path" ]]; then
+        log_info "Cambiando shell de login a zsh (efectivo al reabrir sesión)..."
+        sudo chsh -s "$zsh_path" "$USER"
+    else
+        log_ok "zsh ya es el shell de login"
+    fi
+
+    # oh-my-zsh sin tocar ~/.zshrc (el .zshrc del repo se enlaza en la sección 5)
+    if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+        log_info "Instalando oh-my-zsh..."
+        RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    else
+        log_ok "oh-my-zsh ya instalado"
+    fi
+
+    local autosuggest_dir="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+    if [[ ! -d "$autosuggest_dir" ]]; then
+        log_info "Instalando plugin zsh-autosuggestions..."
+        git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "$autosuggest_dir"
+    else
+        log_ok "zsh-autosuggestions ya instalado"
+    fi
+
+    if ! command -v bun >/dev/null 2>&1 && [[ ! -x "$HOME/.bun/bin/bun" ]]; then
+        log_info "Instalando bun..."
+        curl -fsSL https://bun.com/install | bash
+    else
+        log_ok "bun ya instalado"
+    fi
 }
 
 if [[ "$INSTALL_TOOLS" == true ]]; then
     install_tools
 else
-    for t in ssh jq rg sd lazygit; do
+    for t in ssh jq rg sd lazygit zellij gh tree btop zsh; do
         command -v "$t" >/dev/null 2>&1 || log_warn "Falta '$t' (ejecuta ./install.sh --tools)"
     done
+    command -v bun >/dev/null 2>&1 || [[ -x "$HOME/.bun/bin/bun" ]] || log_warn "Falta 'bun' (ejecuta ./install.sh --tools)"
+    [[ -d "$HOME/.oh-my-zsh" ]] || log_warn "Falta oh-my-zsh (ejecuta ./install.sh --tools)"
     command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1 || log_warn "Falta 'fd' (ejecuta ./install.sh --tools)"
 fi
 
