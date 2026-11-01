@@ -2,7 +2,7 @@
 ## Catálogo de Etiquetas, Baldes de Capacidad y Gestión de Tareas Sombrilla
 
 **Ámbito:** Gobernanza de TI y Calidad de Datos en Plane CE v1.2.3  
-**Proyectos:** `OMNIFY` (ID: `<uuid-proyecto>`) y `OPS` (ID: `<uuid-proyecto>`)
+**Proyectos:** `OMNIFY` (ID: `<uuid-proyecto-A>`) y `OPS` (ID: `<uuid-proyecto-B>`)
 
 ---
 
