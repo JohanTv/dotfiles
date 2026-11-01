@@ -13,6 +13,8 @@ summary: Decidir cómo trabajar desde varias máquinas con la misma instancia de
 - **Principios:** [`principles.md`](../../principles.md) (P2 autonomía, una sola fuente de verdad, local-first).
 - **Alternativas evaluadas:** [`alternativas.md`](./alternativas.md).
 
+> **Nota (2026-11-01):** este RFC parte de que la fuente de verdad es Plane. El [RFC 0014](../0014-contextos-y-perfiles-personal-y-trabajo/README.md) pone esa premisa en duda (un libro local podría ser la verdad del tiempo, con Plane como integración opcional). Aceptar la recomendación de aquí como comportamiento a corto plazo es compatible con ambas, pero la decisión de fondo depende de la del 0014 y podría quedar reemplazada.
+
 ## Pregunta
 
 Una persona trabaja desde más de una máquina (por ejemplo, la del trabajo y una personal) contra la misma instancia de Plane. ¿La caché debe compartirse, por ejemplo en una base de datos remota (Supabase u otra), o basta con la caché local de cada máquina?

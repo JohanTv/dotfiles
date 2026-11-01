@@ -23,7 +23,7 @@
 | 0005 | [Vista personal de actividades (agenda) y registro de diferimiento del backlog](rfcs/0005-vista-personal-agenda-y-backlog/README.md) | borrador | `list --mine`, panel `agenda` con carga, vencidos y backlog propio, y registro del motivo por el que se difiere algo importante. |
 | 0006 | [Decidir la fuente de datos del "Standby externo"](rfcs/0006-standby-externo-fuente-de-datos.md) | borrador | Quitar la línea de bloqueos del reporte o alimentarla (flag, o tiempo en Pausado desde las transiciones). |
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
-| 0014 | [Contextos y perfiles - usar la herramienta para trabajo y para lo personal](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Perfil como aislamiento físico (un directorio y una base por perfil), un segundo Plane para lo personal y sin interfaz de backend hasta que el uso real la justifique. |
+| 0014 | [Contextos, perfiles y fuentes de tareas intercambiables](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Aplazado a propósito. Usar la herramienta en varios contextos (trabajos, personal) y con varios sistemas de tareas; la decisión abierta es dónde vive la verdad del tiempo. |
 
 ## Decisiones
 
