@@ -14,6 +14,7 @@ import golden_support as gs  # noqa: E402
 from plane_cli import config, db, outbox  # noqa: E402
 from plane_cli.api import PlaneUnavailable  # noqa: E402
 
+FAST_PLANE_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plane_fast.py")
 ISSUE = "10000000-0000-4000-8000-000000000001"
 COMMENTS = r"/comments/$"
 BLOCK = '<!-- PLANE_WORKLOG_METADATA {"date": "2026-10-21", "start_time": "08:00", "duration_minutes": 20, "notes": "meta", "track": "mm"} -->'
@@ -79,8 +80,10 @@ class Cli(unittest.TestCase):
 
     # --- fallos de la entrega ---------------------------------------------------
     def test_read_timeout_on_post_queues_without_retrying(self):
-        self.sb.fake.add_fault("POST", COMMENTS, "hang", 20)
-        out, _ = self.cli(*ADD, "-m", "hola", "--json")
+        # plane_fast.py acorta el timeout de lectura a 1 s: la conexión retenida 3 s lo agota sin esperar los 15 s reales
+        self.sb.fake.add_fault("POST", COMMENTS, "hang", 3)
+        with mock.patch.object(gs, "PLANE_PY", FAST_PLANE_PY):
+            out, _ = self.cli(*ADD, "-m", "hola", "--json")
         self.assertEqual((json.loads(out)["status"], json.loads(out)["reason"]), ("queued", "read_timeout"))
         self.assertEqual(len(self.posts()), 1)
         item = self.rows()[0]
