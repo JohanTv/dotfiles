@@ -14,7 +14,7 @@ MAX_FILE_LINES = 450
 MAX_FUNCTION_LINES = 150
 MAX_MAIN_SCRIPT_LINES = 20  # plane.py es solo un shim de arranque
 # Lecturas de la hora real (datetime.now/utcnow/today, date.today, time.time) fuera de `clock.py`, el reloj central. El presupuesto es 0: toda
-# lectura pasa por `clock` (timestamp, now, local_now, local_today). Ver docs/rfcs/0015.
+# lectura pasa por `clock` (timestamp, now, local_now, local_today). Ver docs/decisions/0015.
 MAX_WALL_CLOCK_READS = 0
 WALL_CLOCK_CALLS = {("datetime", "now"), ("datetime", "utcnow"), ("datetime", "today"), ("date", "today"), ("time", "time"), ("time", "time_ns")}
 

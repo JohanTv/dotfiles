@@ -192,7 +192,7 @@ python3 tests/run_parallel.py           # en paralelo, cada trabajo con su HOME 
   controla (`sb.advance(segundos)`; `sb.command([...])` para lanzar con `Popen`; `clock=None` usa la hora real). No
   enmascaran fechas ni horas, así que un error en las del worklog los rompe. Las pruebas en proceso sustituyen
   `clock.timestamp` con `tests/clock_support.Clock`, y las esperas por procesos reales usan `time.monotonic`. El porqué y
-  las comprobaciones están en `docs/rfcs/0015-reloj-controlado-en-las-pruebas.md`.
+  las comprobaciones están en `docs/decisions/0015-reloj-central-y-reloj-congelado-en-las-pruebas.md`.
 - **`tests/plane_fast.py`** ejecuta el mismo `main()` con el timeout de lectura acortado a 1 s, para las pruebas con una
   conexión retenida (`mock.patch.object(gs, "PLANE_PY", ...)`), sin añadir variables de entorno al contrato.
 - **Modo sin conexión** (`test_transport`, `test_circuit`, `test_degrade`, `test_offline_reads`, `test_outbox`,
