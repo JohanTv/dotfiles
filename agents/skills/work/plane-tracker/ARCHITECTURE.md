@@ -174,50 +174,40 @@ encola). `PLANE_NO_QUEUE=1`: `comment add` falla con código 3 en lugar de encol
 Desde el directorio del skill:
 
 ```bash
-python3 -m unittest discover -s tests      # secuencial: referencia y modo para GOLDEN_UPDATE=1
-python3 tests/run_parallel.py              # en paralelo: ~36 s frente a ~2,5 min (4 núcleos físicos, 8 hilos)
+python3 -m unittest discover -s tests   # secuencial: la referencia y el único modo para GOLDEN_UPDATE=1
+python3 tests/run_parallel.py           # en paralelo, cada trabajo con su HOME temporal
 ```
 
-- `tests/run_parallel.py` (solo biblioteca estándar) lanza un proceso por trabajo: los módulos pesados se reparten por método
-  y los ligeros por módulo. Cada proceso tiene su `HOME`/`TMPDIR` temporal y sin variables `PLANE_*`, y corre con
-  prioridad baja (`--nice 10`) para no frenar el resto de la máquina; `-j N` fija los procesos simultáneos y un texto
-  filtra módulos por nombre. Sale con 1 si algún trabajo falla. Antes de lanzar compila el bytecode de `scripts/`: sin él
-  cada subproceso del CLI tarda 0,6 s en arrancar en lugar de 0,13 s.
-- `tests/plane_fast.py` ejecuta el mismo `main()` acortando a 1 s el timeout de lectura (`api._send`): lo usan las
-  pruebas que simulan una conexión retenida (`mock.patch.object(gs, "PLANE_PY", ...)`) sin añadir variables de entorno
-  al contrato ni esperar los 15 s reales.
-- **Reloj congelado.** Las pruebas golden no dependen de la fecha ni de la hora reales: `tests/plane_clock.py` sustituye
-  `datetime.datetime` y `time.time` antes de importar el CLI (la producción no tiene ninguna bandera ni variable de
-  entorno equivalente: un reloj configurable permitiría falsificar las marcas del worklog) y `Sandbox` lo controla. Por
-  defecto el CLI ve el lunes 2026-11-02 a las 12:00 UTC (`PLANE_TEST_NOW=<ISO con zona>` lo cambia solo para ver qué
-  pruebas dependen del instante; los golden lo contienen, así que con otro instante fallan por diseño). Está congelado,
-  no avanza: una prueba que necesite que pase el tiempo usa `sb.advance(segundos)`; un proceso lanzado con `Popen` usa
-  `sb.command([...])` para compartir la misma hora; `Sandbox(clock=None)` usa la hora real. Los golden **no
-  enmascaran** fechas ni horas (solo ids al azar y latencias), así que un error en las horas del worklog los rompe.
-  `tests/test_golden_support.py` fija este comportamiento. Las pruebas en proceso (sin subproceso) controlan el reloj
-  con `tests/clock_support.Clock`, que sustituye `clock.timestamp` y solo avanza con `advance()`. Las esperas por procesos
-  reales usan `time.monotonic`. `python3 tests/run_parallel.py --freeze <ISO con zona>` congela además la hora real del
-  propio proceso de pruebas: toda la suite debe pasar con cualquier instante (comprobado a las 00:05 y a 30 s del cambio de año).
-- Las pruebas no comparten estado (HOME y puertos propios) y `serve_forever` del servidor falso usa
-  `poll_interval=0.01` porque `shutdown()` espera un ciclo de sondeo (0,5 s por defecto).
-- `test_golden.py` ejecuta el CLI por subproceso contra un servidor Plane falso (`http.server` en 127.0.0.1) con `HOME`
-  temporal, `TZ=UTC` y credenciales ficticias, y compara salida, código de salida, peticiones enviadas y filas locales
-  con `tests/golden/*.txt`. Lo no determinista (fechas de hoy, ids de reparto, latencias) se normaliza en
-  `tests/golden_support.py`.
-- `GOLDEN_UPDATE=1` reescribe los golden; solo se usa cuando el cambio de comportamiento es intencional, y el diff se
-  revisa como parte del cambio. `PLANE_PY=<ruta>` apunta el harness a otro `plane.py`.
-- `test_structure.py` guarda las reglas estructurales descritas arriba.
-- `test_cli_tree.py` fija el árbol exacto (y su orden), que cada hoja tenga `handler` y los grupos no, y el tamaño de la
-  ayuda global; `test_renamed.py` las pistas de nombres retirados; `test_json_flag.py` las posiciones válidas de `--json`.
-- `test_transport.py`, `test_circuit.py`, `test_degrade.py`, `test_offline_reads.py`, `test_outbox.py`,
-  `test_outbox_flush.py` y `test_outbox_sync.py` prueban el modo sin conexión con el servidor falso con fallos: cada regla
-  `fake.add_fault(método, regex, tipo, arg, n)` responde con un código (`status`), retiene la conexión (`hang`), la corta
-  (`drop`), aplica la escritura y corta la respuesta (`commit_drop`), retrasa (`delay`), alterna (`flap`) o envía bytes
-  crudos (`raw`); `fake.store_comments` guarda los comentarios con su `external_id` (409 si se repite) y `fake.close()` /
-  `reopen()` simulan una conexión rechazada. `Sandbox.write_circuit()` fija el estado del circuito. Los procesos
-  concurrentes y los interrumpidos se prueban con procesos reales.
-- Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando los módulos de
-  `plane_cli` directamente y sustituyendo `config.CACHE_DIR` y, para la hora, `clock.timestamp` (con `clock_support.Clock`).
+- **`tests/run_parallel.py`** (solo biblioteca estándar): un proceso por trabajo (los módulos pesados, por método), sin
+  variables `PLANE_*` y con prioridad baja (`--nice`). `-j N` limita los procesos, un texto filtra módulos y
+  `--freeze <ISO con zona>` congela la hora real del propio proceso de pruebas: toda la suite debe pasar con cualquier
+  instante. Sale con 1 si algún trabajo falla.
+- **Golden (`test_golden.py`).** Ejecuta el CLI por subproceso contra un servidor Plane falso (`http.server` en
+  127.0.0.1) con `HOME` temporal, `TZ=UTC` y credenciales ficticias, y compara salida, código de salida, peticiones
+  enviadas y filas locales con `tests/golden/*.txt`. Solo se normaliza lo no determinista por naturaleza (puertos, rutas
+  temporales, SHA, ids al azar y latencias; `tests/golden_support.py`). `GOLDEN_UPDATE=1` los reescribe cuando el cambio
+  de comportamiento es intencional, y el diff se revisa como parte del cambio. `PLANE_PY=<ruta>` apunta el harness a otro
+  `plane.py`.
+- **Reloj.** Los golden no leen la hora real: `tests/plane_clock.py` la congela dentro del proceso del CLI y `Sandbox` la
+  controla (`sb.advance(segundos)`; `sb.command([...])` para lanzar con `Popen`; `clock=None` usa la hora real). No
+  enmascaran fechas ni horas, así que un error en las del worklog los rompe. Las pruebas en proceso sustituyen
+  `clock.timestamp` con `tests/clock_support.Clock`, y las esperas por procesos reales usan `time.monotonic`. El porqué y
+  las comprobaciones están en `docs/rfcs/0015-reloj-controlado-en-las-pruebas.md`.
+- **`tests/plane_fast.py`** ejecuta el mismo `main()` con el timeout de lectura acortado a 1 s, para las pruebas con una
+  conexión retenida (`mock.patch.object(gs, "PLANE_PY", ...)`), sin añadir variables de entorno al contrato.
+- **Modo sin conexión** (`test_transport`, `test_circuit`, `test_degrade`, `test_offline_reads`, `test_outbox`,
+  `test_outbox_flush`, `test_outbox_sync`): el servidor falso aplica fallos con `fake.add_fault(método, regex, tipo, arg, n)`:
+  responde con un código (`status`), retiene la conexión (`hang`), la corta (`drop`), aplica la escritura y corta la
+  respuesta (`commit_drop`), retrasa (`delay`), alterna (`flap`) o envía bytes crudos (`raw`). `fake.store_comments`
+  guarda los comentarios con su `external_id` (409 si se repite), `fake.close()` / `reopen()` simulan una conexión
+  rechazada y `Sandbox.write_circuit()` fija el estado del circuito. Los procesos concurrentes y los interrumpidos se
+  prueban con procesos reales.
+- **Estructura y contrato:** `test_structure.py` guarda las reglas estructurales descritas arriba; `test_cli_tree.py` fija
+  el árbol exacto (y su orden), que cada hoja tenga `handler` y los grupos no, y el tamaño de la ayuda global;
+  `test_renamed.py`, las pistas de nombres retirados; `test_json_flag.py`, las posiciones válidas de `--json`; y
+  `test_docs.py`, los documentos de `docs/`.
+- Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando `plane_cli` y
+  sustituyendo `config.CACHE_DIR` y `clock.timestamp`.
 
 ## Qué no romper
 
