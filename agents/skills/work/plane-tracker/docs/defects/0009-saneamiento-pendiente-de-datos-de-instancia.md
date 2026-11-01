@@ -20,6 +20,7 @@ Los documentos actuales se sanearon en el mismo cambio que creó `docs/` (IP, wo
 | :--- | :--- | :--- |
 | Workspace real como valor por defecto en el código | `scripts/plane_cli/cli.py` (`PLANE_WORKSPACE_SLUG`), `scripts/plane_cli/db.py` (columna `workspace`) | Cambiar el comportamiento afecta tests y goldens; decidir si el slug pasa a ser obligatorio. También sigue en el historial, por la misma razón. |
 | Identificador de proyecto real como valor por defecto en el código | `scripts/plane_cli/cli.py` (`PLANE_PROJECT_ID`) | Igual que la fila anterior. |
+| Listas y valores fijos de una organización en el código | `scripts/plane_cli/sync.py` (lista fija de claves de proyecto), `scripts/plane_cli/cmd_read.py` (clave de proyecto asumida para un número suelto) | En una instancia con otras claves, `report --refresh` no trae nada sin `-p`. Se resuelve con los perfiles del [RFC 0014](../rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md). |
 | Claves de proyecto reales como ejemplos (`OMNIFY-175`, `OPS-44`...) | `SKILL.md`, `references/*`, `docs/*` | Decidir si se neutralizan a `PROJ-123` o se aceptan como ejemplos. |
 | Copias que no controla el repositorio | Clones, forks y la caché de GitHub | La reescritura no las alcanza (ver "Límites"). |
 | Copia de seguridad local previa a la reescritura | Un espejo completo fuera del árbol de trabajo | Contiene los datos antiguos; se borra cuando se dé por verificada la reescritura. |

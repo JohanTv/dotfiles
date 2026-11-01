@@ -13,6 +13,7 @@
 | 0004 | [Verificar que Plane devuelve `external_id` en los GET de comentarios](defects/0004-verificar-external-id-en-comentarios.md) | abierto | La cola de salida asume un contrato de `external_id` de Plane que no se ha confirmado en una instancia real. |
 | 0009 | [Saneamiento pendiente de datos de instancia y de personas en el repositorio](defects/0009-saneamiento-pendiente-de-datos-de-instancia.md) | abierto | El historial publicado ya se reescribió; quedan valores por defecto en el código, claves de proyecto como ejemplos y la purga de copias fuera del repositorio. |
 | 0010 | [El reporte no sincroniza con Plane los periodos que tienen registros locales parciales](defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) | abierto | `report` solo sincroniza si el periodo no tiene ningún registro local; con uno solo muestra un resultado parcial como completo y sin aviso. |
+| 0013 | [La cola de salida no registra a qué instancia pertenece cada comentario](defects/0013-cola-de-salida-sin-instancia-de-destino.md) | abierto | `outbox flush` publica con las credenciales del entorno actual; con dos instancias y una sola base local, un comentario podría publicarse en la instancia equivocada. |
 
 ## RFC
 
@@ -22,6 +23,7 @@
 | 0005 | [Vista personal de actividades (agenda) y registro de diferimiento del backlog](rfcs/0005-vista-personal-agenda-y-backlog/README.md) | borrador | `list --mine`, panel `agenda` con carga, vencidos y backlog propio, y registro del motivo por el que se difiere algo importante. |
 | 0006 | [Decidir la fuente de datos del "Standby externo"](rfcs/0006-standby-externo-fuente-de-datos.md) | borrador | Quitar la línea de bloqueos del reporte o alimentarla (flag, o tiempo en Pausado desde las transiciones). |
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
+| 0014 | [Contextos y perfiles - usar la herramienta para trabajo y para lo personal](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Perfil como aislamiento físico (un directorio y una base por perfil), un segundo Plane para lo personal y sin interfaz de backend hasta que el uso real la justifique. |
 
 ## Decisiones
 
