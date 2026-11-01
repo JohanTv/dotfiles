@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Genera docs/INDEX.md a partir del front-matter de docs/{defects,rfcs,decisions}/NNNN-*.md.
+"""Genera docs/INDEX.md a partir del front-matter de docs/{defects,rfcs,decisions}/NNNN-*.md (o de NNNN-*/README.md
+cuando el ítem tiene varios documentos).
 
 Uso: docs_index.py [--check]   (--check no escribe: sale con 1 si INDEX.md no está al día)."""
 import os
@@ -15,7 +16,7 @@ KINDS = {
     "rfcs": ("RFC", ("borrador", "propuesto", "aceptado", "implementado", "rechazado", "reemplazado")),
     "decisions": ("Decisiones", ("aceptado", "reemplazado")),
 }
-FILE_RE = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
+FILE_RE = re.compile(r"^(\d{4})-[a-z0-9-]+(\.md)?$")  # archivo suelto o carpeta del ítem
 HEADER = """# Índice de documentos de desarrollo
 
 > Generado por `scripts/docs_index.py`; no se edita a mano. Un RFC solo existe en el código si su estado es
@@ -39,21 +40,31 @@ def parse_front_matter(text):
     return data
 
 
+def entry_file(folder, name):
+    """Archivo con el front-matter de un ítem: el propio .md o el README.md de su carpeta."""
+    path = os.path.join(folder, name)
+    return os.path.join(path, "README.md") if os.path.isdir(path) else path
+
+
 def collect(docs_dir=DOCS):
-    """[(carpeta, nombre_archivo, front_matter)] ordenado por ID."""
+    """[(carpeta, nombre, front_matter)] ordenado por ID; el nombre es el del archivo o el de la carpeta del ítem."""
     items = []
     for kind in KINDS:
         folder = os.path.join(docs_dir, kind)
         if not os.path.isdir(folder):
             continue
         for name in sorted(os.listdir(folder)):
-            if name.endswith(".md"):
-                with open(os.path.join(folder, name), encoding="utf-8") as handle:
-                    items.append((kind, name, parse_front_matter(handle.read())))
+            if os.path.isdir(os.path.join(folder, name)) or name.endswith(".md"):
+                entry = entry_file(folder, name)
+                meta = {}
+                if os.path.exists(entry):
+                    with open(entry, encoding="utf-8") as handle:
+                        meta = parse_front_matter(handle.read())
+                items.append((kind, name, meta))
     return sorted(items, key=lambda item: item[1][:4])
 
 
-def render(items):
+def render(items, docs_dir=DOCS):
     lines = [HEADER]
     for kind, (title, _states) in KINDS.items():
         rows = [item for item in items if item[0] == kind]
@@ -64,7 +75,8 @@ def render(items):
         lines.append("| ID | Título | Estado | Resumen |\n| :--- | :--- | :--- | :--- |")
         for _kind, name, meta in rows:
             summary = meta.get("summary", "").replace("|", "\\|")
-            lines.append(f"| {name[:4]} | [{meta.get('title', name)}]({kind}/{name}) | {meta.get('status', '?')} | {summary} |")
+            target = f"{kind}/{name}" + ("/README.md" if os.path.isdir(os.path.join(docs_dir, kind, name)) else "")
+            lines.append(f"| {name[:4]} | [{meta.get('title', name)}]({target}) | {meta.get('status', '?')} | {summary} |")
     return "\n".join(lines) + "\n"
 
 

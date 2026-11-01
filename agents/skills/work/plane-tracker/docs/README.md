@@ -20,7 +20,8 @@ Si un ítem es a la vez defecto y decisión (como lo fue el 0003), se parte en d
 ## Reglas
 
 1. **Nombre:** `NNNN-slug-en-minusculas.md`. El `NNNN` es único en todas las carpetas, nunca se renumera ni se reutiliza (los commits lo citan).
-2. **Front-matter obligatorio**, YAML plano:
+   **Un ítem con varios documentos relacionados** (análisis, maquetas, alternativas, mediciones) es una carpeta `NNNN-slug/`: su `README.md` es la entrada, lleva el front-matter y enlaza al resto; los demás documentos de la carpeta no llevan front-matter. Cualquier agente nuevo debe poder entender el problema leyendo esa carpeta.
+2. **Front-matter obligatorio** (en el archivo del ítem o en el `README.md` de su carpeta), YAML plano:
    ```yaml
    ---
    id: "0009"
