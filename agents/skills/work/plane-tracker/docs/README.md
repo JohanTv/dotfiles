@@ -4,7 +4,7 @@ Aquí vive lo que se decide y se discute sobre la herramienta. Los agentes no ca
 
 - **Índice con estado de cada documento:** [INDEX.md](./INDEX.md) (generado).
 - **Principios de diseño:** [principles.md](./principles.md).
-- **Por qué esta estructura:** [0008](./decisions/0008-estructura-de-docs-por-tipo-con-id-global.md).
+- **Por qué esta estructura:** [0008](./decisions/0008-estructura-de-docs-por-tipo-con-id-global/README.md).
 - **Qué no puede aparecer aquí (el repositorio es público):** [0007](./decisions/0007-documentos-agnosticos-de-instancia.md).
 
 ## Tipos

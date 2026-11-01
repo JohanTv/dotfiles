@@ -27,6 +27,11 @@ Lo prometido, lo posible y lo reportado deben coincidir. Una fecha comprometida 
 | Backlog frente a compromiso (P5) | Backlog es intención sin fecha; las fechas de compromiso van solo en lo que está en curso. |
 
 ## Principios técnicos complementarios
+- **Trabajo en curso limitado (ley de Little):** el tiempo medio que tarda un ítem en completarse crece con la cantidad de ítems abiertos a la vez. Limitar lo que está en curso acorta cada entrega y reduce la carga cognitiva (P4). La herramienta debe mostrar cuánto hay en curso y cuánto lleva cada ítem abierto, y sugerir un límite, sin imponerlo (P2).
 - **Local-first:** las lecturas responden con lo local y avisan su antigüedad; la red es para publicar.
 - **Una sola fuente de verdad por dato:** el estado de un ticket vive en Plane; el estado de un documento de diseño, en su cabecera.
 - **No afirmar lo que no se midió:** si no hay fuente, el reporte lo dice o calla.
+
+## Cobertura actual
+
+Qué cubre hoy la herramienta de cada principio y qué falta: [`rfcs/0005-vista-personal-agenda-y-backlog/cobertura-actual-de-principios.md`](./rfcs/0005-vista-personal-agenda-y-backlog/cobertura-actual-de-principios.md).

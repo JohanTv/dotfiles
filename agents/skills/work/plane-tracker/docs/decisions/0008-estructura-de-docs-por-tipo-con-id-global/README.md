@@ -16,9 +16,13 @@ summary: "`docs/defects`, `docs/rfcs` y `docs/decisions`; ID `NNNN` único; esta
 - **ID global único** `NNNN` en una sola secuencia. Nunca se renumera ni se reutiliza: los commits lo citan.
 - **Estado en el front-matter**, nunca en la ubicación: cerrar un ítem no mueve archivos ni rompe enlaces. El estado vive solo en el documento y en el índice; los tickets de Plane no gestionan la herramienta.
 - **Índice generado** (`docs/INDEX.md`) por `scripts/docs_index.py`, comprobado por `tests/test_docs.py`. Sustituye a `ROADMAP.md`.
+- **Un ítem con varios documentos es una carpeta** `NNNN-slug/`: su `README.md` es la entrada y lleva el front-matter; los demás documentos (análisis, maquetas, alternativas, mediciones) viven al lado sin front-matter. El contexto de un ítem debe poder leerlo un agente nuevo sin reconstruirlo de una conversación.
 - `docs/` no lo cita `SKILL.md`: los agentes no lo cargan.
 
 ## Alternativas descartadas
+
+Detalle y evaluación: [`alternativas-evaluadas.md`](./alternativas-evaluadas.md). Resumen:
+
 Todo en `issues/` con un campo de tipo; una carpeta plana `work-items/` (el ciclo de vida de cada tipo es distinto y el nombre choca con el vocabulario de Plane); carpetas por estado (cada cierre rompería enlaces); separar la skill del proyecto (no compensa hoy).
 
 ## Consecuencias

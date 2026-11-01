@@ -9,7 +9,12 @@ summary: "`list --mine`, panel `agenda` con carga, vencidos y backlog propio, y 
 # 0005 · Vista personal de actividades (agenda) y registro de diferimiento del backlog
 
 - **Área:** `list`, comando nuevo `agenda`, `comment add` (bloque de diferimiento), caché local.
-- **Principios:** ver [`../principles.md`](../principles.md).
+- **Principios:** ver [`principles.md`](../../principles.md).
+
+## Documentos de esta carpeta
+
+- [`cobertura-actual-de-principios.md`](./cobertura-actual-de-principios.md): qué cubre hoy la herramienta de cada principio y qué falta (el análisis que origina este RFC).
+- [`reporte-ideal.md`](./reporte-ideal.md): maqueta de `agenda` y de dónde sale cada dato.
 
 ## Contexto
 
@@ -45,7 +50,7 @@ Vista personal de lectura rápida, sin enviar nada. Secciones:
 Un comentario estructurado con bloque oculto (el mismo mecanismo que el worklog) que registra: motivo del diferimiento, costo de no hacerlo, quién decidió y fecha de revisión. Evita añadir etiquetas a una taxonomía ya estricta y mantiene a Plane como fuente única de los tickets.
 
 ### Fase 3 · honestidad del reporte
-- Resolver el "standby externo" ([0003](../defects/0003-standby-externo-sin-fuente-de-datos.md), [0006](./0006-standby-externo-fuente-de-datos.md)).
+- Resolver el "standby externo" ([0003](../../defects/0003-standby-externo-sin-fuente-de-datos.md), [0006](../0006-standby-externo-fuente-de-datos.md)).
 - Avisar cuando el caché de worklogs esté desfasado.
 - Agrupar por balde y no solo por proyecto.
 
