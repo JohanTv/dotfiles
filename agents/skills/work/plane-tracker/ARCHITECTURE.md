@@ -9,39 +9,39 @@ transcripts de agentes y cálculo de flujo) que el paquete importa como módulos
 
 ## Mapa de módulos
 
-Las líneas son aproximadas; el tope duro por archivo es 450.
+El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.py`.
 
-| Módulo | Líneas | Responsabilidad |
-|---|---|---|
-| `plane.py` | 16 | Punto de entrada: ajusta `sys.path` y llama a `cli.main()`. |
-| `plane_cli/__init__.py` | 39 | Docstring con el mapa de capas y módulos. |
-| `plane_cli/config.py` | 76 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
-| `plane_cli/clock.py` | 34 | Reloj central, única fuente de la hora real: `timestamp()` (la primitiva) y, derivadas de ella, `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. |
-| `plane_cli/db.py` | 231 | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
-| `plane_cli/circuit.py` | 217 | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
-| `plane_cli/api.py` | 235 | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`) y `log_request()` (JSONL de latencias). |
-| `plane_cli/mdhtml.py` | 150 | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
-| `plane_cli/cache.py` | 160 | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
-| `plane_cli/resolve.py` | 301 | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
-| `plane_cli/timeutil.py` | 215 | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs y `render_day_block()`. |
-| `plane_cli/worklog.py` | 263 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
-| `plane_cli/outbox.py` | 361 | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
-| `plane_cli/outbox_flush.py` | 127 | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
-| `plane_cli/create_guard.py` | 63 | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
-| `plane_cli/sync.py` | 168 | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
-| `plane_cli/proposal_store.py` | 101 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
-| `plane_cli/proposals.py` | 289 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
-| `plane_cli/flow.py` | 211 | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
-| `plane_cli/renamed.py` | 150 | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
-| `plane_cli/attachments.py` | 171 | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
-| `plane_cli/cmd_comment.py` | 252 | Comando `comment add`. |
-| `plane_cli/cmd_comment_ops.py` | 199 | Comandos `comment edit`, `comment delete` y `worklog propose`. |
-| `plane_cli/cmd_tickets_write.py` | 336 | Comandos `create`, `update` y `link add`. |
-| `plane_cli/cmd_read.py` | 391 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
-| `plane_cli/cmd_report.py` | 255 | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
-| `plane_cli/cmd_outbox.py` | 99 | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
-| `plane_cli/cmd_ops.py` | 262 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
-| `plane_cli/cli.py` | 126 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |
+| Módulo | Responsabilidad |
+|---|---|
+| `plane.py` | Punto de entrada: ajusta `sys.path` y llama a `cli.main()`. |
+| `plane_cli/__init__.py` | Docstring con el mapa de capas y módulos. |
+| `plane_cli/config.py` | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
+| `plane_cli/clock.py` | Reloj central, única fuente de la hora real: `timestamp()` (la primitiva) y, derivadas de ella, `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. |
+| `plane_cli/db.py` | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
+| `plane_cli/circuit.py` | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
+| `plane_cli/api.py` | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`) y `log_request()` (JSONL de latencias). |
+| `plane_cli/mdhtml.py` | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
+| `plane_cli/cache.py` | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
+| `plane_cli/resolve.py` | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
+| `plane_cli/timeutil.py` | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs y `render_day_block()`. |
+| `plane_cli/worklog.py` | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
+| `plane_cli/outbox.py` | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
+| `plane_cli/outbox_flush.py` | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
+| `plane_cli/create_guard.py` | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
+| `plane_cli/sync.py` | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
+| `plane_cli/proposal_store.py` | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
+| `plane_cli/proposals.py` | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
+| `plane_cli/flow.py` | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
+| `plane_cli/renamed.py` | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
+| `plane_cli/attachments.py` | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
+| `plane_cli/cmd_comment.py` | Comando `comment add`. |
+| `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`. |
+| `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
+| `plane_cli/cmd_read.py` | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
+| `plane_cli/cmd_report.py` | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
+| `plane_cli/cmd_outbox.py` | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
+| `plane_cli/cmd_ops.py` | Comandos `health`, `focus set\|clear\|status` y `handoff`, con sus ayudantes de git. |
+| `plane_cli/cli.py` | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |
 
 ## Capas y regla de dependencias
 
