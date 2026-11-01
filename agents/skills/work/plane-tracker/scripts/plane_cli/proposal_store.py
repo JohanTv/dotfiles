@@ -9,9 +9,9 @@ import contextlib
 import fcntl
 import json
 import os
-import time
 
 from plane_cli import config
+from plane_cli import clock
 
 
 PROPOSAL_TTL_SECONDS = 30 * 60
@@ -31,7 +31,7 @@ def proposal_store():
             data = {}
         if not isinstance(data.get("proposals"), dict) or not isinstance(data.get("groups"), dict):
             data = {"proposals": {}, "groups": {}}
-        cutoff = time.time() - PROPOSAL_TTL_SECONDS
+        cutoff = clock.timestamp() - PROPOSAL_TTL_SECONDS
         data["proposals"] = {k: v for k, v in data["proposals"].items() if v.get("ts", 0) > cutoff}
         data["groups"] = {k: v for k, v in data["groups"].items() if v.get("ts", 0) > cutoff}
         yield data
@@ -63,7 +63,7 @@ def _drop_ticket(data, tickets, session_id):
 def save_proposal(ticket, proposal):
     with proposal_store() as data:
         _drop_ticket(data, [ticket], proposal["session_id"])
-        data["proposals"][_entry_key(ticket, proposal["session_id"])] = {"ts": time.time(), "ticket": ticket, "proposal": proposal}
+        data["proposals"][_entry_key(ticket, proposal["session_id"])] = {"ts": clock.timestamp(), "ticket": ticket, "proposal": proposal}
 
 
 def save_group(group_id, parts):
@@ -71,7 +71,7 @@ def save_group(group_id, parts):
     session_id = next(iter(parts.values()))["session_id"]
     with proposal_store() as data:
         _drop_ticket(data, list(parts), session_id)
-        data["groups"][group_id] = {"ts": time.time(), "session": session_id, "parts": parts}
+        data["groups"][group_id] = {"ts": clock.timestamp(), "session": session_id, "parts": parts}
 
 
 def load_recent_proposal(ticket, session_id=None):

@@ -6,7 +6,6 @@ client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo
 """
 
 import sys
-import time
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -16,6 +15,7 @@ from plane_cli.outbox import mark_sent, owner_of
 from plane_cli.resolve import get_actor_uuid, get_projects_map
 from plane_cli.timeutil import time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment, upsert_worklog
+from plane_cli import clock
 
 
 def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
@@ -31,7 +31,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     try:
         d_from = datetime.strptime(date_from_str, "%Y-%m-%d").date() - timedelta(days=1)
     except Exception:
-        d_from = datetime.now().date() - timedelta(days=7)
+        d_from = clock.local_today() - timedelta(days=7)
 
     target_idents = []
     if filter_project:
@@ -119,13 +119,14 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                             continue
 
                         ticket_label = f"{ident}-{iss.get('sequence_id')}"
+                        moment = clock.local_now()  # una sola lectura: inicio, fin y fecha por defecto deben ser coherentes
                         entry = {
                             "ticket_id": ticket_label,
                             "track": meta.get("track", "main"),
                             "issue_name": iss.get("name", ""),
-                            "date": meta.get("date", datetime.now().strftime("%Y-%m-%d")),
-                            "start_time": meta.get("start_time", (datetime.now() - timedelta(minutes=dur)).strftime("%H:%M")),
-                            "end_time": meta.get("end_time", datetime.now().strftime("%H:%M")),
+                            "date": meta.get("date", moment.strftime("%Y-%m-%d")),
+                            "start_time": meta.get("start_time", (moment - timedelta(minutes=dur)).strftime("%H:%M")),
+                            "end_time": meta.get("end_time", moment.strftime("%H:%M")),
                             "duration_minutes": dur,
                             "worker_type": meta.get("worker_type", "human"),
                             "capacity_bucket": meta.get("capacity_bucket", "deep_work"),
@@ -153,13 +154,13 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
         return
 
     # Actualizar watermark de sync
-    now = time.time()
+    now = clock.timestamp()
     with conn:
         conn.execute("""
             INSERT INTO sync_metadata (key, value, updated_at)
             VALUES (?, ?, ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at;
-        """, (f"sync:{workspace}", datetime.now().isoformat(), now))
+        """, (f"sync:{workspace}", datetime.fromtimestamp(now).isoformat(), now))
 
     if synced_count > 0:
         sys.stderr.write(f"✔ Se sincronizaron {synced_count} registros telemétricos en SQLite3.\n")

@@ -18,10 +18,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
 
 from plane_cli import circuit, config
 from plane_cli.circuit import PlaneUnavailable
+from plane_cli import clock
 
 
 REQUEST_LOG_MAX_BYTES = 1_000_000
@@ -41,7 +41,7 @@ def log_request(method, url, status, elapsed_ms, attempt, error=None):
         log_path = config.request_log()
         if os.path.exists(log_path) and os.path.getsize(log_path) > REQUEST_LOG_MAX_BYTES:
             os.replace(log_path, log_path + ".1")
-        record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), "method": method,
+        record = {"ts": clock.now().isoformat(timespec="seconds"), "method": method,
                   "path": urllib.parse.urlparse(url).path, "status": status, "ms": int(elapsed_ms),
                   "attempt": attempt, "error": error}
         fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)

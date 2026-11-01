@@ -13,9 +13,9 @@ PACKAGE = os.path.join(SCRIPTS, "plane_cli")
 MAX_FILE_LINES = 450
 MAX_FUNCTION_LINES = 150
 MAX_MAIN_SCRIPT_LINES = 20  # plane.py es solo un shim de arranque
-# Lecturas de la hora real (datetime.now/utcnow/today, date.today, time.time) fuera de config.now(). Es un trinquete: no puede crecer, y
-# conviene bajarlo al migrar un módulo a config.now() (así el reloj queda en un solo punto). Ver docs/rfcs/0015.
-MAX_WALL_CLOCK_READS = 35
+# Lecturas de la hora real (datetime.now/utcnow/today, date.today, time.time) fuera de `clock.py`, el reloj central. El presupuesto es 0: toda
+# lectura pasa por `clock` (timestamp, now, local_now, local_today). Ver docs/rfcs/0015.
+MAX_WALL_CLOCK_READS = 0
 WALL_CLOCK_CALLS = {("datetime", "now"), ("datetime", "utcnow"), ("datetime", "today"), ("date", "today"), ("time", "time"), ("time", "time_ns")}
 
 
@@ -49,16 +49,13 @@ def undefined_globals(path):
 
 
 def wall_clock_reads(path):
-    """Número de llamadas que leen la hora real en un archivo, sin contar el cuerpo de `now()` de config.py (el reloj central)."""
+    """Número de llamadas que leen la hora real en un archivo; `clock.py` (el reloj central) es el único que puede hacerlo."""
+    if os.path.basename(path) == "clock.py":
+        return 0
     with open(path, encoding="utf-8") as handle:
         tree = ast.parse(handle.read())
-    skipped = set()
-    if os.path.basename(path) == "config.py":
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "now":
-                skipped.update(id(child) for child in ast.walk(node))
     return sum(1 for node in ast.walk(tree)
-               if id(node) not in skipped and isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+               if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                and isinstance(node.func.value, ast.Name) and (node.func.value.id, node.func.attr) in WALL_CLOCK_CALLS)
 
 
@@ -89,12 +86,11 @@ class Structure(unittest.TestCase):
             if name != "__init__":
                 self.assertNotIn(name, sys.stdlib_module_names, f"{name}.py sombrea un módulo de la biblioteca estándar")
 
-    def test_wall_clock_reads_outside_the_central_clock_do_not_grow(self):
+    def test_wall_clock_is_read_only_through_the_central_clock(self):
         counts = {os.path.relpath(path, SKILL): wall_clock_reads(path) for path in sources()}
-        total = sum(counts.values())
-        detail = ", ".join(f"{name}: {n}" for name, n in sorted(counts.items(), key=lambda item: -item[1]) if n)
-        self.assertLessEqual(total, MAX_WALL_CLOCK_READS,
-                             f"hay {total} lecturas de la hora real fuera de config.now() (máximo {MAX_WALL_CLOCK_READS}); usa config.now(). {detail}")
+        offenders = ", ".join(f"{name}: {n}" for name, n in sorted(counts.items()) if n)
+        self.assertLessEqual(sum(counts.values()), MAX_WALL_CLOCK_READS,
+                             f"hay lecturas directas de la hora real; usa plane_cli.clock (timestamp, now, local_now, local_today): {offenders}")
 
     def test_import_graph_is_acyclic_and_layered(self):
         graph = package_imports()

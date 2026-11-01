@@ -6,7 +6,6 @@ No hace: el cálculo del flujo por ticket (vive en flow.py).
 
 import json
 import sys
-import time
 import urllib.error
 from datetime import datetime, timedelta
 
@@ -25,6 +24,7 @@ from plane_cli.timeutil import (
     time_to_minutes,
 )
 from plane_cli.worklog import CHECK_ERRORS, check_worklogs, extract_metadata_from_comment, find_metadata_block
+from plane_cli import clock
 
 
 SYNC_COOLDOWN = 300   # 5 minutos
@@ -96,7 +96,7 @@ def _period(args, today):
 
 
 def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_id):
-    start_date, end_date = _period(args, datetime.now().date())
+    start_date, end_date = _period(args, clock.local_today())
     return cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id,
                             start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
@@ -109,7 +109,7 @@ def _warn_unpublished(args, conn, s_str, e_str):
 
 
 def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
-    today = datetime.now().date()
+    today = clock.local_today()
     is_week = getattr(args, "week", False)
     force_sync = getattr(args, "refresh", False)
 
@@ -125,7 +125,7 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     # Verificar si necesitamos sincronizar remotamente
     sync_meta = conn.execute("SELECT updated_at FROM sync_metadata WHERE key = ?", (f"sync:{workspace}",)).fetchone()
     last_synced = sync_meta["updated_at"] if sync_meta else 0
-    now = time.time()
+    now = clock.timestamp()
 
     # Contar registros existentes en el rango
     count_row = conn.execute("SELECT COUNT(*) as cnt FROM worklogs WHERE date >= ? AND date <= ?", (s_str, e_str)).fetchone()

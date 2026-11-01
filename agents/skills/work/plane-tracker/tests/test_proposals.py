@@ -15,6 +15,7 @@ from plane_cli import proposals  # noqa: E402
 from plane_cli import timeutil  # noqa: E402
 from plane_cli import worklog  # noqa: E402
 from plane_cli import db  # noqa: E402
+from plane_cli import clock  # noqa: E402
 from plane_cli import config  # noqa: E402
 import session_clock as sc  # noqa: E402
 
@@ -45,9 +46,9 @@ class Base(unittest.TestCase):
         os.environ["TZ"] = "America/Lima"
         time.tzset()
         self.tmp = tempfile.TemporaryDirectory()
-        self._saved = (config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session)
+        self._saved = (config.CACHE_DIR, clock.now, sc.timestamps, sc.resolve_session)
         config.CACHE_DIR = self.tmp.name
-        config.now = lambda: NOW
+        clock.now = lambda: NOW
         sc.timestamps = lambda agent, sid, **kw: STAMPS
         sc.resolve_session = lambda agent, cwd, explicit=None, env=None, **kw: (SID, "test", [])
         self.conn = sqlite3.connect(":memory:")
@@ -55,7 +56,7 @@ class Base(unittest.TestCase):
         db.init_db(self.conn)
 
     def tearDown(self):
-        config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session = self._saved
+        config.CACHE_DIR, clock.now, sc.timestamps, sc.resolve_session = self._saved
         self.conn.close()
         self.tmp.cleanup()
         if self._tz is None:

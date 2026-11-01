@@ -4,11 +4,11 @@ import os
 import sqlite3
 import sys
 import tempfile
-import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+import clock_support  # noqa: E402
 import golden_support as gs  # noqa: E402
 from plane_cli import cache, db  # noqa: E402
 
@@ -168,11 +168,12 @@ class Units(unittest.TestCase):
             self.assertEqual(cache.age_text(seconds), text)
 
     def test_snapshot_pruning_and_partial_update(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        controlled = clock_support.Clock()  # la poda usa la edad de cada instantánea: el reloj es controlado
+        with controlled.patch(), tempfile.TemporaryDirectory() as tmp:
             conn = sqlite3.connect(os.path.join(tmp, "t.db"))
             conn.row_factory = sqlite3.Row
             db.init_db(conn)
-            now = time.time()
+            now = controlled.t
             for i in range(cache.SNAPSHOT_MAX_ROWS + 5):
                 cache.save_snapshot(conn, {"id": f"i{i}"}, f"OMNIFY-{i}", [])
                 conn.execute("UPDATE issue_snapshots SET fetched_at = ? WHERE issue_id = ?", (now - 1000 + i, f"i{i}"))

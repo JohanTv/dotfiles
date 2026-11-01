@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import flow_metrics
 import session_clock
@@ -22,6 +22,7 @@ from plane_cli.outbox import pending_counts
 from plane_cli.proposals import FOCUS_KEEP_DAYS, focus_intervals
 from plane_cli.resolve import detect_ticket_from_git, local_ticket_label
 from plane_cli.worklog import PLACEHOLDER
+from plane_cli import clock
 
 
 def summarize_requests(records, since):
@@ -56,7 +57,7 @@ def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
                         continue
         except OSError:
             continue
-    summary = summarize_requests(records, datetime.now(timezone.utc) - timedelta(hours=args.hours))
+    summary = summarize_requests(records, clock.now() - timedelta(hours=args.hours))
     state = circuit.describe()
     queue = pending_counts(conn)
     if getattr(args, "json", False):
@@ -88,7 +89,7 @@ def _focus_context(args, conn):
         for sid, ts in cands:
             sys.stderr.write(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})\n")
         sys.exit(1)
-    now = config.now()
+    now = clock.now()
     with conn:  # las marcas son útiles solo el día en curso: se purgan las antiguas
         conn.execute("DELETE FROM session_marks WHERE COALESCE(ended_at, started_at) < ?", ((now - timedelta(days=FOCUS_KEEP_DAYS)).isoformat(timespec="seconds"),))
     current = conn.execute("SELECT id, ticket FROM session_marks WHERE session_id = ? AND ended_at IS NULL", (session_id,)).fetchall()

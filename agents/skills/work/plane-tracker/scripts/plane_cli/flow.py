@@ -6,10 +6,8 @@ No hace: escribir en Plane.
 
 import json
 import sys
-import time
 import urllib.error
 import urllib.parse
-from datetime import datetime, timezone
 
 import flow_metrics
 import session_clock
@@ -18,6 +16,7 @@ from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.resolve import get_states_map, resolve_issue, resolve_project_and_seq
 from plane_cli.timeutil import format_minutes, time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
+from plane_cli import clock
 
 
 def format_lifecycle(issue):
@@ -26,7 +25,7 @@ def format_lifecycle(issue):
     if not created:
         return "Ciclo     : ?"
     completed = session_clock.parse_time(issue.get("completed_at"))
-    end = completed or datetime.now(timezone.utc)
+    end = completed or clock.now()
     days = (end - created).total_seconds() / 86400.0
     span = f"{days:.1f} días" if days >= 1 else format_minutes(int((end - created).total_seconds() // 60))
     if completed:
@@ -55,7 +54,7 @@ def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, tic
 
     Incremental: un ticket cuyo updated_at no cambió no se vuelve a pedir (los abiertos expiran a la hora).
     """
-    now = time.time()
+    now = clock.timestamp()
     cached = conn.execute("SELECT fetched_at, issue_updated_at FROM flow_fetch WHERE issue_id = ?", (issue["id"],)).fetchone()
     fresh = bool(
         cached and cached["issue_updated_at"] == issue.get("updated_at")
@@ -132,7 +131,7 @@ def build_ticket_flow(conn, base_url, api_key, workspace, project_id, issue, tic
         return None, transitions, states
     flow = flow_metrics.compute_flow(
         {"name": issue.get("name"), "created_at": created, "completed_at": session_clock.parse_time(issue.get("completed_at")), "state": issue.get("state")},
-        transitions, states, wls, datetime.now(timezone.utc))
+        transitions, states, wls, clock.now())
     return flow, transitions, states
 
 

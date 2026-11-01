@@ -1,7 +1,7 @@
 """Paquete de la CLI plane-tracker (punto de entrada: scripts/plane.py -> cli.main).
 
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
-  1. config        rutas de caché, reloj, variables de entorno
+  1. config, clock rutas de caché y variables de entorno; reloj central (única fuente de la hora real)
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
   3. mdhtml, cache, resolve, timeutil, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
@@ -9,7 +9,8 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
 
 Módulos:
-  config          CACHE_DIR, db_file(), request_log(), proposal_file(), now(), get_env_or_fail()
+  config          CACHE_DIR, db_file(), request_log(), proposal_file(), get_env_or_fail()
+  clock           timestamp(), now(), local_now(), local_today(): toda lectura de la hora real pasa por aquí
   db              conexión SQLite (WAL) y esquema
   circuit         circuito de fallo rápido entre procesos y PlaneUnavailable
   api             api_request(): clasificación de fallos, reintentos acotados, circuito y registro de latencia

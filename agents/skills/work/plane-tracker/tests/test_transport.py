@@ -15,6 +15,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+import clock_support  # noqa: E402
 import golden_support as gs  # noqa: E402
 from plane_cli import api, circuit, config  # noqa: E402
 
@@ -64,7 +65,8 @@ class Transport(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.fake = gs.FakePlane()
         self.sleeps = []
-        for patcher in (mock.patch.object(config, "CACHE_DIR", self.tmp.name), mock.patch.object(api, "time", types.SimpleNamespace(sleep=self.sleeps.append, monotonic=time.monotonic))):
+        self.clock = clock_support.Clock()  # el circuito vive de la hora: se controla y solo avanza con self.clock.advance()
+        for patcher in (mock.patch.object(config, "CACHE_DIR", self.tmp.name), self.clock.patch(), mock.patch.object(api, "time", types.SimpleNamespace(sleep=self.sleeps.append, monotonic=time.monotonic))):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.addCleanup(self.tmp.cleanup)
@@ -220,18 +222,16 @@ class Transport(unittest.TestCase):
         self.unavailable()
         self.fake.reopen()
         self.fake.add_fault("*", "/users/me/", "status", 503)
-        past = config.now().timestamp() + circuit.COOLDOWNS[0] + 1
-        with mock.patch.object(config, "now", lambda: __import__("datetime").datetime.fromtimestamp(past, __import__("datetime").timezone.utc)):
-            exc = self.unavailable()
-            self.assertEqual(exc.kind, "http_503")
-            self.assertEqual(self.hits(), [("GET", "/api/v1/users/me/", "")])
-            self.assertEqual(circuit.describe()["level"], 1)
+        self.clock.advance(circuit.COOLDOWNS[0] + 1)
+        exc = self.unavailable()
+        self.assertEqual(exc.kind, "http_503")
+        self.assertEqual(self.hits(), [("GET", "/api/v1/users/me/", "")])
+        self.assertEqual(circuit.describe()["level"], 1)
         self.fake.clear_faults()
-        past += circuit.COOLDOWNS[1] + 1
-        with mock.patch.object(config, "now", lambda: __import__("datetime").datetime.fromtimestamp(past, __import__("datetime").timezone.utc)):
-            self.assertIn("results", self.call())
-            self.assertEqual([p for _, p, _ in self.hits()], ["/api/v1/users/me/", "/api/v1/users/me/", PROJECTS])
-            self.assertEqual(circuit.describe()["state"], "closed")
+        self.clock.advance(circuit.COOLDOWNS[1] + 1)
+        self.assertIn("results", self.call())
+        self.assertEqual([p for _, p, _ in self.hits()], ["/api/v1/users/me/", "/api/v1/users/me/", PROJECTS])
+        self.assertEqual(circuit.describe()["state"], "closed")
 
 
 ISSUE = "10000000-0000-4000-8000-000000000001"

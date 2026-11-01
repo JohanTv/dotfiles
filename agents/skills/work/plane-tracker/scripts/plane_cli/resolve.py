@@ -10,11 +10,11 @@ import os
 import re
 import subprocess
 import sys
-import time
 import urllib.parse
 
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.cache import serve_stale
+from plane_cli import clock
 
 
 PROJECTS_TTL = 86400  # 24 horas
@@ -22,7 +22,7 @@ PROJECTS_TTL = 86400  # 24 horas
 
 def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
     """Obtiene el mapa de identifier -> UUID de proyectos desde SQLite o Plane API."""
-    now = time.time()
+    now = clock.timestamp()
     rows = conn.execute("SELECT identifier, project_id, name, updated_at FROM projects WHERE workspace = ?", (workspace,)).fetchall()
     as_map = lambda items: {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"]} for r in items}
     if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
@@ -202,7 +202,7 @@ def _states_mapping(items):
 
 def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
     """Mapea nombres y slugs de estados a su UUID usando caché SQLite3 con TTL."""
-    now = time.time()
+    now = clock.timestamp()
     rows = conn.execute("SELECT id, name, slug, group_name, is_default, updated_at FROM states WHERE project_id = ?", (project_id,)).fetchall() if conn else []
     if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
         return _states_mapping(rows)
@@ -230,7 +230,7 @@ def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh
 
 def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
     """Mapea nombres de etiquetas a su UUID con paginación y caché SQLite3 con TTL."""
-    now = time.time()
+    now = clock.timestamp()
     rows = conn.execute("SELECT id, name, color, updated_at FROM labels WHERE project_id = ?", (project_id,)).fetchall() if conn else []
     if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
         return {r["name"].lower().strip(): r["id"] for r in rows}

@@ -8,11 +8,11 @@ confirmar se fuerza un refresco de la caché antes de comparar.
 
 import hashlib
 import re
-import time
 
 import session_clock
 from plane_cli.api import PlaneUnavailable
 from plane_cli.cache import age_text, sync_issues_cache
+from plane_cli import clock
 
 DUPLICATE_WINDOW_HOURS = 24
 
@@ -29,7 +29,7 @@ def mark_unconfirmed(conn, project_id, title):
     """Marca que se va a enviar la creación de este título; sigue viva mientras no se confirme el resultado."""
     with conn:
         conn.execute("INSERT OR REPLACE INTO sync_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-                     (_mark_key(project_id, title), _norm(title), time.time()))
+                     (_mark_key(project_id, title), _norm(title), clock.timestamp()))
 
 
 def clear_mark(conn, project_id, title):
@@ -39,7 +39,7 @@ def clear_mark(conn, project_id, title):
 
 def _has_open_mark(conn, project_id, title):
     row = conn.execute("SELECT updated_at FROM sync_metadata WHERE key = ?", (_mark_key(project_id, title),)).fetchone()
-    return bool(row) and time.time() - row["updated_at"] < DUPLICATE_WINDOW_HOURS * 3600
+    return bool(row) and clock.timestamp() - row["updated_at"] < DUPLICATE_WINDOW_HOURS * 3600
 
 
 def recent_duplicates(conn, base_url, api_key, workspace, project_id, project_ident, title):
@@ -52,12 +52,12 @@ def recent_duplicates(conn, base_url, api_key, workspace, project_id, project_id
             refreshed = True
         except PlaneUnavailable:
             pass
-    cutoff = time.time() - DUPLICATE_WINDOW_HOURS * 3600
+    cutoff = clock.timestamp() - DUPLICATE_WINDOW_HOURS * 3600
     wanted, found = _norm(title), []
     for row in conn.execute("SELECT ticket_id, title, created_at FROM issues_cache WHERE project_id = ?", (project_id,)):
         created = session_clock.parse_time(row["created_at"])
         if created and created.timestamp() >= cutoff and _norm(row["title"]) == wanted:
-            found.append((row["ticket_id"], age_text(time.time() - created.timestamp())))
+            found.append((row["ticket_id"], age_text(clock.timestamp() - created.timestamp())))
     if unconfirmed and refreshed and not found:
         clear_mark(conn, project_id, title)  # la creación anterior no llegó a aplicarse: se puede reintentar
     return found

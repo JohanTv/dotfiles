@@ -6,28 +6,20 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+import clock_support  # noqa: E402
 from plane_cli import circuit, config  # noqa: E402
 
 SCRIPTS = os.path.join(os.path.dirname(__file__), "..", "scripts")
 
 
-class Clock:
-    def __init__(self):
-        self.t = 1_800_000_000.0
-
-    def __call__(self):
-        return datetime.fromtimestamp(self.t, timezone.utc)
-
-
 class CircuitCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.clock = Clock()
-        for patcher in (mock.patch.object(config, "CACHE_DIR", self.tmp.name), mock.patch.object(config, "now", self.clock)):
+        self.clock = clock_support.Clock()
+        for patcher in (mock.patch.object(config, "CACHE_DIR", self.tmp.name), self.clock.patch()):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.addCleanup(self.tmp.cleanup)

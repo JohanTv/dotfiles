@@ -20,6 +20,7 @@ from plane_cli.proposal_store import consume_proposal, load_recent_proposal, sav
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, local_ticket_label, resolve_issue, resolve_project_and_seq
 from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders
+from plane_cli import clock
 
 
 def _resolve_duration(args, conn, meta, issue_ref):
@@ -157,7 +158,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     else:
         comment_html = markdown_to_html(content)
 
-    now = datetime.now()
+    now = clock.local_now()
     if unavailable is None:
         # Etiqueta real del ticket: identifier del proyecto resuelto (OPS-13, nunca OMNIFY-13 por defecto)
         proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
@@ -219,7 +220,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "notes": meta.get("notes", issue.get("name", "")),
         "stoppers": meta.get("stoppers", []),
         "plane_comment_id": None,
-        "created_at": datetime.now().isoformat(),
+        "created_at": now.isoformat(),
         "raw_payload": meta
     }
     draft = Draft(base_url, api_key, workspace, project_id, issue, ticket_label, comment_html, meta, entry, unavailable)

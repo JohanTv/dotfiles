@@ -9,8 +9,8 @@ No hace: llamadas a Plane.
 import json
 import re
 import sys
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from plane_cli import clock
 
 
 def extract_metadata_from_comment(comment_html):
@@ -47,7 +47,7 @@ def extract_metadata_from_comment(comment_html):
         except Exception:
             dur = 60
 
-        d_str = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+        d_str = date_match.group(1) if date_match else clock.local_now().strftime("%Y-%m-%d")
         notes_str = notes_match.group(1).strip() if notes_match else ""
         bucket_str = bucket_match.group(1).strip() if bucket_match else "deep_work"
         track_str = track_match.group(1).strip() if track_match else "main"
@@ -71,10 +71,11 @@ def extract_metadata_from_comment(comment_html):
 
 def upsert_worklog(conn, entry):
     """Inserta o actualiza un registro de trabajo en SQLite3 de forma idempotente."""
-    now = time.time()
+    now = clock.timestamp()
+    moment = datetime.fromtimestamp(now)  # una sola lectura del reloj para todos los valores por defecto
     t_id = entry.get("ticket_id", "GENERAL")
     track = entry.get("track", "main")
-    d_str = entry.get("date", datetime.now().strftime("%Y-%m-%d"))
+    d_str = entry.get("date", moment.strftime("%Y-%m-%d"))
     s_time = entry.get("start_time", "09:00")
     e_time = entry.get("end_time", "10:00")
     dur = entry.get("duration_minutes", 60)
@@ -88,7 +89,7 @@ def upsert_worklog(conn, entry):
     stoppers = json.dumps(entry.get("stoppers", []), ensure_ascii=False)
     comment_id = entry.get("plane_comment_id") or entry.get("id")
     raw_payload = json.dumps(entry.get("raw_payload", entry), ensure_ascii=False)
-    created_at = entry.get("created_at", datetime.now().isoformat())
+    created_at = entry.get("created_at", moment.isoformat())
 
     with conn:
         conn.execute("""
@@ -163,7 +164,7 @@ def corrected_metadata(old, duration, track=None, capacity_bucket=None, worker_t
     measured_by["was"] = measured_by.get("kind")
     measured_by["kind"] = "corrected"
     meta["measured_by"] = measured_by
-    meta["edited_at"] = edited_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    meta["edited_at"] = edited_at or clock.now().isoformat(timespec="seconds")
     return meta
 
 

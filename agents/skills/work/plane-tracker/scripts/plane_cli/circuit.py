@@ -17,6 +17,7 @@ import urllib.error
 from datetime import datetime
 
 from plane_cli import config
+from plane_cli import clock
 
 TRIP_AFTER = 2
 WINDOW = 120
@@ -57,10 +58,6 @@ class PlaneUnavailable(urllib.error.URLError):
 
     def __str__(self):
         return self.cause
-
-
-def _now():
-    return config.now().timestamp()
 
 
 def hhmm(ts):
@@ -126,7 +123,7 @@ def record(ok, error=None, probe=False):
     ok=True resetea todo. Un fallo suma al contador (se abre al llegar a TRIP_AFTER); una sonda fallida con el circuito
     abierto sube un nivel de enfriamiento.
     """
-    now = _now()
+    now = clock.timestamp()
     if ok:
         if _is_clean(_read(), now):
             return _read()
@@ -157,7 +154,7 @@ def _run(run_probe):
 
 def gate(run_probe):
     """Se llama antes de cada petición. Abierto y en enfriamiento (o con la sonda en manos de otro proceso): falla sin red."""
-    now = _now()
+    now = clock.timestamp()
     with _locked() as state:
         if state["opened_at"] is None:
             return
@@ -175,7 +172,7 @@ def probe(run_probe, force=False):
 
     Con force=True sondea siempre, también con el circuito cerrado o en enfriamiento.
     """
-    now = _now()
+    now = clock.timestamp()
     if not force:
         with _locked() as state:
             if state["opened_at"] is None or now < state["opened_at"] + _cooldown(state) or now < state["probing_until"]:
@@ -189,7 +186,7 @@ def retry_in():
     state = _read()
     if state["opened_at"] is None:
         return COOLDOWNS[0]
-    return max(1, math.ceil(state["opened_at"] + _cooldown(state) - _now()))
+    return max(1, math.ceil(state["opened_at"] + _cooldown(state) - clock.timestamp()))
 
 
 def last_failure():
@@ -213,7 +210,7 @@ def format_unavailable(exc):
         return exc.message + "\n"
     if exc.kind == "offline":
         return "Modo sin conexión (PLANE_OFFLINE=1). No se envió nada.\n"
-    since = exc.since or hhmm(_now())
+    since = exc.since or hhmm(clock.timestamp())
     if exc.delivered == "unknown" and exc.method != "GET":
         return (f"Plane no responde desde las {since} ({exc.cause}). "
                 "Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.\n")

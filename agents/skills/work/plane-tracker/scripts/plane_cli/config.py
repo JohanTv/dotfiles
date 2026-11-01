@@ -1,14 +1,14 @@
-"""Entorno compartido: directorio de caché y sus rutas, reloj, medianoche local y variables de entorno.
+"""Entorno compartido: directorio de caché y sus rutas, medianoche local y variables de entorno.
 
-Expone: CACHE_DIR, db_file(), request_log(), proposal_file(), now(), local_midnight_utc(), positive_int(),
+Expone: CACHE_DIR, db_file(), request_log(), proposal_file(), local_midnight_utc(), positive_int(),
 add_json_flag(), load_zshrc_local_if_needed(), get_env_or_fail().
-No hace: acceso a red ni a SQLite. Las rutas y el reloj se leen en cada llamada (por atributo del módulo) para que
-los tests puedan sustituirlos.
+No hace: acceso a red ni a SQLite ni leer la hora (eso es de `clock`). Las rutas se leen en cada llamada (por atributo
+del módulo) para que los tests puedan sustituirlas.
 """
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import timezone
 
 CACHE_DIR = os.path.expanduser("~/.cache/plane")
 
@@ -23,11 +23,6 @@ def request_log():
 
 def proposal_file():
     return os.path.join(CACHE_DIR, "last_proposal.json")
-
-
-def now():
-    """Instante actual en UTC."""
-    return datetime.now(timezone.utc)
 
 
 def local_midnight_utc(moment_utc):

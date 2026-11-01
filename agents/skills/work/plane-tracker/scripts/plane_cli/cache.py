@@ -8,11 +8,11 @@ Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen
 
 import json
 import sys
-import time
 import urllib.parse
 from datetime import datetime, timezone
 
 from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli import clock
 
 ISSUES_TTL = 1800  # 30 minutos
 ISSUES_MAX_PAGES = 20
@@ -32,7 +32,7 @@ def age_text(seconds):
 
 
 def warn_stale(updated_at):
-    sys.stderr.write(f"⚠ Datos locales de hace {age_text(time.time() - updated_at)}; Plane no responde.\n")
+    sys.stderr.write(f"⚠ Datos locales de hace {age_text(clock.timestamp() - updated_at)}; Plane no responde.\n")
 
 
 def fail_no_cache(what):
@@ -68,7 +68,7 @@ def _fetch_all_issues(base_url, api_key, workspace, project_id):
 
 def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
     """Sincroniza los issues del proyecto en SQLite (búsqueda FTS5 instantánea). Sin Plane sirve la caché existente."""
-    now = time.time()
+    now = clock.timestamp()
     row = conn.execute("SELECT MAX(updated_at) AS last_sync FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()
     last_sync = row["last_sync"] if row else None
     if not force_refresh and last_sync and (now - last_sync) < ISSUES_TTL:
@@ -104,7 +104,7 @@ def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_id
 
 def save_snapshot(conn, issue, ticket_id, comments=None):
     """Guarda la última lectura completa de un ticket. Sin `comments` (--no-comments) solo se renueva el issue."""
-    now = time.time()
+    now = clock.timestamp()
     issue_json = json.dumps(issue, ensure_ascii=False)
     with conn:
         if comments is None:

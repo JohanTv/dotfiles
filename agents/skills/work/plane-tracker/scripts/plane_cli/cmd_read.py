@@ -9,7 +9,6 @@ import json
 import os
 import re
 import sys
-import time
 
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, sync_issues_cache, warn_stale
@@ -23,6 +22,7 @@ from plane_cli.resolve import (
     resolve_issue,
     resolve_project_and_seq,
 )
+from plane_cli import clock
 
 
 def _fetch_comments(base_url, api_key, workspace, project_id, issue):
@@ -88,7 +88,7 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
         return
 
     if offline:
-        print(f"\n⚠ Datos locales de hace {age_text(time.time() - offline['fetched_at'])}; Plane no responde."
+        print(f"\n⚠ Datos locales de hace {age_text(clock.timestamp() - offline['fetched_at'])}; Plane no responde."
               + (" Solo metadatos del listado: sin descripción ni comentarios." if offline["metadata_only"]
                  else " Esta copia no incluye comentarios." if skip_comments else ""), end="")
     print(f"\n📌 {args.issue}: {issue.get('name')}")

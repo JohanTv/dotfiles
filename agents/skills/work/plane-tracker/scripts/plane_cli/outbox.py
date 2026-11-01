@@ -21,9 +21,9 @@ import urllib.error
 import urllib.parse
 from dataclasses import dataclass, field
 
-from plane_cli import config
 from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
 from plane_cli.worklog import extract_metadata_from_comment, replace_metadata_block, strip_metadata_block, upsert_worklog
+from plane_cli import clock
 
 EXTERNAL_SOURCE = "plane-tracker"
 LEASE_SECONDS = 180
@@ -69,7 +69,7 @@ def fail(message, prefix="Error: "):
 
 
 def stamp():
-    return config.now().isoformat(timespec="seconds")
+    return clock.now().isoformat(timespec="seconds")
 
 
 def make_client_id(ticket_label, track, date, start_time, html):
@@ -94,7 +94,7 @@ def claim(conn, item_id):
     conn.execute("BEGIN IMMEDIATE")
     try:
         row = conn.execute("SELECT * FROM outbox WHERE id = ?", (item_id,)).fetchone()
-        now = config.now().timestamp()
+        now = clock.timestamp()
         free = row is not None and (row["state"] == "pending" or (row["state"] == "sending" and (row["lease_until"] or 0) < now))
         if free:
             conn.execute("UPDATE outbox SET state = 'sending', attempts = attempts + 1, maybe_delivered = 1, lease_until = ?, updated_at = ? WHERE id = ?",

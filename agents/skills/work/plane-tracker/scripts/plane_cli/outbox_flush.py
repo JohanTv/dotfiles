@@ -14,10 +14,11 @@ import time
 import urllib.error
 from datetime import datetime, timedelta
 
-from plane_cli import circuit, config
+from plane_cli import circuit
 from plane_cli.api import PlaneUnavailable, api_request, http_detail, probe_plane
 from plane_cli.outbox import Rejected, deliver, pending_counts, stamp
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
+from plane_cli import clock
 
 OUTBOX_MAX_AGE_DAYS = 7
 PRUNE_DAYS = 30
@@ -65,7 +66,7 @@ def _target_resolver(conn, base_url, api_key, workspace, default_project_id):
 
 
 def _prepare(conn, retry_failed):
-    cutoff = (config.now() - timedelta(days=PRUNE_DAYS)).isoformat(timespec="seconds")
+    cutoff = (clock.now() - timedelta(days=PRUNE_DAYS)).isoformat(timespec="seconds")
     with conn:
         conn.execute("DELETE FROM outbox WHERE state IN ('sent', 'dropped') AND updated_at < ?", (cutoff,))
         if retry_failed:
@@ -73,7 +74,7 @@ def _prepare(conn, retry_failed):
 
 
 def _too_old(item, include_old):
-    age = config.now() - datetime.fromisoformat(item["created_at"])
+    age = clock.now() - datetime.fromisoformat(item["created_at"])
     return not include_old and age > timedelta(days=OUTBOX_MAX_AGE_DAYS)
 
 
@@ -90,7 +91,7 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
         kind, since = (None, None) if offline else circuit.last_failure()
         result.update(stopped="unavailable", unavailable=PlaneUnavailable("offline" if offline else (kind or "unknown"), "no", since=since))
         return _finish(conn, result)
-    now = config.now().timestamp()
+    now = clock.timestamp()
     candidates = conn.execute("SELECT * FROM outbox WHERE state = 'pending' OR (state = 'sending' AND lease_until < ?) ORDER BY id", (now,)).fetchall()
     target_of = _target_resolver(conn, base_url, api_key, workspace, default_project_id)
     processed = 0

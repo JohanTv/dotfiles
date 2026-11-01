@@ -11,7 +11,7 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import golden_support as gs  # noqa: E402
-from plane_cli import config, db, outbox  # noqa: E402
+from plane_cli import clock, config, db, outbox  # noqa: E402
 from plane_cli.api import PlaneUnavailable  # noqa: E402
 
 FAST_PLANE_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plane_fast.py")
@@ -262,7 +262,7 @@ class Library(unittest.TestCase):
     def test_a_live_lease_blocks_the_claim(self):
         self.fake.add_fault("POST", COMMENTS, "drop")
         outbox.publish_comment(self.conn, self.draft())
-        self.conn.execute("UPDATE outbox SET state = 'sending', lease_until = ?", (config.now().timestamp() + 100,))
+        self.conn.execute("UPDATE outbox SET state = 'sending', lease_until = ?", (clock.timestamp() + 100,))
         self.conn.commit()
         self.assertEqual(outbox.deliver(self.conn, self.item(), lambda: (gs.P1, ISSUE), self.fake.base_url, "k", gs.WS), ("busy",))
 

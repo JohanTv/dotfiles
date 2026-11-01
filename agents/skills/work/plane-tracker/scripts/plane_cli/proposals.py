@@ -15,6 +15,7 @@ import session_clock
 
 from plane_cli import config
 from plane_cli.proposal_store import proposal_store
+from plane_cli import clock
 
 
 # Reuniones y soporte no dejan huella en un transcript: ahí siempre se pregunta.
@@ -190,7 +191,7 @@ def _measure(conn, args, worker_type, exclude_tickets, ticket, use_focus):
     if not stamps:
         return {"ok": False, "agent": agent, "session_id": session_id, "reason": f"Sin evidencia de tiempos para la sesión {session_id} ({agent})."}
 
-    now = config.now()
+    now = clock.now()
     try:
         win = _resolve_window(args, now)
     except ValueError as exc:

@@ -3,13 +3,15 @@ import io
 import os
 import sqlite3
 import sys
-import time
 import unittest
 from argparse import Namespace
 from contextlib import redirect_stderr
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
+sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+import clock_support  # noqa: E402
+from plane_cli import clock  # noqa: E402
 from plane_cli import cmd_tickets_write as ctw  # noqa: E402
 from plane_cli import create_guard as cg  # noqa: E402
 from plane_cli import db  # noqa: E402
@@ -19,11 +21,15 @@ PROJECT = "proj-1"
 
 
 def iso(hours_ago):
-    return (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
+    return (clock.now() - timedelta(hours=hours_ago)).isoformat()
 
 
 class Base(unittest.TestCase):
     def setUp(self):
+        self.clock = clock_support.Clock()  # la guarda mide ventanas de 24 h: el reloj es controlado, no la hora real
+        patcher = self.clock.patch()
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
         db.init_db(self.conn)
@@ -44,7 +50,7 @@ class Base(unittest.TestCase):
         with self.conn:
             self.conn.execute(
                 "INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at, created_at) "
-                "VALUES (?, 1, ?, ?, ?, 'Backlog', 'backlog', 'none', '', ?, ?)", (ticket + project, ticket, project, title, time.time(), iso(hours_ago)))
+                "VALUES (?, 1, ?, ?, ?, 'Backlog', 'backlog', 'none', '', ?, ?)", (ticket + project, ticket, project, title, clock.timestamp(), iso(hours_ago)))
 
     def duplicates(self, title):
         return cg.recent_duplicates(self.conn, "http://x", "k", "ws", PROJECT, "OMNIFY", title)
@@ -90,7 +96,7 @@ class RecentDuplicates(Base):
     def test_expired_mark_is_ignored(self):
         cg.mark_unconfirmed(self.conn, PROJECT, "Crear algo")
         with self.conn:
-            self.conn.execute("UPDATE sync_metadata SET updated_at = ?", (time.time() - 25 * 3600,))
+            self.conn.execute("UPDATE sync_metadata SET updated_at = ?", (clock.timestamp() - 25 * 3600,))
         self.duplicates("Crear algo")
         self.assertEqual(self.refreshes, 0)
 

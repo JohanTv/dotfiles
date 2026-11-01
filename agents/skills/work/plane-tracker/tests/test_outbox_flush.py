@@ -189,16 +189,16 @@ class Processes(Base):
         self.queue("interrumpido")
         self.fake.add_fault("POST", COMMENTS, "delay", 2, n=1)
         proc = self.flush_process()
-        deadline = time.time() + 20
-        while not any(r[0] == "POST" for r in self.fake.requests) and time.time() < deadline:
+        deadline = time.monotonic() + 20
+        while not any(r[0] == "POST" for r in self.fake.requests) and time.monotonic() < deadline:
             time.sleep(0.05)
         proc.kill()
         proc.communicate()
         self.assertEqual(self.rows()[0]["state"], "sending")
         out, _ = self.cli("outbox", "flush")
         self.assertIn("0 publicado(s), 0 fallido(s), 1 pendiente(s)", out)
-        deadline = time.time() + 10
-        while not self.fake.committed and time.time() < deadline:
+        deadline = time.monotonic() + 10
+        while not self.fake.committed and time.monotonic() < deadline:
             time.sleep(0.05)
         self.sql("UPDATE outbox SET lease_until = 1")
         out, _ = self.cli("outbox", "flush")
