@@ -47,7 +47,8 @@ def build_jobs(filters):
 
 def run_job(args):
     home = tempfile.mkdtemp(prefix="plane-par-")
-    env = {k: v for k, v in os.environ.items() if not k.startswith("PLANE_")}
+    # Se descartan las variables PLANE_* (credenciales, instancia) salvo PLANE_TEST_NOW, que solo lee el harness de pruebas para fijar el reloj
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PLANE_") or k == "PLANE_TEST_NOW"}
     env.update(HOME=home, TMPDIR=home)
     started = time.monotonic()
     try:
