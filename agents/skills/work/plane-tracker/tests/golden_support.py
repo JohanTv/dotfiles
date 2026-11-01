@@ -507,6 +507,13 @@ def _scrub_body(text, keys):
     return json.dumps(parsed, sort_keys=True, ensure_ascii=False)
 
 
+def today_placeholder(text):
+    """Sustituye la fecha de hoy por <HOY>. Se aplica a la salida real y al golden esperado: si una fecha fija del fixture
+    coincide con el día en que corre la suite, ambos lados la convierten igual en lugar de fallar solo ese día."""
+    now = datetime.now()
+    return text.replace(now.strftime("%Y-%m-%d"), "<HOY>").replace(now.strftime("%d/%m/%Y"), "<HOY>")
+
+
 def normalize(text, sandbox, scrub=()):
     text = text.replace(str(sandbox.fake.port), "PORT").replace(str(sandbox.dead_port), "DEADPORT").replace(sandbox.tmp.name, "<TMP>")
     text = re.sub(r"\b[0-9a-f]{40}\b", "<SHA>", text)
@@ -515,8 +522,7 @@ def normalize(text, sandbox, scrub=()):
         # Las marcas completas de tiempo se limpian ANTES de sustituir la fecha de hoy: si no, según la hora
         # del día la fecha local coincide con la UTC y la marca queda como "<HOY> hh:mm:ss".
         text = re.sub(r"\b20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\b", "<TS>", text)
-    now = datetime.now()
-    text = text.replace(now.strftime("%Y-%m-%d"), "<HOY>").replace(now.strftime("%d/%m/%Y"), "<HOY>")
+    text = today_placeholder(text)
     text = re.sub(r"desde las \d\d:\d\d", "desde las <HH:MM>", text)
     text = re.sub(r"abierto desde hace [\d.]+ (días|min|h)", "abierto desde hace <N> \\1", text)
     if scrub:
@@ -574,4 +580,4 @@ def check_golden(testcase, name, actual):
         testcase.fail(f"falta el golden {path} (genéralo con GOLDEN_UPDATE=1 contra la línea base)")
     with open(path, "r", encoding="utf-8") as handle:
         expected = handle.read()
-    testcase.assertEqual(actual, expected, f"la salida de '{name}' difiere del golden")
+    testcase.assertEqual(actual, today_placeholder(expected), f"la salida de '{name}' difiere del golden")
