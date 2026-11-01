@@ -89,15 +89,17 @@ Hecho el 2026-11-01, solo en `tests/` (`scripts/` sin ningún cambio):
 
 **Limitaciones conocidas:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` siguen en tiempo real, y las pausas de 1 s de la publicación de la cola se mantienen); las pruebas unitarias que ejecutan código en proceso no pasan por el lanzador (parchean `config.now` o no dependen de la hora).
 
-## Riesgos
+## Riesgos (con su desenlace)
 
-- **Los golden pueden cambiar** al congelar el reloj: algunas salidas con edades ("hace X") podrían pasar de `<N>` a un valor concreto. No verificado.
-- **Alguna prueba podría necesitar que el tiempo avance dentro de un único subproceso** (por ejemplo, el guion de `test_circuit.py` con cinco procesos simultáneos). No se leyó ese guion.
-- **Modificar la biblioteca estándar en el lanzador** es magia: debe documentarse y limitarse al lanzador de pruebas.
+- **Los golden podían cambiar al congelar el reloj.** Ocurrió, como se esperaba: 61 líneas en 10 archivos, y se comprobó que todas eran solo valores de fecha u hora.
+- **Alguna prueba podía necesitar que el tiempo avanzara dentro de un único subproceso.** Resultó ser una sola (la del lease de `test_outbox_flush`) y la causa era un `Popen` sin el lanzador, no el reloj congelado. El guion de cinco procesos de `test_circuit.py` no pasa por el lanzador (usa su propio guion y la hora real) y pasa, también bajo CPU saturada.
+- **Modificar la biblioteca estándar en el lanzador es magia.** Queda limitado a `tests/plane_clock.py`, está documentado en `ARCHITECTURE.md` y lo cubren pruebas del lanzador (todas las formas de leer la hora, lecturas repetidas idénticas, código de salida, nombre del script, rechazo de un instante sin zona y `--help` idéntico).
+
+**Lo que sigue usando la hora real en las pruebas, y por qué es aceptable:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` son esperas reales); los bucles de espera del proceso padre en `test_outbox_flush` aguardan a procesos reales con un límite de tiempo; y `test_create_guard`, `test_offline_reads` y `test_circuit` calculan tiempos relativos al mismo reloj que usa el código bajo prueba. Ninguno depende de la fecha del calendario, y la prueba negativa con otros instantes lo confirma. Una aserción con tope de tiempo real (por ejemplo, un comando debe terminar en menos de 2 o 3 s) depende de la velocidad de la máquina, no de la fecha; pasó bajo CPU saturada con un margen de 13 a 20 veces.
 
 ## Cuándo hacerlo
 
-Antes del defecto [0010](../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) conviene considerarlo: ese arreglo toca el reporte y sus pruebas dependen de fechas, y con un reloj fijo quedarían deterministas desde el principio.
+Hecho. Se implementó antes del defecto [0010](../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md), de modo que las pruebas del reporte que ese arreglo toque nacen deterministas.
 
 ## Criterio de cierre
 
