@@ -20,7 +20,8 @@
 ```text
 dotfiles/
 ├── Makefile                    # 🎯 Orquestador maestro (make, make work, make personal, make doctor)
-├── install.sh                  # Instalador idempotente y detector de SO
+├── install.sh                  # Instalador idempotente y detector de SO (--tools: apt + Homebrew)
+├── Brewfile                    # Herramientas CLI vía Homebrew (rg, sd, lazygit, lazydocker)
 ├── .gitignore                  # Protección contra secretos, dist/ y temporales
 │
 ├── agents/                     # 🤖 Orquestación unificada de Agentes de IA
@@ -62,13 +63,17 @@ En cualquier máquina nueva con Ubuntu o WSL (puedes clonarlo en `~/Code/dotfile
 ```bash
 git clone https://github.com/johantv/dotfiles.git ~/Code/dotfiles
 cd ~/Code/dotfiles
-./install.sh
+./install.sh --tools   # primera vez: instala openssh-client, jq, Homebrew y el Brewfile (pide sudo)
+./install.sh           # siguientes veces: solo enlaza y avisa de lo que falte
 ```
 
 El script `install.sh`:
 1. Crea enlaces simbólicos (*symlinks*) limpios a tu `$HOME`.
 2. Respalda automáticamente cualquier configuración preexistente con sufijo `.bak`.
 3. Detecta si estás en WSL o Ubuntu nativo para enlazar solo lo que corresponde.
+4. Con `--tools` (opt-in, idempotente) instala lo que falte: paquetes apt base (`openssh-client`, `jq`, `fd-find`, `bat`…), Homebrew y el `Brewfile`. Sin el flag no usa `sudo` y solo avisa.
+
+SSH **no** se versiona (hosts y llaves van a mano). `dotfiles-doctor` te dice qué falta y el comando exacto.
 
 ---
 

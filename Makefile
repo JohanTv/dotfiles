@@ -14,7 +14,7 @@ PROFILE_RULES := $(DOTFILES_DIR)/agents/rules/src/$(PROFILE).md
 
 IS_WSL := $(shell grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null && echo true || echo false)
 
-.PHONY: all work personal compile-rules link-rules sync-skills sync-binaries doctor check install help
+.PHONY: all work personal compile-rules link-rules sync-skills sync-binaries doctor check install tools help
 
 all: compile-rules link-rules sync-skills sync-binaries
 	@echo "✔ Dotfiles sincronizados con perfil activo: [$(PROFILE)] (WSL: $(IS_WSL))"
@@ -181,6 +181,9 @@ check: doctor
 install:
 	@./install.sh
 
+tools:
+	@./install.sh --tools
+
 help:
 	@echo "Uso del Makefile de Dotfiles:"
 	@echo "  make              Compila perfil activo ($(PROFILE)) y concilia symlinks"
@@ -188,3 +191,4 @@ help:
 	@echo "  make personal     Activa perfil personal limpio"
 	@echo "  make doctor       Ejecuta dotfiles-doctor para auditar integridad"
 	@echo "  make install      Ejecuta instalador completo"
+	@echo "  make tools        Instalador + herramientas base (apt, Homebrew, Brewfile)"

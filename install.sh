@@ -58,6 +58,57 @@ else
 fi
 
 # ------------------------------------------------------------------------------
+# 1b. Herramientas base (opt-in con --tools; idempotente)
+# apt: lo que el .zshrc asume (batcat/fdfind) + openssh-client. brew: ver Brewfile.
+# ------------------------------------------------------------------------------
+INSTALL_TOOLS=false
+for arg in "$@"; do
+    case "$arg" in
+        --tools) INSTALL_TOOLS=true ;;
+        -h|--help) echo "Uso: ./install.sh [--tools]"; exit 0 ;;
+        *) log_warn "Argumento desconocido: $arg" ;;
+    esac
+done
+
+APT_BASE=(openssh-client curl git build-essential procps file jq fd-find bat fzf zoxide eza)
+BREW_BIN="/home/linuxbrew/.linuxbrew/bin/brew"
+
+install_tools() {
+    local missing=()
+    for p in "${APT_BASE[@]}"; do
+        dpkg -s "$p" >/dev/null 2>&1 || missing+=("$p")
+    done
+    if (( ${#missing[@]} )); then
+        log_info "Instalando paquetes apt: ${missing[*]}"
+        sudo apt-get update -y && sudo apt-get install -y "${missing[@]}"
+    else
+        log_ok "Paquetes apt base ya instalados"
+    fi
+
+    if ! command -v brew >/dev/null 2>&1 && [[ ! -x "$BREW_BIN" ]]; then
+        log_info "Instalando Homebrew..."
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    else
+        log_ok "Homebrew ya instalado"
+    fi
+    # Solo para esta ejecución; el .zshrc ya exporta el PATH de brew
+    [[ -x "$BREW_BIN" ]] && eval "$("$BREW_BIN" shellenv)"
+
+    if command -v brew >/dev/null 2>&1; then
+        HOMEBREW_NO_ANALYTICS=1 brew bundle --file="$DOTFILES_DIR/Brewfile"
+    fi
+}
+
+if [[ "$INSTALL_TOOLS" == true ]]; then
+    install_tools
+else
+    for t in ssh jq rg sd lazygit; do
+        command -v "$t" >/dev/null 2>&1 || log_warn "Falta '$t' (ejecuta ./install.sh --tools)"
+    done
+    command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1 || log_warn "Falta 'fd' (ejecuta ./install.sh --tools)"
+fi
+
+# ------------------------------------------------------------------------------
 # 2. Configurar y Compilar Reglas y Skills de Agentes IA (via Makefile)
 # ------------------------------------------------------------------------------
 log_info "Configurando y compilando reglas y skills de Agentes IA..."
