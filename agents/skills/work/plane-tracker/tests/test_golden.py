@@ -4,6 +4,7 @@ temporal; ver golden_support.py."""
 import os
 import sys
 import unittest
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
@@ -122,6 +123,17 @@ class Golden(unittest.TestCase):
 
     # --- escritura ------------------------------------------------------------
     def test_comment(self):
+        # El paso "mismo minuto" depende del reloj real: si la ejecución cruza un cambio de minuto la advertencia no aparece.
+        # Solo en ese caso se repite el escenario una vez; cualquier otro fallo se propaga.
+        for attempt in (1, 2):
+            minute = datetime.now().strftime("%Y%m%d%H%M")
+            try:
+                return self._comment_scenario()
+            except AssertionError:
+                if attempt == 2 or datetime.now().strftime("%Y%m%d%H%M") == minute:
+                    raise
+
+    def _comment_scenario(self):
         steps = [["comment", "add", "OMNIFY-1", "-m", "**Hola** mundo\n\n- uno\n- dos", "--duration", "15", "--track", "t1", "--capacity", "tooling_dx"],
                  ["comment", "add", "OMNIFY-1", "-m", "mismo minuto", "--duration", "15", "--track", "t1", "--capacity", "tooling_dx", "--json"],
                  ["comment", "add", "OPS-13", "-f", "cuerpo.md", "--duration", "5", "--worker-type", "agent:claude", "--session", gs.SESSION, "--json"],
