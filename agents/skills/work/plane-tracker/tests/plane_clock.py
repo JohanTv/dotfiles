@@ -2,6 +2,7 @@
 """Lanzador de pruebas: congela la hora real y ejecuta otro script (plane.py, o plane_fast.py) en el mismo proceso.
 
 Uso: plane_clock.py <ISO-8601 con zona, p. ej. 2026-11-02T12:00:00+00:00> <script> [args...]
+     plane_clock.py <ISO-8601 con zona> -m <módulo> [args...]   (por ejemplo, -m unittest: congela el propio proceso de pruebas)
 
 Sustituye `datetime.datetime` por una subclase cuyo `now()`, `utcnow()` y `today()` devuelven el instante fijado, y `time.time`,
 ANTES de que el script importe `plane_cli`: así `from datetime import datetime` y `import time` ya ven el reloj fijo y la
@@ -48,6 +49,13 @@ def main(argv):
         return 2
     freeze(instant)
     target = argv[1]
+    if target == "-m":
+        if len(argv) < 3:
+            sys.stderr.write("plane_clock.py: falta el módulo después de -m\n")
+            return 2
+        sys.argv = [argv[2], *argv[3:]]
+        runpy.run_module(argv[2], run_name="__main__", alter_sys=True)
+        return 0
     sys.argv = [target, *argv[2:]]
     runpy.run_path(target, run_name="__main__")
     return 0

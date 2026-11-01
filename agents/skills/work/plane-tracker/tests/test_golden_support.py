@@ -9,9 +9,12 @@ import tempfile
 import textwrap
 import unittest
 from datetime import datetime
+from types import SimpleNamespace
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
+import run_parallel as rp  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLANE = os.path.join(HERE, "..", "scripts", "plane.py")
@@ -72,6 +75,35 @@ class ClockLauncher(unittest.TestCase):
             plain = subprocess.run([sys.executable, PLANE, "--help"], env=env, capture_output=True, text=True, timeout=60)
         launched = run_launcher(INSTANT, PLANE, "--help")
         self.assertEqual((launched.returncode, launched.stdout, launched.stderr), (plain.returncode, plain.stdout, plain.stderr))
+
+
+    def test_module_mode_freezes_the_whole_process(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with open(os.path.join(folder, "probe_mod.py"), "w", encoding="utf-8") as handle:
+                handle.write("import sys, time\nfrom datetime import datetime\nprint(datetime.now().isoformat(), time.time(), sys.argv[1:])\n")
+            proc = run_launcher("2031-12-31T23:59:30+00:00", "-m", "probe_mod", "a", env_extra={"PYTHONPATH": folder})
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.strip(), "2031-12-31T23:59:30 1956527970.0 ['a']")
+
+    def test_module_mode_requires_a_module(self):
+        proc = run_launcher(INSTANT, "-m")
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("falta el módulo", proc.stderr)
+
+
+class ParallelRunnerFreeze(unittest.TestCase):
+    def command_for(self, freeze):
+        with mock.patch.object(rp.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="", stderr="")) as run:
+            rp.run_job(["test_clock"], freeze)
+        return run.call_args[0][0]
+
+    def test_without_freeze_the_job_is_plain_unittest(self):
+        self.assertEqual(self.command_for(None)[1:], ["-m", "unittest", "test_clock"])
+
+    def test_freeze_runs_each_job_through_the_launcher(self):
+        command = self.command_for("2031-12-31T23:59:30+00:00")
+        self.assertEqual(command[1], gs.CLOCK_PY)
+        self.assertEqual(command[2:], ["2031-12-31T23:59:30+00:00", "-m", "unittest", "test_clock"])
 
 
 class SandboxClock(unittest.TestCase):

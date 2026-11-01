@@ -4,7 +4,9 @@
 Los módulos pesados (golden, outbox...) se reparten por método para que el tiempo total tienda a la prueba más lenta; los
 ligeros van por módulo. Los trabajos corren con prioridad baja (--nice) para no restar fluidez al resto de la máquina.
 
-Uso: python3 tests/run_parallel.py [-j N] [--nice N] [texto ...]   (los textos filtran módulos por nombre)
+Uso: python3 tests/run_parallel.py [-j N] [--nice N] [--freeze ISO] [texto ...]   (los textos filtran módulos por nombre)
+--freeze ISO congela además la hora real del propio proceso de pruebas (con plane_clock.py): ninguna prueba debe depender de la fecha real,
+así que toda la suite debe pasar con cualquier instante; sirve para comprobarlo.
 Salida: 0 si todo pasa, 1 si algún trabajo falla. No regenera los golden: para eso, GOLDEN_UPDATE=1 con unittest normal."""
 import argparse
 import compileall
@@ -45,14 +47,17 @@ def build_jobs(filters):
     return jobs
 
 
-def run_job(args):
+def run_job(args, freeze=None):
     home = tempfile.mkdtemp(prefix="plane-par-")
     # Se descartan las variables PLANE_* (credenciales, instancia) salvo PLANE_TEST_NOW, que solo lee el harness de pruebas para fijar el reloj
     env = {k: v for k, v in os.environ.items() if not k.startswith("PLANE_") or k == "PLANE_TEST_NOW"}
     env.update(HOME=home, TMPDIR=home)
     started = time.monotonic()
     try:
-        proc = subprocess.run([sys.executable, "-m", "unittest", *args], cwd=HERE, env=env, capture_output=True, text=True, timeout=JOB_TIMEOUT)
+        command = [sys.executable, "-m", "unittest", *args]
+        if freeze:
+            command = [sys.executable, os.path.join(HERE, "plane_clock.py"), freeze, "-m", "unittest", *args]
+        proc = subprocess.run(command, cwd=HERE, env=env, capture_output=True, text=True, timeout=JOB_TIMEOUT)
         code, output = proc.returncode, proc.stdout + proc.stderr
     except subprocess.TimeoutExpired:
         code, output = 124, f"TIMEOUT: más de {JOB_TIMEOUT} s"
@@ -65,6 +70,7 @@ def main(argv):
     parser = argparse.ArgumentParser(description="Ejecuta la suite de plane-tracker en paralelo")
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 4, help="procesos simultáneos (por defecto, los hilos de la CPU)")
     parser.add_argument("--nice", type=int, default=10, help="aumento de 'nice' de los trabajos; 0 lo desactiva (por defecto 10)")
+    parser.add_argument("--freeze", metavar="ISO", help="congela la hora real del proceso de pruebas en este instante (ISO-8601 con zona)")
     parser.add_argument("filtro", nargs="*", help="solo módulos cuyo nombre contenga alguno de estos textos")
     opts = parser.parse_args(argv)
     if opts.nice > 0 and hasattr(os, "nice"):
@@ -76,7 +82,7 @@ def main(argv):
         return 1
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=max(1, opts.jobs)) as pool:
-        results = list(pool.map(run_job, jobs))
+        results = list(pool.map(lambda job: run_job(job, opts.freeze), jobs))
     wall = time.monotonic() - started
     failed = [r for r in results if r[1] != 0]
     for name, code, output, _secs in failed:
