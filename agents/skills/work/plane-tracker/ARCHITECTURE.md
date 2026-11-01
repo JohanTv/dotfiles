@@ -169,9 +169,21 @@ encola). `PLANE_NO_QUEUE=1`: `comment add` falla con código 3 en lugar de encol
 Desde el directorio del skill:
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests      # secuencial: referencia y modo para GOLDEN_UPDATE=1
+python3 tests/run_parallel.py              # en paralelo: ~36 s frente a ~2,5 min (4 núcleos físicos, 8 hilos)
 ```
 
+- `tests/run_parallel.py` (solo biblioteca estándar) lanza un proceso por trabajo: los módulos pesados se reparten por método
+  y los ligeros por módulo. Cada proceso tiene su `HOME`/`TMPDIR` temporal y sin variables `PLANE_*`, y corre con
+  prioridad baja (`--nice 10`) para no frenar el resto de la máquina; `-j N` fija los procesos simultáneos y un texto
+  filtra módulos por nombre. Sale con 1 si algún trabajo falla. Antes de lanzar compila el bytecode de `scripts/`: sin él
+  cada subproceso del CLI tarda 0,6 s en arrancar en lugar de 0,13 s.
+- `tests/plane_fast.py` ejecuta el mismo `main()` acortando a 1 s el timeout de lectura (`api._send`): lo usan las
+  pruebas que simulan una conexión retenida (`mock.patch.object(gs, "PLANE_PY", ...)`) sin añadir variables de entorno
+  al contrato ni esperar los 15 s reales.
+- Las pruebas no comparten estado (HOME y puertos propios), pero hay dos cuidados: `test_comment` depende del minuto
+  real del reloj y repite el escenario una vez solo si la ejecución cruza un cambio de minuto; y `serve_forever` del
+  servidor falso usa `poll_interval=0.01` porque `shutdown()` espera un ciclo de sondeo (0,5 s por defecto).
 - `test_golden.py` ejecuta el CLI por subproceso contra un servidor Plane falso (`http.server` en 127.0.0.1) con `HOME`
   temporal, `TZ=UTC` y credenciales ficticias, y compara salida, código de salida, peticiones enviadas y filas locales
   con `tests/golden/*.txt`. Lo no determinista (fechas de hoy, ids de reparto, latencias) se normaliza en
