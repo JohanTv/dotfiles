@@ -1,7 +1,7 @@
-$ plane.py update OMNIFY-1 --state Revisión --priority HIGH --labels backend,nope,BUG --start-date 2026-10-01 --due-date 2026-11-01
+$ plane.py update OMNIFY-1 --state Revisión --priority HIGH --labels backend,nope,BUG --start-date 2026-10-01 --due-date 2026-10-27
 [exit 0]
 --- stdout ---
-✔ Ticket OMNIFY-1 actualizado con éxito: [Estado ➔ Revisión, Prioridad ➔ HIGH, Etiquetas ➔ backend,nope,BUG, Inicio ➔ 2026-10-01, Vence ➔ 2026-11-01]
+✔ Ticket OMNIFY-1 actualizado con éxito: [Estado ➔ Revisión, Prioridad ➔ HIGH, Etiquetas ➔ backend,nope,BUG, Inicio ➔ 2026-10-01, Vence ➔ 2026-10-27]
 --- stderr ---
 Advertencia: Etiqueta 'nope' no existe en el proyecto. Ignorada.
 
@@ -108,7 +108,7 @@ Error: no se pudo leer 'no-existe.md': [Errno 2] No such file or directory: 'no-
 $ plane.py create [FIX] Corregir validación del campo teléfono en formularios de campaña -d Texto **md**
 
 1. uno
-2. dos -p OPS --priority urgent --state Pendiente --labels backend,bug,zzz --start-date 2026-10-26 --due-date 2026-11-01
+2. dos -p OPS --priority urgent --state Pendiente --labels backend,bug,zzz --start-date 2026-10-26 --due-date 2026-10-27
 [exit 0]
 --- stdout ---
 
@@ -212,7 +212,7 @@ GET /api/v1/workspaces/ws/projects/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
-PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b000000-0000-4000-8000-11111111-111", "1b100000-0000-4000-8000-11111111-111"], "priority": "high", "start_date": "2026-10-01", "state": "11004844-0000-4000-8000-11111111-111", "target_date": "2026-11-01"}
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b000000-0000-4000-8000-11111111-111", "1b100000-0000-4000-8000-11111111-111"], "priority": "high", "start_date": "2026-10-01", "state": "11004844-0000-4000-8000-11111111-111", "target_date": "2026-10-27"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"name": "[FEAT] Título renombrado", "priority": "low"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
@@ -235,7 +235,7 @@ GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
-POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/ {"description_html": "<p>Texto <strong>md</strong></p>\n<ol><li>uno</li><li>dos</li></ol>", "labels": ["1b000000-0000-4000-8000-22222222-222", "1b100000-0000-4000-8000-22222222-222"], "name": "[FIX] Corregir validación del campo teléfono en formularios de campaña", "priority": "urgent", "start_date": "2026-10-26", "state": "22004750-0000-4000-8000-22222222-222", "target_date": "2026-11-01"}
+POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/ {"description_html": "<p>Texto <strong>md</strong></p>\n<ol><li>uno</li><li>dos</li></ol>", "labels": ["1b000000-0000-4000-8000-22222222-222", "1b100000-0000-4000-8000-22222222-222"], "name": "[FIX] Corregir validación del campo teléfono en formularios de campaña", "priority": "urgent", "start_date": "2026-10-26", "state": "22004750-0000-4000-8000-22222222-222", "target_date": "2026-10-27"}
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/ {"name": "[QA] Probar flujo", "priority": "none"}
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002/issue-attachments/ {"name": "adj.txt", "size": 13, "type": "text/plain"}
 POST /upload/bucket <multipart>

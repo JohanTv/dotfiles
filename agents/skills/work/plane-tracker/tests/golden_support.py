@@ -76,7 +76,7 @@ def build_data():
         P1: [
             {"id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "name": "Validaciones de formulario SMS", "priority": "high",
              "state": s(P1, "Progreso"), "created_at": "2026-10-01T10:00:00Z", "updated_at": "2026-10-20T15:00:00Z", "completed_at": None,
-             "start_date": "2026-10-01", "target_date": "2026-11-01", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": []},
+             "start_date": "2026-10-01", "target_date": "2026-10-27", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": []},
             {"id": "10000000-0000-4000-8000-000000000002", "sequence_id": 2, "name": "Acortador de enlaces", "priority": "medium",
              "state": s(P1, "Completado"), "created_at": "2026-10-10T09:00:00Z", "updated_at": "2026-10-15T12:00:00Z",
              "completed_at": "2026-10-15T12:00:00Z", "start_date": None, "target_date": None, "description_html": "", "labels": []},

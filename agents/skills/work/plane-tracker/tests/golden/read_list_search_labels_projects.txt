@@ -23,7 +23,7 @@ $ plane.py list --json
     "updated_at": "2026-10-20T15:00:00Z",
     "completed_at": null,
     "start_date": "2026-10-01",
-    "target_date": "2026-11-01",
+    "target_date": "2026-10-27",
     "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
     "labels": []
   },
@@ -73,7 +73,7 @@ $ plane.py --json list
     "updated_at": "2026-10-20T15:00:00Z",
     "completed_at": null,
     "start_date": "2026-10-01",
-    "target_date": "2026-11-01",
+    "target_date": "2026-10-27",
     "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
     "labels": []
   },

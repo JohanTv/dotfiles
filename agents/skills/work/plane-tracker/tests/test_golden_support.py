@@ -1,6 +1,7 @@
 """La normalización de la fecha de hoy debe ser simétrica: una fecha fija del fixture que coincida con el día en que corre
 la suite no puede hacer fallar los golden (ocurrió el 2026-11-01, día de una fecha del fixture)."""
 import os
+import re
 import sys
 import unittest
 from datetime import datetime
@@ -25,6 +26,21 @@ class TodayPlaceholder(unittest.TestCase):
         text = "vence 2026-11-01"
         self.assertEqual(self.collapse_with_today(text, 2026, 10, 31), text)
         self.assertEqual(self.collapse_with_today(text, 2027, 3, 9), text)
+
+
+class FixtureDates(unittest.TestCase):
+    """Una fecha fija de fixture que sea de hoy o futura es una bomba: el día que "hoy" la alcance, la suite fallará solo ese día
+    (ocurrió el 2026-11-01 con una fecha escrita pocos días antes). Las fechas de los fixtures y de los escenarios deben ser pasadas."""
+
+    FILES = ("golden_support.py", "test_golden.py")
+
+    def test_fixture_and_scenario_dates_are_in_the_past(self):
+        today = datetime.now().strftime("%Y-%m-%d")
+        for name in self.FILES:
+            with open(os.path.join(os.path.dirname(__file__), name), encoding="utf-8") as handle:
+                text = handle.read()
+            for date in sorted(set(re.findall(r"\b(20\d\d-\d\d-\d\d)\b", text))):
+                self.assertLess(date, today, f"{name}: la fecha {date} es de hoy o futura; usa una fecha pasada (si no, un día cualquiera coincidirá con 'hoy')")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ $ plane.py get OMNIFY-1
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 
@@ -34,7 +34,7 @@ $ plane.py get OMNIFY-1 --json
   "updated_at": "2026-10-20T15:00:00Z",
   "completed_at": null,
   "start_date": "2026-10-01",
-  "target_date": "2026-11-01",
+  "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
   "labels": [],
   "comments": [
@@ -87,7 +87,7 @@ $ plane.py --json get OMNIFY-1
   "updated_at": "2026-10-20T15:00:00Z",
   "completed_at": null,
   "start_date": "2026-10-01",
-  "target_date": "2026-11-01",
+  "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
   "labels": [],
   "comments": [
@@ -135,7 +135,7 @@ $ plane.py get OMNIFY-1 --no-comments --no-description
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 --- stderr ---
@@ -149,7 +149,7 @@ $ plane.py get OMNIFY-1 --last 2 --full
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 
@@ -243,7 +243,7 @@ $ plane.py get 1
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 
@@ -322,7 +322,7 @@ $ plane.py get
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 
@@ -345,7 +345,7 @@ $ plane.py get @
    • Estado    : Progreso
    • Prioridad : HIGH
    • Creado el : 2026-10-01
-   • Plan      : 2026-10-01 → 2026-11-01
+   • Plan      : 2026-10-01 → 2026-10-27
    • Ciclo     : abierto desde hace <N> días
    • UUID      : 10000000-0000-4000-8000-000000000001
 

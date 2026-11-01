@@ -216,7 +216,7 @@ class Golden(unittest.TestCase):
         self.golden("comment_edit_delete", steps, scrub=STAMPS, db_queries=[WORKLOGS])
 
     def test_update_create_link(self):
-        steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-11-01"],
+        steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-10-27"],
                  ["update", "OMNIFY-1", "--title", "[FEAT] Título renombrado", "--priority", "low"],
                  ["update", "OMNIFY-1", "--title", "   "],
                  ["update", "OMNIFY-1", "--state", "completado", "--json"],
@@ -230,7 +230,7 @@ class Golden(unittest.TestCase):
                  ["update", "OMNIFY-1", "--description", "   "],
                  ["update", "OMNIFY-1", "--description-file", "no-existe.md"],
                  ["create", "[FIX] Corregir validación del campo teléfono en formularios de campaña", "-d", "Texto **md**\n\n1. uno\n2. dos",
-                  "-p", "OPS", "--priority", "urgent", "--state", "Pendiente", "--labels", "backend,bug,zzz", "--start-date", "2026-10-26", "--due-date", "2026-11-01"],
+                  "-p", "OPS", "--priority", "urgent", "--state", "Pendiente", "--labels", "backend,bug,zzz", "--start-date", "2026-10-26", "--due-date", "2026-10-27"],
                  ["create", "[QA] Probar flujo", "--json", "--attach", "adj.txt"],
                  ["create", "Sin fase", "-d", "<p>ya html</p>"],
                  ["create", "[RFC] Algo", "-p", "nope"], ["create", "[FEAT] Algo", "--state", "nope"], ["create", "[FEAT] Algo", "--attach", "no-existe.txt"],
