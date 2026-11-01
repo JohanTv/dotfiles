@@ -29,3 +29,4 @@
 | :--- | :--- | :--- | :--- |
 | 0007 | [Los documentos del repositorio son agnósticos de instancia, empresa y personas](decisions/0007-documentos-agnosticos-de-instancia.md) | aceptado | Ningún documento del repo contiene hosts, IPs, nombres de personas o clientes ni datos de horas reales; la evidencia concreta vive fuera del repo. |
 | 0008 | [Documentos de desarrollo en docs/ por tipo, con ID global y estado en la cabecera](decisions/0008-estructura-de-docs-por-tipo-con-id-global/README.md) | aceptado | `docs/defects`, `docs/rfcs` y `docs/decisions`; ID `NNNN` único; estado en el front-matter; índice generado. |
+| 0012 | [Estrategia de pruebas rápidas - paralelo por procesos, servidor falso ágil y lanzador sin esperas](decisions/0012-estrategia-de-pruebas-rapidas/README.md) | aceptado | La suite pasó de 157 s a 97 s en secuencial y a 33-48 s en paralelo, sin tocar el código de producción ni añadir dependencias. |
