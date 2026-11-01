@@ -6,10 +6,10 @@
 # export DOTFILES_PROFILE="work"
 
 # Plane Self-Hosted (Gestión de Tareas TI)
-# export PLANE_BASE_URL="http://plane.example.com"
+# export PLANE_BASE_URL="https://plane.example.com"
 # export PLANE_API_KEY="plane_api_xxx"
 # export PLANE_WORKSPACE_SLUG="mi-workspace"
-# export PLANE_PROJECT_ID="<uuid-proyecto>" # Omnify
+# export PLANE_PROJECT_ID="<project-uuid>"
 
 # Ejemplo de tokens o API keys privadas:
 # export GITHUB_TOKEN="ghp_xxx"
