@@ -56,6 +56,7 @@ class Base(unittest.TestCase):
 
     def tearDown(self):
         config.CACHE_DIR, config.now, sc.timestamps, sc.resolve_session = self._saved
+        self.conn.close()
         self.tmp.cleanup()
         if self._tz is None:
             os.environ.pop("TZ", None)
