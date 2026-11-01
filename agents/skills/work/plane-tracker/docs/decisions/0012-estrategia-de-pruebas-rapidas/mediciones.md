@@ -49,5 +49,6 @@ Los trabajos paralelos suman unos 250-360 s de CPU frente a los 97 s secuenciale
 ## Fragilidades encontradas
 
 - **Prueba dependiente del minuto del reloj.** `test_comment` espera que dos pasos caigan en el mismo minuto; si la ejecución lo cruza, falla. En secuencial fallaba en torno al 5 % de las ejecuciones y bajo contención más. Ahora repite el escenario una vez, y solo en ese caso.
+- **Fecha de hoy igual a una fecha del fixture.** Un fixture con una fecha fija (`target_date`) coincidió con el día en que se ejecutó la suite (2026-11-01): la normalización sustituía la fecha de hoy por `<HOY>` en la salida real pero no en los archivos golden, y tres pruebas fallaban solo ese día, también con el código ya publicado. Ahora la misma sustitución se aplica al golden esperado y `tests/test_golden_support.py` fija el comportamiento para cualquier día.
 - **Puerto "muerto".** `Sandbox.dead_port` reserva y libera un puerto; con varios procesos, otro servidor falso podría recibirlo. No se vio fallar; probabilidad baja y no nula.
 - **Aserciones de tiempo con tope superior** (por ejemplo, un comando debe terminar en menos de 2 o 3 s): pasaron en todas las ejecuciones, incluida la saturada, con un margen de 13 a 20 veces.
