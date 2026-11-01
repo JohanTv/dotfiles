@@ -1,20 +1,25 @@
+---
+id: "0002"
+title: Gestión de worktrees multi-repo por ticket
+status: propuesto
+created: 2026-10-31
+summary: Script independiente que crea, por ticket, un worktree en cada repo implicado con rama y base verificadas; sin implementar.
+---
+
 # 0002 · Gestión de worktrees multi-repo por ticket
 
-- **Estado:** propuesta, sin implementar
-- **Detectado:** 2026-10-31
-- **Tipo:** propuesta de mejora (no es un defecto)
-- **Área:** superficie nueva `worktree add`; si se implementa como script, `bin/work/plane-worktree`
+- **Área:** superficie nueva `worktree add`; si se implementa como script, `bin/work/plane-worktree`.
 
 ## Contexto
 
-Al iniciar un requerimiento que cruza varios repositorios (por ejemplo `omnify-detonador-sms` + `omnify-backend`) hay que, por cada repo: crear una carpeta contenedora por ticket, elegir la rama base remota, hacer `fetch`, inventar el nombre de la rama, crear el worktree y comprobar que no colisiona. Son 4-6 comandos por repo, con dos decisiones semánticas en medio y varios modos de fallo silenciosos.
+Al iniciar un requerimiento que cruza varios repositorios (por ejemplo un servicio de envío + un backend) hay que, por cada repo: crear una carpeta contenedora por ticket, elegir la rama base remota, hacer `fetch`, inventar el nombre de la rama, crear el worktree y comprobar que no colisiona. Son 4-6 comandos por repo, con dos decisiones semánticas en medio y varios modos de fallo silenciosos.
 
 Layout deseado:
 
 ```text
-.worktrees/OMNIFY-238-sms-operator-recovery/
-├── omnify-detonador-sms/   feat/OMNIFY-238-detonador-portabilidad-dlq
-└── omnify-backend/         feat/OMNIFY-238-webhook-operador
+.worktrees/PROJ-238-operator-recovery/
+├── repo-envio/             feat/PROJ-238-envio-reintento
+└── repo-backend/           feat/PROJ-238-webhook-operador
 ```
 
 ## Evidencia verificada
@@ -28,8 +33,8 @@ Layout deseado:
 | El árbol de comandos raíz es explícito y cerrado | `scripts/plane_cli/cli.py:24-47` | Un verbo raíz nuevo rompe la convención; un grupo es lo previsto. |
 | La ayuda global tiene un tope de 280 columnas (1120 caracteres) | `tests/test_cli_tree.py:101` | Hoy se usan 1080: quedan 40 caracteres. Un grupo con tres verbos lo revienta. |
 | `main()` valida `PLANE_BASE_URL` y `PLANE_API_KEY` antes de despachar | `cli.py:111-112`, contrato en `ARCHITECTURE.md:199` | Un comando que solo ejecuta git heredaría una dependencia de Plane que no necesita. |
-| `origin/dev` no existe en `omnify-frontend` (tiene `main`, `staging`) ni en `omnicanal` (solo `main`) | `git branch -r` | `dev` no puede ser un default ciego. |
-| Existen dos clones de `omnify-backend` en ramas distintas | `Code/omnify/`, `Code/[cliente]/` | Un mapa `nombre → ruta` en configuración es ambiguo y envejece mal. |
+| `origin/dev` no existe en todos los repos (hay repos con `main` + `staging`, y repos con solo `main`) | `git branch -r` | `dev` no puede ser un default ciego. |
+| Pueden existir dos clones del mismo repo en ramas distintas | `Code/repo/`, `Code/repo-otro-clon/` | Un mapa `nombre → ruta` en configuración es ambiguo y envejece mal. |
 | `git -C repo worktree add ruta-relativa` resuelve contra el repo, no contra el cwd | comportamiento de git | Hay que pasar rutas absolutas siempre. |
 
 ## Propuesta original y descartes
@@ -37,10 +42,10 @@ Layout deseado:
 | Pieza | Veredicto | Motivo |
 | :--- | :--- | :--- |
 | Fan-out a N repos | Se mantiene | Es el único valor nuevo real. |
-| `--type` derivado del título | Descartada | `[RFC]` → `spike` contradice la decisión de trabajar el 238 como `feat`. |
+| `--type` derivado del título | Descartada | `[RFC]` → `spike` contradice la decisión de trabajar un ticket `[RFC]` como `feat`. |
 | `--description` derivada del título | Descartada | Genera slugs mutilados. |
 | `PLANE_REPOS` (nombre → ruta) | Descartada | Segunda fuente de verdad, ya ambigua. |
-| `origin/dev` por defecto sin verificar | Descartada | Falla en dos repos del workspace. |
+| `origin/dev` por defecto sin verificar | Descartada | Falla en repos que no tienen `dev`. |
 | `list` / `remove` | Descartadas | `git worktree list` y `git worktree remove` ya existen; reimplementarlos añade superficie destructiva. |
 | `README.md` generado en el padre | Descartada | Plantilla que se desincroniza; el ticket ya es la fuente. |
 | `--reuse-branch` | Descartada | La semántica de git ya distingue rama libre (attach) de rama ocupada (error). |
@@ -86,8 +91,8 @@ Matriz de comportamiento:
 
 | Riesgo | Severidad | Mitigación |
 | :--- | :--- | :--- |
-| Ambigüedad de `omnify-backend` (dos clones) | Alta | Solo rutas, o nombre corto con coincidencia única. |
-| `origin/dev` ausente en otros repos | Alta | Verificar ref y listar ramas disponibles. |
+| Ambigüedad de un repo con dos clones | Alta | Solo rutas, o nombre corto con coincidencia única. |
+| `origin/dev` ausente en algunos repos | Alta | Verificar ref y listar ramas disponibles. |
 | Tipo de rama heredado de la fase del ticket | Alta | `--type` explícito. |
 | `remove --force` destruyendo trabajo sin commitear | Alta | No implementar `remove`. |
 | Gate de credenciales de Plane para un comando git | Media | Ubicarlo fuera del CLI. |

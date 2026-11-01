@@ -208,5 +208,5 @@ python3 -m unittest discover -s tests
 
 ## Propuestas pendientes
 
-Lo acordado que aún no está implementado (p. ej. la idempotencia de `create`) vive en `ROADMAP.md`, que marca
-explícitamente qué no existe en el código.
+Lo acordado que aún no está implementado vive en `docs/` (defectos, RFC y decisiones, con su estado en la cabecera);
+`docs/INDEX.md` lo lista y marca explícitamente qué no existe en el código. Convenciones: `docs/README.md`.
