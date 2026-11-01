@@ -24,7 +24,7 @@
 | 0006 | [Decidir la fuente de datos del "Standby externo"](rfcs/0006-standby-externo-fuente-de-datos.md) | borrador | Quitar la línea de bloqueos del reporte o alimentarla (flag, o tiempo en Pausado desde las transiciones). |
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
 | 0014 | [Contextos, perfiles y fuentes de tareas intercambiables](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Aplazado a propósito. Usar la herramienta en varios contextos (trabajos, personal) y con varios sistemas de tareas; la decisión abierta es dónde vive la verdad del tiempo. |
-| 0015 | [Reloj controlado en las pruebas desde el lanzador, sin tocar producción](rfcs/0015-reloj-controlado-en-las-pruebas.md) | implementado | Implementado. Un lanzador congela la hora real del CLI en las pruebas golden (sin tocar producción), los golden dejan de enmascarar fechas y horas y un trinquete impide que crezcan las lecturas del reloj real. |
+| 0015 | [Reloj controlado en las pruebas desde el lanzador, sin tocar producción](rfcs/0015-reloj-controlado-en-las-pruebas.md) | implementado | Implementado. Un lanzador congela la hora real del CLI en las pruebas golden, los golden dejan de enmascarar fechas y horas, y toda lectura de la hora de producción pasa por un reloj central con un presupuesto de 0 lecturas directas. |
 
 ## Decisiones
 

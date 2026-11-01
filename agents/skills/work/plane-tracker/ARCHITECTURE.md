@@ -14,33 +14,34 @@ Las líneas son aproximadas; el tope duro por archivo es 450.
 | Módulo | Líneas | Responsabilidad |
 |---|---|---|
 | `plane.py` | 16 | Punto de entrada: ajusta `sys.path` y llama a `cli.main()`. |
-| `plane_cli/__init__.py` | 35 | Docstring con el mapa de capas y módulos. |
-| `plane_cli/config.py` | 80 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), reloj `now()`, `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
-| `plane_cli/db.py` | 230 | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
-| `plane_cli/circuit.py` | 220 | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
+| `plane_cli/__init__.py` | 39 | Docstring con el mapa de capas y módulos. |
+| `plane_cli/config.py` | 76 | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
+| `plane_cli/clock.py` | 34 | Reloj central, única fuente de la hora real: `timestamp()` (la primitiva) y, derivadas de ella, `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. |
+| `plane_cli/db.py` | 231 | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
+| `plane_cli/circuit.py` | 217 | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
 | `plane_cli/api.py` | 235 | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`) y `log_request()` (JSONL de latencias). |
 | `plane_cli/mdhtml.py` | 150 | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
 | `plane_cli/cache.py` | 160 | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
-| `plane_cli/resolve.py` | 300 | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
+| `plane_cli/resolve.py` | 301 | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
 | `plane_cli/timeutil.py` | 215 | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs y `render_day_block()`. |
-| `plane_cli/worklog.py` | 230 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
-| `plane_cli/outbox.py` | 360 | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
-| `plane_cli/outbox_flush.py` | 125 | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
+| `plane_cli/worklog.py` | 263 | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
+| `plane_cli/outbox.py` | 361 | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
+| `plane_cli/outbox_flush.py` | 127 | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
 | `plane_cli/create_guard.py` | 63 | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
-| `plane_cli/sync.py` | 165 | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
-| `plane_cli/proposal_store.py` | 100 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
-| `plane_cli/proposals.py` | 290 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
-| `plane_cli/flow.py` | 210 | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
+| `plane_cli/sync.py` | 168 | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola. |
+| `plane_cli/proposal_store.py` | 101 | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
+| `plane_cli/proposals.py` | 289 | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
+| `plane_cli/flow.py` | 211 | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
 | `plane_cli/renamed.py` | 150 | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
-| `plane_cli/attachments.py` | 170 | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
-| `plane_cli/cmd_comment.py` | 250 | Comando `comment add`. |
-| `plane_cli/cmd_comment_ops.py` | 200 | Comandos `comment edit`, `comment delete` y `worklog propose`. |
-| `plane_cli/cmd_tickets_write.py` | 270 | Comandos `create`, `update` y `link add`. |
-| `plane_cli/cmd_read.py` | 390 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
+| `plane_cli/attachments.py` | 171 | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
+| `plane_cli/cmd_comment.py` | 252 | Comando `comment add`. |
+| `plane_cli/cmd_comment_ops.py` | 199 | Comandos `comment edit`, `comment delete` y `worklog propose`. |
+| `plane_cli/cmd_tickets_write.py` | 336 | Comandos `create`, `update` y `link add`. |
+| `plane_cli/cmd_read.py` | 391 | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
 | `plane_cli/cmd_report.py` | 255 | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
-| `plane_cli/cmd_outbox.py` | 100 | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
-| `plane_cli/cmd_ops.py` | 260 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
-| `plane_cli/cli.py` | 125 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |
+| `plane_cli/cmd_outbox.py` | 99 | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
+| `plane_cli/cmd_ops.py` | 262 | Comandos `health`, `focus set|clear|status` y `handoff`, con sus ayudantes de git. |
+| `plane_cli/cli.py` | 126 | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |
 
 ## Capas y regla de dependencias
 
@@ -61,9 +62,13 @@ Los módulos se importan siempre por nombre explícito (`from plane_cli.resolve 
 
 ## Convenciones
 
-- **Reloj y rutas solo por `config`.** El código lee `config.now()` y `config.CACHE_DIR` / `db_file()` /
-  `request_log()` / `proposal_file()` por atributo del módulo en cada llamada; nunca `from plane_cli.config import now`.
-  Así un test sustituye `config.now` o `config.CACHE_DIR` y el cambio llega a todos los módulos.
+- **Rutas solo por `config`, hora solo por `clock`.** El código lee `config.CACHE_DIR` / `db_file()` / `request_log()` /
+  `proposal_file()` y `clock.timestamp()` / `now()` / `local_now()` / `local_today()` por atributo del módulo en cada
+  llamada; nunca `from plane_cli.clock import now`. Así un test sustituye `config.CACHE_DIR` o `clock.timestamp` y el
+  cambio llega a todos los módulos. **Ningún otro archivo lee la hora real** (`datetime.now`, `time.time`...): lo
+  verifica `tests/test_structure.py` con un presupuesto de 0. `time.monotonic` (tiempo transcurrido) y `time.sleep` no son
+  "la hora" y no pasan por `clock`. No hay variable de entorno ni modo de pruebas que fije la hora: permitiría falsificar
+  las marcas del worklog.
 - **Idioma:** mensajes de usuario, comentarios y documentación en español; flags e identificadores internos en inglés.
 - **Comentarios:** concisos y agnósticos; explican el porqué de una restricción vigente, no la historia del cambio.
 - **Docstring de cabecera** en cada módulo: responsabilidad, qué expone y qué no hace.
@@ -189,8 +194,10 @@ python3 tests/run_parallel.py              # en paralelo: ~36 s frente a ~2,5 mi
   no avanza: una prueba que necesite que pase el tiempo usa `sb.advance(segundos)`; un proceso lanzado con `Popen` usa
   `sb.command([...])` para compartir la misma hora; `Sandbox(clock=None)` usa la hora real. Los golden **no
   enmascaran** fechas ni horas (solo ids al azar y latencias), así que un error en las horas del worklog los rompe.
-  `tests/test_golden_support.py` fija este comportamiento y `tests/test_structure.py` impide que crezca el número de
-  lecturas de la hora real fuera de `config.now()` (hoy 35; bájalo al migrar un módulo).
+  `tests/test_golden_support.py` fija este comportamiento. Las pruebas en proceso (sin subproceso) controlan el reloj
+  con `tests/clock_support.Clock`, que sustituye `clock.timestamp` y solo avanza con `advance()`. Las esperas por procesos
+  reales usan `time.monotonic`. `python3 tests/run_parallel.py --freeze <ISO con zona>` congela además la hora real del
+  propio proceso de pruebas: toda la suite debe pasar con cualquier instante (comprobado a las 00:05 y a 30 s del cambio de año).
 - Las pruebas no comparten estado (HOME y puertos propios) y `serve_forever` del servidor falso usa
   `poll_interval=0.01` porque `shutdown()` espera un ciclo de sondeo (0,5 s por defecto).
 - `test_golden.py` ejecuta el CLI por subproceso contra un servidor Plane falso (`http.server` en 127.0.0.1) con `HOME`
@@ -210,7 +217,7 @@ python3 tests/run_parallel.py              # en paralelo: ~36 s frente a ~2,5 mi
   `reopen()` simulan una conexión rechazada. `Sandbox.write_circuit()` fija el estado del circuito. Los procesos
   concurrentes y los interrumpidos se prueban con procesos reales.
 - Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando los módulos de
-  `plane_cli` directamente y sustituyendo `config.CACHE_DIR` / `config.now`.
+  `plane_cli` directamente y sustituyendo `config.CACHE_DIR` y, para la hora, `clock.timestamp` (con `clock_support.Clock`).
 
 ## Qué no romper
 

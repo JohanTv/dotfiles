@@ -3,12 +3,12 @@ id: "0015"
 title: Reloj controlado en las pruebas desde el lanzador, sin tocar producción
 status: implementado
 created: 2026-11-01
-summary: Implementado. Un lanzador congela la hora real del CLI en las pruebas golden (sin tocar producción), los golden dejan de enmascarar fechas y horas y un trinquete impide que crezcan las lecturas del reloj real.
+summary: Implementado. Un lanzador congela la hora real del CLI en las pruebas golden, los golden dejan de enmascarar fechas y horas, y toda lectura de la hora de producción pasa por un reloj central con un presupuesto de 0 lecturas directas.
 ---
 
 # 0015 · Reloj controlado en las pruebas desde el lanzador
 
-> **Estado: implementado el 2026-11-01** (pasos 1, 2 y 4; el paso 3, migrar producción a `config.now()`, se descarta por ahora). Resultados en [Implementación y resultados](#implementación-y-resultados).
+> **Estado: implementado el 2026-11-01** (los cuatro pasos, incluida la migración de producción al reloj central). Resultados en [Implementación y resultados](#implementación-y-resultados).
 
 - **Contexto:** [decisión 0012](../decisions/0012-estrategia-de-pruebas-rapidas/README.md) y su [`mediciones.md`](../decisions/0012-estrategia-de-pruebas-rapidas/mediciones.md), donde se registró la bomba de fecha.
 
@@ -53,7 +53,7 @@ La opción C se comprobó en una prueba de humo fuera del repositorio (Python 3.
 
 1. **Medio día.** Añadir el lanzador y usarlo solo en `test_comment`; quitar el bucle de reintento si la prueba pasa de forma determinista. Añadir una prueba por AST como trinquete: el número de sitios que leen la hora fuera de `config.now()` no puede crecer (línea base: 35).
 2. **Medio día.** Extenderlo a todos los golden y **dejar de enmascarar** `date`, `start_time`, `end_time` y `created_at`. Regenerar los golden con `GOLDEN_UPDATE=1`, revisando el diff como cambio intencional: es una caracterización previa a cualquier refactor y cierra el agujero de cobertura de las horas del worklog.
-3. **Después, y solo si molesta la duplicación (2-3 días):** migrar a `config.now()` módulo por módulo, bajando la línea base del trinquete. Las pruebas ya serían deterministas sin este paso.
+3. **(Hecho, ver más abajo.) Después, y solo si molesta la duplicación (2-3 días):** migrar a `config.now()` módulo por módulo, bajando la línea base del trinquete. Las pruebas ya serían deterministas sin este paso.
 4. Con el reloj congelado se pueden eliminar `today_placeholder`, la guarda `FixtureDates` basada en la fecha real (pasaría a comparar contra la constante) y, más tarde, `<TS>`, "desde las" y "abierto desde hace". En un segundo paso, porque cada eliminación cambia un golden.
 
 **Esfuerzo (opinión):** 1-1,5 días los pasos 1 y 2; 3-4 días si se hace también el paso 3.
@@ -74,7 +74,7 @@ Hecho el 2026-11-01, solo en `tests/` (`scripts/` sin ningún cambio):
 - **Golden:** dejan de enmascarar fechas y horas (solo ids al azar y latencias) y se regeneraron. Se comprobó cada línea cambiada, 61 líneas en 10 archivos: **todas son solo valores de fecha u hora**, ninguna otra parte de la salida.
 - **Eliminado:** `today_placeholder`, los marcadores `<HOY>`, `<TS>`, `<HH:MM>` y "abierto desde hace <N>", y el reintento de `test_comment`.
 - **Una prueba tuvo que adaptarse:** `test_killed_flush_is_resolved_after_its_lease_expires` lanzaba el CLI con `Popen` sin el lanzador, así que el proceso interrumpido escribía un lease con la hora real y el siguiente `flush`, congelado y posterior, lo veía vencido. Ahora usa `sb.command(...)`.
-- **Salvaguardas nuevas** (`tests/test_golden_support.py`, `tests/test_structure.py`): el lanzador (todas las formas de leer la hora ven el instante, las lecturas repetidas son idénticas, el código de salida y el nombre del script pasan, rechaza un instante sin zona y `--help` es idéntico con y sin lanzador); el `Sandbox` (congelado por defecto, `advance` y `clock=None`, el CLI ve la fecha del sandbox); los golden no usan marcadores de fecha; las fechas de fixtures son anteriores al instante congelado; el arnés no lee la hora real; y un **trinquete por AST** que fija en 35 las lecturas de la hora real en producción fuera de `config.now()`.
+- **Salvaguardas nuevas** (`tests/test_golden_support.py`, `tests/test_structure.py`): el lanzador (todas las formas de leer la hora ven el instante, las lecturas repetidas son idénticas, el código de salida y el nombre del script pasan, rechaza un instante sin zona y `--help` es idéntico con y sin lanzador); el `Sandbox` (congelado por defecto, `advance` y `clock=None`, el CLI ve la fecha del sandbox); los golden no usan marcadores de fecha; las fechas de fixtures son anteriores al instante congelado; el arnés no lee la hora real; y un **trinquete por AST** que fijó en 35 las lecturas de la hora real en producción fuera de `config.now()` (bajado a 0 con el paso 3, ver abajo).
 
 **Fragilidades que quedan resueltas:** el reintento de `test_comment` (el escenario ya no depende del minuto real), la ventana de medianoche (el instante es a mediodía), la sustitución de "hoy" en zona local frente a UTC (ya no existe) y el margen de 25 s del circuito (los ayudantes usan el reloj del sandbox).
 
@@ -85,9 +85,21 @@ Hecho el 2026-11-01, solo en `tests/` (`scripts/` sin ningún cambio):
 - **Error en la primera medición:** el runner descartaba `PLANE_TEST_NOW` junto con el resto de las variables `PLANE_*`, así que las dos primeras ejecuciones con otra fecha corrieron en realidad con el reloj por defecto y pasaron todas, sin probar nada. Se detectó porque el resultado era implausible, se corrigió el runner para dejar pasar solo esa variable y se repitió.
 - `--help` idéntico con y sin el lanzador: cubierto por una prueba.
 
-**Decisión sobre el paso 3 (migrar producción a `config.now()`): no por ahora.** Las pruebas ya son deterministas sin tocar producción. Migrar cambiaría las marcas de tiempo del worklog, y recién ahora hay una red de seguridad (golden con horas exactas) para hacerlo con garantías. El trinquete queda en 35; si se migra un módulo, se baja. Compensa solo si molesta la duplicación de lecturas.
+### Paso 3 (producción al reloj central): hecho el mismo día
 
-**Limitaciones conocidas:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` siguen en tiempo real, y las pausas de 1 s de la publicación de la cola se mantienen); las pruebas unitarias que ejecutan código en proceso no pasan por el lanzador (parchean `config.now` o no dependen de la hora).
+Primero se descartó "por ahora" porque migrar cambiaba las marcas de tiempo del worklog en producción y no había red de seguridad. Con los golden ya comparando las horas exactas la red existía, y como la herramienta no está en producción y el único usuario es quien la mantiene, se hizo de inmediato.
+
+- **`plane_cli/clock.py`** es la única fuente de la hora real. Tiene una sola primitiva, `timestamp()`, y de ella se derivan `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. Sustituir `timestamp` fija las tres lecturas y las mantiene coherentes entre sí. No lee variables de entorno ni tiene modo de pruebas.
+- **Migrados 43 sitios:** las 35 lecturas directas (`datetime.now`, `time.time`...) y los 8 usos de `config.now()`, que se eliminó. `time.monotonic` (tiempo transcurrido) y `time.sleep` no son "la hora" y no pasan por el reloj.
+- **Una lectura por función donde antes había varias.** Al registrar un worklog, `sync.py` leía el reloj tres veces para la fecha, el inicio y el fin, y `worklog.py` y `cmd_comment.py` varias veces para valores por defecto que debían ser coherentes; ahora cada función lee una vez.
+- **Se llama por atributo** (`clock.now()`, nunca `from plane_cli.clock import now`), para que una prueba pueda sustituirlo; lo verifica una prueba por AST.
+- **Trinquete en 0:** `tests/test_structure.py` falla si cualquier archivo, salvo `clock.py`, lee la hora real (se comprobó que detecta un `time.time()` nuevo). Se quitaron además los imports que quedaron sin usar.
+- **Pruebas en proceso:** las que parcheaban `config.now` o leían la hora real usan ahora `tests/clock_support.Clock` (sustituye `clock.timestamp` y solo avanza con `advance()`): circuito, transporte, propuestas, guarda de duplicados y lecturas sin conexión. Las esperas por procesos reales de `test_outbox_flush` usan `time.monotonic`.
+- **Comportamiento idéntico verificado:** los golden, que incluyen las horas exactas de los worklogs, **no cambiaron ni una línea** tras la migración.
+
+**¿Pueden romperse en algún momento las pruebas que usaban la hora real?** Se comprobó en lugar de suponerlo. `tests/run_parallel.py --freeze <ISO>` congela la hora real del propio proceso de pruebas (con `plane_clock.py -m unittest`) y toda la suite, 284 pruebas, pasa con la hora fijada en 2027-01-05 a las 12:00, en 2028-02-29 a las 00:05 y en 2031-12-31 a las 23:59:30. Un control negativo (un instante sin zona horaria) hace fallar los trabajos, lo que demuestra que la opción se aplica y no se ignora (la primera medición con otras fechas fue inválida precisamente por eso, ver arriba).
+
+**Limitaciones conocidas:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` siguen en tiempo real, y las pausas de 1 s de la publicación de la cola se mantienen). Las aserciones con tope de tiempo real (por ejemplo, un comando debe terminar en menos de 2 o 3 s) dependen de la velocidad de la máquina, no de la fecha. El único acceso a la hora real que queda en las pruebas es el respaldo de `Sandbox.write_circuit` cuando se pide `clock=None`.
 
 ## Riesgos (con su desenlace)
 
@@ -95,7 +107,7 @@ Hecho el 2026-11-01, solo en `tests/` (`scripts/` sin ningún cambio):
 - **Alguna prueba podía necesitar que el tiempo avanzara dentro de un único subproceso.** Resultó ser una sola (la del lease de `test_outbox_flush`) y la causa era un `Popen` sin el lanzador, no el reloj congelado. El guion de cinco procesos de `test_circuit.py` no pasa por el lanzador (usa su propio guion y la hora real) y pasa, también bajo CPU saturada.
 - **Modificar la biblioteca estándar en el lanzador es magia.** Queda limitado a `tests/plane_clock.py`, está documentado en `ARCHITECTURE.md` y lo cubren pruebas del lanzador (todas las formas de leer la hora, lecturas repetidas idénticas, código de salida, nombre del script, rechazo de un instante sin zona y `--help` idéntico).
 
-**Lo que sigue usando la hora real en las pruebas, y por qué es aceptable:** `time.sleep` y `time.monotonic` no se parchean (los timeouts de socket, `hang` y `delay` son esperas reales); los bucles de espera del proceso padre en `test_outbox_flush` aguardan a procesos reales con un límite de tiempo; y `test_create_guard`, `test_offline_reads` y `test_circuit` calculan tiempos relativos al mismo reloj que usa el código bajo prueba. Ninguno depende de la fecha del calendario, y la prueba negativa con otros instantes lo confirma. Una aserción con tope de tiempo real (por ejemplo, un comando debe terminar en menos de 2 o 3 s) depende de la velocidad de la máquina, no de la fecha; pasó bajo CPU saturada con un margen de 13 a 20 veces.
+**Lo que queda de la hora real en las pruebas:** solo esperas reales (`time.sleep`, `time.monotonic`, timeouts de socket) y el respaldo `clock=None` de `Sandbox`; nada depende de la fecha del calendario, y `run_parallel.py --freeze` lo demuestra con tres instantes distintos.
 
 ## Cuándo hacerlo
 
@@ -103,4 +115,4 @@ Hecho. Se implementó antes del defecto [0010](../defects/0010-reporte-no-sincro
 
 ## Criterio de cierre
 
-Cumplido el 2026-11-01: pasos 1, 2 y 4 hechos, 10 ejecuciones seguidas sin fallos, prueba negativa con otros instantes (que muestra qué pruebas dependen del instante congelado) y decisión registrada sobre el paso 3.
+Cumplido el 2026-11-01: los cuatro pasos hechos, 10 ejecuciones seguidas sin fallos, prueba negativa con otros instantes para los golden, suite completa con la hora real congelada en tres instantes, golden sin cambios tras migrar producción y trinquete en 0.
