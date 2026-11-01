@@ -34,12 +34,16 @@ import socket
 import tempfile
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 PLANE_PY = os.environ.get("PLANE_PY") or os.path.join(SKILL, "scripts", "plane.py")
+CLOCK_PY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plane_clock.py")
+# Instante en que el CLI cree estar en las pruebas: lunes, a mediodía y posterior a todas las fechas de los fixtures. Solo se cambia
+# con PLANE_TEST_NOW para comprobar qué pruebas dependen de "hoy"; la producción no tiene ninguna variable equivalente.
+FROZEN_NOW = os.environ.get("PLANE_TEST_NOW") or "2026-11-02T12:00:00+00:00"
 GOLDEN_DIR = os.path.join(HERE, "golden")
 
 P1 = "11111111-1111-4111-8111-111111111111"
@@ -378,7 +382,7 @@ class FakePlane:
 class Sandbox:
     """HOME temporal + repo git temporal + servidor falso: nada sale de /tmp ni toca el Plane real."""
 
-    def __init__(self, extra_env=None, with_repo=False, with_session=False, fake=None):
+    def __init__(self, extra_env=None, with_repo=False, with_session=False, fake=None, clock=FROZEN_NOW):
         self.tmp = tempfile.TemporaryDirectory(prefix="plane-golden-")
         self.home = os.path.join(self.tmp.name, "home")
         self.work = os.path.join(self.tmp.name, "work")
@@ -391,6 +395,10 @@ class Sandbox:
         probe.close()
         self.dead_url = f"http://127.0.0.1:{self.dead_port}"
         self.last_elapsed = 0.0
+        # clock=None usa la hora real (solo para pruebas cuyo objeto es que pase el tiempo real); por defecto el CLI ve un reloj
+        # congelado en `self.now` (segundos desde la época) y la prueba lo hace avanzar de forma explícita con advance().
+        self.clock = clock
+        self.now = datetime.fromisoformat(clock).timestamp() if clock else None
         self.env = {"PATH": os.environ.get("PATH", ""), "HOME": self.home, "TZ": "UTC", "LC_ALL": "C.UTF-8", "PYTHONIOENCODING": "utf-8",
                     "PYTHONDONTWRITEBYTECODE": "1", "PLANE_BASE_URL": self.fake.base_url, "PLANE_API_KEY": "dummy",
                     "PLANE_WORKSPACE_SLUG": WS, "PLANE_PROJECT_ID": P1, "PLANE_ACTOR_UUID": ME,
@@ -428,17 +436,28 @@ class Sandbox:
         env = {k: v for k, v in self.env.items() if k not in env_drop}
         env.update({k: v.replace("{DEAD}", self.dead_url) for k, v in (env_set or {}).items()})
         started = time.monotonic()
-        proc = subprocess.run([sys.executable, PLANE_PY, *args], env=env, cwd=cwd or self.work, input=stdin, capture_output=True,
-                              text=True, timeout=timeout)
+        proc = subprocess.run(self.command(args), env=env, cwd=cwd or self.work, input=stdin, capture_output=True, text=True, timeout=timeout)
         self.last_elapsed = time.monotonic() - started
         return proc.returncode, proc.stdout, proc.stderr
+
+    def command(self, args):
+        """Línea de comando para ejecutar el CLI con el reloj de este sandbox; úsala también al lanzar procesos con Popen para que
+        compartan la misma hora (un proceso con la hora real y otro con la congelada verían leases y enfriamientos distintos)."""
+        if not self.clock:
+            return [sys.executable, PLANE_PY, *args]
+        return [sys.executable, CLOCK_PY, datetime.fromtimestamp(self.now, timezone.utc).isoformat(), PLANE_PY, *args]
+
+    def advance(self, seconds):
+        """Hace avanzar el reloj congelado que ven las siguientes ejecuciones del CLI."""
+        assert self.clock, "advance() solo tiene sentido con el reloj congelado"
+        self.now += seconds
 
     def circuit_path(self):
         return os.path.join(self.home, ".cache", "plane", "circuit.json")
 
     def write_circuit(self, opened_ago=5, level=0, last_error="refused", since_ago=60, consec=2, **extra):
         """Deja el circuito abierto (opened_ago segundos atrás) o, con opened_ago=None, cerrado con `consec` fallos."""
-        now = time.time()
+        now = self.now if self.clock else time.time()
         state = {"consec": consec, "opened_at": None if opened_ago is None else now - opened_ago, "level": level, "probing_until": 0,
                  "last_error": last_error, "since": now - since_ago, "last_ok": None, "skipped": 0, **extra}
         os.makedirs(os.path.dirname(self.circuit_path()), exist_ok=True)
@@ -472,7 +491,6 @@ class Sandbox:
 # Normalización y golden
 # ------------------------------------------------------------------------------
 
-VOLATILE_KEYS = ("date", "start_time", "end_time", "created_at", "updated_at", "edited_at", "ts", "ms", "p50_ms", "p95_ms", "max_ms")
 _META_RE = re.compile(r"<!-- PLANE_WORKLOG_METADATA (.*?) -->", re.S)
 
 
@@ -507,24 +525,12 @@ def _scrub_body(text, keys):
     return json.dumps(parsed, sort_keys=True, ensure_ascii=False)
 
 
-def today_placeholder(text):
-    """Sustituye la fecha de hoy por <HOY>. Se aplica a la salida real y al golden esperado: si una fecha fija del fixture
-    coincide con el día en que corre la suite, ambos lados la convierten igual en lugar de fallar solo ese día."""
-    now = datetime.now()
-    return text.replace(now.strftime("%Y-%m-%d"), "<HOY>").replace(now.strftime("%d/%m/%Y"), "<HOY>")
-
-
 def normalize(text, sandbox, scrub=()):
+    """Sustituye lo que no es determinista por naturaleza (puertos, rutas temporales, SHA, ids al azar y latencias). Las fechas y las
+    horas no se enmascaran: con el reloj congelado son deterministas y, así, un error en ellas rompe el golden."""
     text = text.replace(str(sandbox.fake.port), "PORT").replace(str(sandbox.dead_port), "DEADPORT").replace(sandbox.tmp.name, "<TMP>")
     text = re.sub(r"\b[0-9a-f]{40}\b", "<SHA>", text)
     text = re.sub(r"\b(group\W+|grupo |pendiente )[0-9a-f]{8}\b", r"\1<GRP>", text)
-    if scrub:
-        # Las marcas completas de tiempo se limpian ANTES de sustituir la fecha de hoy: si no, según la hora
-        # del día la fecha local coincide con la UTC y la marca queda como "<HOY> hh:mm:ss".
-        text = re.sub(r"\b20\d\d-\d\d-\d\d \d\d:\d\d:\d\d\b", "<TS>", text)
-    text = today_placeholder(text)
-    text = re.sub(r"desde las \d\d:\d\d", "desde las <HH:MM>", text)
-    text = re.sub(r"abierto desde hace [\d.]+ (días|min|h)", "abierto desde hace <N> \\1", text)
     if scrub:
         text = re.sub(r'(\d+) ms\b', "<N> ms", text)
         text = re.sub(r'"(%s)": (?:"[^"]*"|[\d.]+)' % "|".join(scrub), r'"\1": "<VOLATIL>"', text)
@@ -580,4 +586,4 @@ def check_golden(testcase, name, actual):
         testcase.fail(f"falta el golden {path} (genéralo con GOLDEN_UPDATE=1 contra la línea base)")
     with open(path, "r", encoding="utf-8") as handle:
         expected = handle.read()
-    testcase.assertEqual(actual, today_placeholder(expected), f"la salida de '{name}' difiere del golden")
+    testcase.assertEqual(actual, expected, f"la salida de '{name}' difiere del golden")

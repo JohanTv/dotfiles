@@ -47,7 +47,7 @@ $ plane.py report --date 2026-10-20 --json
     "stoppers_json": "[]",
     "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
     "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   },
   {
     "ticket_id": "OMNIFY-1",
@@ -67,7 +67,7 @@ $ plane.py report --date 2026-10-20 --json
     "stoppers_json": "[]",
     "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"}",
     "created_at": "2026-10-20T11:05:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   },
   {
     "ticket_id": "OMNIFY-1",
@@ -87,7 +87,7 @@ $ plane.py report --date 2026-10-20 --json
     "stoppers_json": "[\"Esperando credenciales\"]",
     "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:30\", \"notes\": \"Revisión\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [\"Esperando credenciales\"], \"track\": \"subagent\", \"worker_type\": \"agent:claude\"}",
     "created_at": "2026-10-20T11:35:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   }
 ]
 --- stderr ---
@@ -115,7 +115,7 @@ $ plane.py --json report --date 2026-10-20
     "stoppers_json": "[]",
     "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
     "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   },
   {
     "ticket_id": "OMNIFY-1",
@@ -135,7 +135,7 @@ $ plane.py --json report --date 2026-10-20
     "stoppers_json": "[]",
     "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"}",
     "created_at": "2026-10-20T11:05:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   },
   {
     "ticket_id": "OMNIFY-1",
@@ -155,7 +155,7 @@ $ plane.py --json report --date 2026-10-20
     "stoppers_json": "[\"Esperando credenciales\"]",
     "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:30\", \"notes\": \"Revisión\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [\"Esperando credenciales\"], \"track\": \"subagent\", \"worker_type\": \"agent:claude\"}",
     "created_at": "2026-10-20T11:35:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   }
 ]
 --- stderr ---
@@ -249,7 +249,7 @@ $ plane.py report --date 2026-10-20 -p OPS --json
     "stoppers_json": "[]",
     "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
     "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": "<VOLATIL>"
+    "updated_at": 1793620800.0
   }
 ]
 --- stderr ---

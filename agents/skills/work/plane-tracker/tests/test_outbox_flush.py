@@ -170,7 +170,7 @@ class Flush(Base):
 
 class Processes(Base):
     def flush_process(self):
-        return subprocess.Popen([sys.executable, gs.PLANE_PY, "outbox", "flush"], env=self.sb.env, cwd=self.sb.work, stdout=subprocess.PIPE,
+        return subprocess.Popen(self.sb.command(["outbox", "flush"]), env=self.sb.env, cwd=self.sb.work, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True)
 
     def test_two_concurrent_flushes_publish_each_item_exactly_once(self):

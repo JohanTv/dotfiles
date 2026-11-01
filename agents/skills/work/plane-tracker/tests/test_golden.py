@@ -4,7 +4,6 @@ temporal; ver golden_support.py."""
 import os
 import sys
 import unittest
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
@@ -17,8 +16,8 @@ NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJ
 WORKLOG_COLS = ("ticket_id", "track", "date", "start_time", "end_time", "duration_minutes", "plane_comment_id", "project_id", "issue_name",
                 "worker_type", "capacity_bucket", "phase", "role", "notes", "stoppers_json", "raw_payload", "created_at")
 WORKLOGS = ("worklogs", "SELECT * FROM worklogs ORDER BY ticket_id, track, duration_minutes, notes, date", WORKLOG_COLS)
-NOW_FIELDS = ("date", "start_time", "end_time", "created_at", "edited_at", "updated_at", "client_id", "external_id")
-STAMPS = ("created_at", "edited_at", "updated_at")
+RANDOM_FIELDS = ("client_id", "external_id")  # ids al azar; las fechas y horas NO se enmascaran: el reloj está congelado
+LATENCY_FIELDS = ("ms", "p50_ms", "p95_ms", "max_ms")
 SESS = ["--agent", "claude", "--session", gs.SESSION]
 CID1 = "c1000000-0000-4000-8000-000000000001"
 CID4 = "c1000000-0000-4000-8000-000000000004"
@@ -74,7 +73,7 @@ class Golden(unittest.TestCase):
                             ("GET", r"/projects/%s/states/$" % gs.P2, 403, {"detail": "prohibido"})]
         steps = [["list"], ["labels"], ["search", "formulario"], ["get", "OMNIFY-1"], ["get", "OPS-13"],
                  ["comment", "add", "OPS-13", "-m", "hola", "--duration", "5"]]
-        self.golden("errors_http", steps, setup=setup, scrub=NOW_FIELDS)
+        self.golden("errors_http", steps, setup=setup, scrub=RANDOM_FIELDS)
 
     # --- lectura --------------------------------------------------------------
     def test_get(self):
@@ -109,31 +108,20 @@ class Golden(unittest.TestCase):
                  ["report", "--date", "2026-10-20", "-p", "OPS"], ["report", "--date", "2026-10-20", "-p", "OPS", "--json"],
                  ["report", "--date", "bad"], ["worklog", "check", "--date", "2026-10-20"], ["worklog", "check", "--date", "2026-10-20", "--json"],
                  ["report", "--date", "2026-01-01"], ["report", "--date", "2026-10-20", "--refresh"]]
-        self.golden("report", steps, scrub=("updated_at",), sort_requests=True, db_queries=[WORKLOGS])
+        self.golden("report", steps, sort_requests=True, db_queries=[WORKLOGS])
 
     def test_report_week_header(self):
         self.golden("report_noactor", [{"args": ["report", "--date", "2026-10-20"], "env_drop": ("PLANE_ACTOR_UUID",)}],
-                    scrub=("updated_at",), sort_requests=True, db_queries=[WORKLOGS])
+                    sort_requests=True, db_queries=[WORKLOGS])
 
     def test_report_flow(self):
         steps = [["report", "--date", "2026-10-14", "--refresh"], ["report", "flow", "--date", "2026-10-14"],
                  ["report", "flow", "--date", "2026-10-14", "--json"], ["worklog", "check", "--date", "2026-10-14"],
                  ["report", "flow", "--date", "2026-10-14", "-p", "OPS"], ["report", "flow", "--date", "2026-10-14", "--refresh"]]
-        self.golden("report_flow", steps, scrub=("updated_at",), sort_requests=True)
+        self.golden("report_flow", steps, sort_requests=True)
 
     # --- escritura ------------------------------------------------------------
     def test_comment(self):
-        # El paso "mismo minuto" depende del reloj real: si la ejecución cruza un cambio de minuto la advertencia no aparece.
-        # Solo en ese caso se repite el escenario una vez; cualquier otro fallo se propaga.
-        for attempt in (1, 2):
-            minute = datetime.now().strftime("%Y%m%d%H%M")
-            try:
-                return self._comment_scenario()
-            except AssertionError:
-                if attempt == 2 or datetime.now().strftime("%Y%m%d%H%M") == minute:
-                    raise
-
-    def _comment_scenario(self):
         steps = [["comment", "add", "OMNIFY-1", "-m", "**Hola** mundo\n\n- uno\n- dos", "--duration", "15", "--track", "t1", "--capacity", "tooling_dx"],
                  ["comment", "add", "OMNIFY-1", "-m", "mismo minuto", "--duration", "15", "--track", "t1", "--capacity", "tooling_dx", "--json"],
                  ["comment", "add", "OPS-13", "-f", "cuerpo.md", "--duration", "5", "--worker-type", "agent:claude", "--session", gs.SESSION, "--json"],
@@ -152,7 +140,7 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-1", "-m", "### Bitácora\n\n- **Hecho:** nota limpia", "--duration", "4"],
                  ["comment", "add", "OMNIFY-999", "-m", "x", "--duration", "5"]]
         self.golden("comment", steps, files={"cuerpo.md": "# Título\n\nTexto con `código` y [enlace](https://x.example)\n"},
-                    scrub=NOW_FIELDS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
+                    scrub=RANDOM_FIELDS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
 
     def test_outbox(self):
         def setup(sb):
@@ -170,7 +158,7 @@ class Golden(unittest.TestCase):
                  ["outbox", "drop"], ["outbox"], ["health"]]
         queue = ("outbox", "SELECT * FROM outbox ORDER BY id", ("id", "client_id", "ticket_ref", "state", "attempts", "maybe_delivered", "last_error",
                                                                    "plane_comment_id", "wl_ticket_id", "wl_track", "wl_date", "wl_start_time"))
-        self.golden("outbox", steps, setup=setup, scrub=NOW_FIELDS, db_queries=[queue, WORKLOGS])
+        self.golden("outbox", steps, setup=setup, scrub=RANDOM_FIELDS, db_queries=[queue, WORKLOGS])
 
     def test_proposals(self):
         steps = [["worklog", "propose", "OMNIFY-1", *SESS, "--date", "2026-10-20"],
@@ -185,7 +173,7 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-1", "-m", "Aceptada", "--accept-proposal", *SESS],
                  ["comment", "add", "OMNIFY-1", "-m", "Otra vez", "--accept-proposal", *SESS],
                  ["comment", "add", "OMNIFY-1", "-m", "Se propone", *SESS]]
-        self.golden("proposals", steps, scrub=STAMPS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
+        self.golden("proposals", steps, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
 
     def test_split(self):
         steps = [["worklog", "propose", "--split", "OMNIFY-1=50%,OPS-13=rest", *SESS, "--date", "2026-10-20"],
@@ -196,7 +184,7 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-1", "-m", "Parte uno", "--accept-proposal", *SESS],
                  ["comment", "add", "OPS-13", "-m", "Parte dos", "--accept-proposal", *SESS],
                  ["comment", "add", "OPS-13", "-m", "Sin reparto", *SESS]]
-        self.golden("split", steps, scrub=STAMPS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
+        self.golden("split", steps, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
 
     def test_comment_edit_delete(self):
         steps = [["comment", "delete", "OMNIFY-1", "--comment-id", CID1],
@@ -213,7 +201,7 @@ class Golden(unittest.TestCase):
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4],
                  ["comment", "edit", "OMNIFY-1", "--duration", "10"],
                  ["comment", "delete", "OMNIFY-1", "--comment-id", CID4]]
-        self.golden("comment_edit_delete", steps, scrub=STAMPS, db_queries=[WORKLOGS])
+        self.golden("comment_edit_delete", steps, db_queries=[WORKLOGS])
 
     def test_update_create_link(self):
         steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-10-27"],
@@ -253,7 +241,7 @@ class Golden(unittest.TestCase):
         def setup(sb):
             sb.fake.fail = [("GET", r"/projects/%s/issues/$" % gs.P2, 503, {"detail": "caído"})]
         steps = [["projects"], ["list"], ["list", "-p", "OPS"], ["health"], ["health", "--json"], ["health", "--hours", "1"]]
-        self.golden("health", steps, setup=setup, scrub=("ts", "ms", "p50_ms", "p95_ms", "max_ms", "last_ok"))
+        self.golden("health", steps, setup=setup, scrub=LATENCY_FIELDS)
 
     def test_handoff(self):
         steps = [["handoff"], ["handoff", "OMNIFY-9", "--base", "main"], ["handoff", "--base", "nope"], ["handoff", "--base", "--evil"],

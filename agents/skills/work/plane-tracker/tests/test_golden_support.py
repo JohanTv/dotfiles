@@ -1,46 +1,127 @@
-"""La normalización de la fecha de hoy debe ser simétrica: una fecha fija del fixture que coincida con el día en que corre
-la suite no puede hacer fallar los golden (ocurrió el 2026-11-01, día de una fecha del fixture)."""
+"""El reloj de las pruebas golden: el lanzador `plane_clock.py` congela la hora real del CLI, el `Sandbox` la controla y ninguna
+prueba depende de la fecha del día en que corre (el 2026-11-01 una fecha futura de un fixture coincidió con "hoy" y rompió tres
+golden solo ese día)."""
 import os
 import re
+import subprocess
 import sys
+import tempfile
+import textwrap
 import unittest
 from datetime import datetime
-from unittest import mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-
-class TodayPlaceholder(unittest.TestCase):
-    def collapse_with_today(self, text, year, month, day):
-        with mock.patch.object(gs, "datetime") as fake:
-            fake.now.return_value = datetime(year, month, day, 12, 0)
-            return gs.today_placeholder(text)
-
-    def test_a_fixture_date_equal_to_today_collapses_on_both_sides(self):
-        actual, golden = "vence 2026-11-01 (01/11/2026)", "vence 2026-11-01 (01/11/2026)"
-        self.assertEqual(self.collapse_with_today(actual, 2026, 11, 1), self.collapse_with_today(golden, 2026, 11, 1))
-        self.assertEqual(self.collapse_with_today(golden, 2026, 11, 1), "vence <HOY> (<HOY>)")
-
-    def test_other_days_leave_fixture_dates_untouched(self):
-        text = "vence 2026-11-01"
-        self.assertEqual(self.collapse_with_today(text, 2026, 10, 31), text)
-        self.assertEqual(self.collapse_with_today(text, 2027, 3, 9), text)
+HERE = os.path.dirname(os.path.abspath(__file__))
+PLANE = os.path.join(HERE, "..", "scripts", "plane.py")
+INSTANT = "2026-11-02T12:00:00+00:00"
 
 
-class FixtureDates(unittest.TestCase):
-    """Una fecha fija de fixture que sea de hoy o futura es una bomba: el día que "hoy" la alcance, la suite fallará solo ese día
-    (ocurrió el 2026-11-01 con una fecha escrita pocos días antes). Las fechas de los fixtures y de los escenarios deben ser pasadas."""
+def run_launcher(*args, env_extra=None):
+    with tempfile.TemporaryDirectory() as home:
+        env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "TZ": "UTC", "LC_ALL": "C.UTF-8", "PYTHONIOENCODING": "utf-8", **(env_extra or {})}
+        return subprocess.run([sys.executable, gs.CLOCK_PY, *args], env=env, capture_output=True, text=True, timeout=60)
 
-    FILES = ("golden_support.py", "test_golden.py")
 
-    def test_fixture_and_scenario_dates_are_in_the_past(self):
-        today = datetime.now().strftime("%Y-%m-%d")
-        for name in self.FILES:
-            with open(os.path.join(os.path.dirname(__file__), name), encoding="utf-8") as handle:
+class ClockLauncher(unittest.TestCase):
+    def probe(self, body):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8")
+        handle.write(textwrap.dedent(body))
+        handle.close()
+        self.addCleanup(os.unlink, handle.name)
+        return handle.name
+
+    def test_every_way_of_reading_the_clock_sees_the_frozen_instant(self):
+        script = self.probe("""
+            import time
+            from datetime import datetime, timedelta, timezone
+            print(datetime.now().isoformat(), datetime.now(timezone.utc).isoformat(), datetime.today().isoformat(), time.time())
+            print(datetime.now().date(), (datetime.now() - timedelta(minutes=15)).strftime("%H:%M"))
+        """)
+        proc = run_launcher("2026-11-02T12:00:00+00:00", script)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(proc.stdout.splitlines(), ["2026-11-02T12:00:00 2026-11-02T12:00:00+00:00 2026-11-02T12:00:00 1793620800.0", "2026-11-02 11:45"])
+
+    def test_repeated_reads_are_identical_and_other_instants_work(self):
+        script = self.probe("""
+            from datetime import datetime
+            a = datetime.now(); b = datetime.now()
+            print(a == b, a.isoformat())
+        """)
+        self.assertEqual(run_launcher("2028-02-29T00:05:00+00:00", script).stdout.strip(), "True 2028-02-29T00:05:00")
+
+    def test_exit_code_and_script_name_pass_through(self):
+        script = self.probe("""
+            import os, sys
+            print(os.path.basename(sys.argv[0]), sys.argv[1:])
+            sys.exit(7)
+        """)
+        proc = run_launcher(INSTANT, script, "uno", "dos")
+        self.assertEqual(proc.returncode, 7)
+        self.assertEqual(proc.stdout.strip(), f"{os.path.basename(script)} ['uno', 'dos']")
+
+    def test_instant_without_timezone_is_rejected(self):
+        proc = run_launcher("2026-11-02T12:00:00", PLANE)
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("zona horaria", proc.stderr)
+
+    def test_help_is_identical_with_and_without_the_launcher(self):
+        with tempfile.TemporaryDirectory() as home:
+            env = {"PATH": os.environ.get("PATH", ""), "HOME": home, "TZ": "UTC", "LC_ALL": "C.UTF-8", "PYTHONIOENCODING": "utf-8"}
+            plain = subprocess.run([sys.executable, PLANE, "--help"], env=env, capture_output=True, text=True, timeout=60)
+        launched = run_launcher(INSTANT, PLANE, "--help")
+        self.assertEqual((launched.returncode, launched.stdout, launched.stderr), (plain.returncode, plain.stdout, plain.stderr))
+
+
+class SandboxClock(unittest.TestCase):
+    def test_the_clock_is_frozen_by_default_and_advances_only_when_asked(self):
+        sb = gs.Sandbox()
+        self.addCleanup(sb.close)
+        start = sb.now
+        sb.advance(90)
+        self.assertEqual(sb.now, start + 90)
+
+    def test_a_sandbox_can_opt_out_to_the_real_clock(self):
+        sb = gs.Sandbox(clock=None)
+        self.addCleanup(sb.close)
+        self.assertIsNone(sb.now)
+        with self.assertRaises(AssertionError):
+            sb.advance(1)
+
+    def test_the_cli_sees_the_sandbox_instant(self):
+        sb = gs.Sandbox()
+        self.addCleanup(sb.close)
+        code, out, _ = sb.run(["report", "--today"], env_set={"PLANE_OFFLINE": "1"})
+        self.assertEqual(code, 0)
+        self.assertIn(datetime.fromisoformat(gs.FROZEN_NOW).strftime("%d/%m/%Y"), out)
+
+
+class NoRealClockInTheHarness(unittest.TestCase):
+    """Las pruebas golden no deben leer la hora real: el reloj lo controla el Sandbox."""
+
+    def read(self, name):
+        with open(os.path.join(HERE, name), encoding="utf-8") as handle:
+            return handle.read()
+
+    def test_fixture_and_scenario_dates_are_before_the_frozen_instant(self):
+        frozen_day = gs.FROZEN_NOW[:10]
+        for name in ("golden_support.py", "test_golden.py"):
+            for date in sorted(set(re.findall(r"\b(20\d\d-\d\d-\d\d)\b", self.read(name)))):
+                if date != "2026-11-02":  # el propio valor por defecto del instante congelado
+                    self.assertLess(date, frozen_day, f"{name}: la fecha {date} no es anterior al instante congelado {frozen_day}")
+
+    def test_golden_files_do_not_use_date_placeholders(self):
+        for name in sorted(os.listdir(gs.GOLDEN_DIR)):
+            with open(os.path.join(gs.GOLDEN_DIR, name), encoding="utf-8") as handle:
                 text = handle.read()
-            for date in sorted(set(re.findall(r"\b(20\d\d-\d\d-\d\d)\b", text))):
-                self.assertLess(date, today, f"{name}: la fecha {date} es de hoy o futura; usa una fecha pasada (si no, un día cualquiera coincidirá con 'hoy')")
+            for marker in ("<HOY>", "<TS>", "<HH:MM>"):
+                self.assertNotIn(marker, text, f"{name}: el golden enmascara la hora con {marker}; el reloj congelado la hace determinista")
+
+    def test_the_harness_reads_the_real_clock_only_as_the_documented_fallback(self):
+        self.assertEqual(len(re.findall(r"datetime\.now\(|date\.today\(", self.read("golden_support.py"))), 0)
+        self.assertEqual(len(re.findall(r"datetime\.now\(|date\.today\(|time\.time\(", self.read("test_golden.py"))), 0)
+        self.assertEqual(len(re.findall(r"\btime\.time\(", self.read("golden_support.py"))), 1, "solo write_circuit con clock=None puede leer time.time()")
 
 
 if __name__ == "__main__":

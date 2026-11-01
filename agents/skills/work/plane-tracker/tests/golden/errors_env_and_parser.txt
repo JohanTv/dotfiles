@@ -107,7 +107,7 @@ $ plane.py attachment list 10000000-0000-4000-8000-000000000001
 --- stdout ---
 
 --- stderr ---
-Plane no responde desde las <HH:MM> (conexión rechazada). No se envió nada; reintenta en 30 s.
+Plane no responde desde las 12:00 (conexión rechazada). No se envió nada; reintenta en 30 s.
 
 $ plane.py attachment list 10000000-0000-4000-8000-000000000001
 [exit 3]

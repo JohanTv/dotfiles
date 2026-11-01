@@ -38,8 +38,8 @@ $ plane.py health
    • Circuito: cerrado
    • Cola de salida: 0 pendiente(s), 0 fallido(s)
    • 2 × HTTP 503
-     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
-     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+     2026-11-02 12:00:00  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+     2026-11-02 12:00:00  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
 --- stderr ---
 
 
@@ -58,7 +58,7 @@ $ plane.py health --json
   },
   "last_failures": [
     {
-      "ts": "<VOLATIL>",
+      "ts": "2026-11-02 12:00:00",
       "method": "GET",
       "path": "/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/",
       "status": 503,
@@ -67,7 +67,7 @@ $ plane.py health --json
       "error": null
     },
     {
-      "ts": "<VOLATIL>",
+      "ts": "2026-11-02 12:00:00",
       "method": "GET",
       "path": "/api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/",
       "status": 503,
@@ -84,7 +84,7 @@ $ plane.py health --json
     "since": null,
     "cause": null,
     "next_probe_in": null,
-    "last_ok": "<VOLATIL>"
+    "last_ok": "12:00"
   },
   "outbox": {
     "pending": 0,
@@ -103,8 +103,8 @@ $ plane.py health --hours 1
    • Circuito: cerrado
    • Cola de salida: 0 pendiente(s), 0 fallido(s)
    • 2 × HTTP 503
-     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
-     <TS>  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+     2026-11-02 12:00:00  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
+     2026-11-02 12:00:00  GET ces/ws/projects/22222222-2222-4222-8222-222222222222/issues/  → HTTP 503 (<N> ms)
 --- stderr ---
 
 
