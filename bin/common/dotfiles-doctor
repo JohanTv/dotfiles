@@ -12,6 +12,9 @@ import filecmp
 import argparse
 import json
 import difflib
+import glob
+import shutil
+import stat
 
 USE_COLOR = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 GREEN = "\033[92m" if USE_COLOR else ""
@@ -404,6 +407,66 @@ def audit_mcp_servers():
     return mcp_results
 
 
+def audit_ssh():
+    """Read-only advisory audit of SSH prerequisites (nothing here is versioned)."""
+    results = []
+    ssh_dir = os.path.expanduser("~/.ssh")
+
+    def mode_of(path):
+        return stat.S_IMODE(os.stat(path).st_mode)
+
+    def add(ok, message, fix=None):
+        results.append({"ok": ok, "message": message, "fix": fix})
+
+    if shutil.which("ssh"):
+        add(True, "openssh-client instalado")
+    else:
+        add(False, "ssh no está instalado", "./install.sh --tools  (o: sudo apt install openssh-client)")
+
+    if not os.path.isdir(ssh_dir):
+        add(False, "~/.ssh no existe", "mkdir -m 700 ~/.ssh")
+        return results
+
+    if mode_of(ssh_dir) & 0o077:
+        add(False, f"~/.ssh con permisos {mode_of(ssh_dir):o} (esperado 700)", "chmod 700 ~/.ssh")
+    else:
+        add(True, "~/.ssh con permisos 700")
+
+    keys = [k for k in glob.glob(os.path.join(ssh_dir, "id_*")) if not k.endswith(".pub")]
+    if not keys:
+        add(False, "No hay llave privada en ~/.ssh", "ssh-keygen -t ed25519")
+    for k in keys:
+        if mode_of(k) & 0o077:
+            add(False, f"{k.replace(os.path.expanduser('~'), '~')} con permisos {mode_of(k):o} (esperado 600)", f"chmod 600 {k}")
+        else:
+            add(True, f"{k.replace(os.path.expanduser('~'), '~')} con permisos 600")
+
+    conf_dir = os.path.join(ssh_dir, "config.d")
+    config = os.path.join(ssh_dir, "config")
+    confs = sorted(glob.glob(os.path.join(conf_dir, "*.conf")))
+    # OpenSSH rechaza config/includes escribibles por grupo u otros ("Bad owner or permissions")
+    for f in ([config] if os.path.isfile(config) else []) + confs:
+        if mode_of(f) & 0o022:
+            add(False, f"{f.replace(os.path.expanduser('~'), '~')} con permisos {mode_of(f):o} (esperado 600)", f"chmod 600 {f}")
+    if not os.path.isfile(config) and not confs:
+        add(False, "Sin hosts configurados (~/.ssh/config o ~/.ssh/config.d/*.conf)", "crea tus .conf a mano (no se versionan)")
+    elif confs:
+        has_include = False
+        if os.path.isfile(config):
+            with open(config) as fh:
+                has_include = any(l.strip().lower().startswith("include") for l in fh)
+        if not has_include:
+            add(False, "Hay config.d/*.conf pero ~/.ssh/config no tiene Include", "echo 'Include ~/.ssh/config.d/*.conf' >> ~/.ssh/config")
+
+    if shutil.which("ssh"):
+        r = subprocess.run(["ssh", "-G", "localhost"], capture_output=True, text=True)
+        if r.returncode == 0:
+            add(True, "ssh -G localhost: configuración válida")
+        else:
+            add(False, "ssh -G localhost falla: " + (r.stderr.strip().splitlines() or ["?"])[-1])
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="dotfiles-doctor - Diagnóstico y auditoría de configuraciones de dotfiles.",
@@ -441,6 +504,7 @@ def main():
 
     git_state = get_git_status()
     mcp_state = audit_mcp_servers()
+    ssh_state = audit_ssh()
 
     # Apply fixes if requested
     fixed_count = 0
@@ -459,6 +523,7 @@ def main():
             "wsl": wsl_active,
             "git": git_state,
             "mcp": mcp_state,
+            "ssh": ssh_state,
             "targets": [item for sublist in results_by_cat.values() for item in sublist],
             "issues_count": len(issues_found),
             "fixed_count": fixed_count
@@ -519,15 +584,24 @@ def main():
         mark = f"{GREEN}✔" if m["ok"] else f"{RED}✖"
         print(f"   {mark}{RESET} {BOLD}{m['agent']:18}{RESET} {DIM}➔ {m['message']}{RESET}")
 
+    # 4. SSH (informativo: nada de esto se versiona)
+    print(f"\n{BOLD}4. Prerrequisitos SSH (solo diagnóstico, no versionado):{RESET}")
+    for s_it in ssh_state:
+        mark = f"{GREEN}✔" if s_it["ok"] else f"{YELLOW}⚠"
+        print(f"   {mark}{RESET} {s_it['message']}")
+        if s_it.get("fix") and not s_it["ok"]:
+            print(f"       {DIM}➔ {s_it['fix']}{RESET}")
+
     # Diffs
     if diff_outputs:
-        print(f"\n{BOLD}{YELLOW}4. Diferencias detectadas en archivos desconectados:{RESET}")
+        print(f"\n{BOLD}{YELLOW}5. Diferencias detectadas en archivos desconectados:{RESET}")
         for path, d_txt in diff_outputs:
             print(f"\n{CYAN}--- Diffs en {path} ---{RESET}")
             print(d_txt)
 
     print(f"\n{DIM}{'─' * 68}{RESET}")
-    if not issues_found and git_state.get("clean"):
+    ssh_issues = [x for x in ssh_state if not x["ok"]]
+    if not issues_found and git_state.get("clean") and not ssh_issues:
         print(f"{GREEN}{BOLD}🎉 ¡Todo está en orden! Tu máquina y tu repositorio están 100% sincronizados.{RESET}\n")
     else:
         if fixed_count > 0:
@@ -535,6 +609,8 @@ def main():
         elif issues_found:
             print(f"{YELLOW}{BOLD}⚠ Se detectaron {len(issues_found)} detalle(s) que requieren atención.{RESET}")
             print(f"  {DIM}Ejecuta 'dotfiles-doctor --fix' o './install.sh' para restaurarlos.{RESET}")
+        if ssh_issues:
+            print(f"{YELLOW}{BOLD}⚠ {len(ssh_issues)} aviso(s) de SSH (sección 4).{RESET} {DIM}No se reparan con --fix: son manuales y no se versionan.{RESET}")
         if not git_state.get("clean"):
             print(f"  {DIM}Hay cambios pendientes en Git. Revísalos con 'git diff' o haz commit.{RESET}")
         print("")
