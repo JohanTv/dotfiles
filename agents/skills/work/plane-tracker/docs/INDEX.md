@@ -11,7 +11,7 @@
 | 0001 | [No se puede fijar inicio y fin reales al registrar tiempo declarado](defects/0001-registro-retroactivo-de-horas.md) | abierto | `comment add --duration` usa la hora de publicación como fin; el registro retroactivo distorsiona la fusión de intervalos. |
 | 0003 | [El "Standby externo" del reporte no tiene fuente de datos](defects/0003-standby-externo-sin-fuente-de-datos.md) | abierto | El reporte afirma "Sin bloqueos reportados" aunque ningún flujo puede reportar bloqueos; la decisión de producto está en 0006. |
 | 0004 | [Verificar que Plane devuelve `external_id` en los GET de comentarios](defects/0004-verificar-external-id-en-comentarios.md) | abierto | La cola de salida asume un contrato de `external_id` de Plane que no se ha confirmado en una instancia real. |
-| 0009 | [Saneamiento pendiente de datos de instancia y de personas en el repositorio](defects/0009-saneamiento-pendiente-de-datos-de-instancia.md) | abierto | Quedan ejemplos con claves de proyecto reales, un workspace por defecto en el código y datos ya publicados en el historial. |
+| 0009 | [Saneamiento pendiente de datos de instancia y de personas en el repositorio](defects/0009-saneamiento-pendiente-de-datos-de-instancia.md) | abierto | El historial publicado ya se reescribió; quedan valores por defecto en el código, claves de proyecto como ejemplos y la purga de copias fuera del repositorio. |
 | 0010 | [El reporte no sincroniza con Plane los periodos que tienen registros locales parciales](defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) | abierto | `report` solo sincroniza si el periodo no tiene ningún registro local; con uno solo muestra un resultado parcial como completo y sin aviso. |
 
 ## RFC
