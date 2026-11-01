@@ -95,6 +95,7 @@ attach_to_session true
 session_serialization true
 serialize_pane_viewport true
 
-// Portapapeles: OSC52 (default de Zellij), portable entre Ubuntu nativo y WSL
-copy_clipboard "system"
+// Portapapeles: clip-copy (bin/desktop-linux o bin/wsl segun entorno) evita que
+// Alacritty dispute la propiedad de la seleccion X11 (warning XCB)
+copy_command "clip-copy"
 copy_on_select true

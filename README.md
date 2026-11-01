@@ -49,8 +49,8 @@ dotfiles/
 │
 └── bin/                        # 🚀 Utilidades y automatizaciones
     ├── common/                 # Scripts universales (WSL + Ubuntu): find-session, dotfiles-doctor
-    ├── desktop-linux/          # Scripts específicos de GNOME/X11: focus-alacritty, etc.
-    ├── wsl/                    # Scripts exclusivos de WSL: shot (capturas vía Windows)
+    ├── desktop-linux/          # Scripts específicos de GNOME/X11: focus-alacritty, clip-copy, etc.
+    ├── wsl/                    # Scripts exclusivos de WSL: shot (capturas vía Windows), clip-copy (portapapeles)
     └── work/                   # Scripts de trabajo (perfil work): plane-tracker
 ```
 

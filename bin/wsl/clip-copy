@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# clip-copy: copia stdin al portapapeles de Windows. Lo usa Zellij como copy_command
+# clip.exe lee ANSI si no hay BOM (rompe tildes/ñ): se convierte a UTF-16 con BOM.
+# NOTA: sin verificar en WSL real; si falla, probar powershell.exe Set-Clipboard.
+CLIP=$(command -v clip.exe || echo /mnt/c/Windows/System32/clip.exe)
+iconv -f UTF-8 -t UTF-16 | "$CLIP"

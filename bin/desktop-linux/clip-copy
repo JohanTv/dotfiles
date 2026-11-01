@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# clip-copy: copia stdin al portapapeles (X11). Lo usa Zellij como copy_command
+exec xclip -selection clipboard
