@@ -1,10 +1,10 @@
 # 🏛️ Arquitectura del Sistema de Tracking, Telemetría y Gestión de Work Items
 ## Especificación Maestra de Ingeniería para Plane CE v1.2.3 en Flujos Asistidos por IA (agy, Claude Code, OpenCode)
 
-**Autor:** [mantenedor] & Asistente Orquestador (DeepMind Antigravity)  
+**Autor:** el mantenedor del repositorio y un asistente orquestador  
 **Fecha:** 29 de Octubre de 2026 | **Versión:** 2.4.0 (FTS5 + Klee Interval Merging + Handoff Engine)  
 **Entorno:** Ubuntu Linux (WSL) / Host Nativo | **Perfil Dotfiles:** `work`  
-**Instancia Plane:** `http://plane.example.com` (Workspace: `mi-workspace` | Proyecto Core: `OMNIFY` | Operaciones: `OPS`)  
+**Instancia Plane:** `https://plane.example.com` (Workspace: `mi-workspace` | Proyecto Core: `OMNIFY` | Operaciones: `OPS`)  
 **Base de Datos Local:** `~/.cache/plane/worklogs.db` (SQLite3 con WAL Mode)
 
 ---
@@ -29,14 +29,14 @@ El sistema resuelve la desconexión crítica entre el **desarrollo acelerado por
 │ ➔ Motor Local-First en SQLite3 WAL (~/.cache/plane/worklogs.db)        │
 │ ➔ Búsqueda Momento Cero FTS5 (< 2ms)                                  │
 │ ➔ Interval Merging de Klee (Lebesgue 1D) para fusión de concurrencia   │
-│ ➔ Protocolo de Relevo Asíncrono (Task Handoff con [líder técnico]/equipo)       │
+│ ➔ Protocolo de Relevo Asíncrono (Task Handoff con el equipo)           │
 │ ➔ Reporte Diario a Jefatura a las 6:00 pm (0.08s, sin IA, 0 tokens)    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Principios Fundamentales:
 1. **Local-First con Zero-Latency:** Las consultas de etiquetas, proyectos, búsqueda de tickets y registro de sesiones responden en **< 2 milisegundos** desde SQLite local. La red solo se utiliza para transiciones oficiales de estado y publicación de bitácoras.
-2. **Dual-Layer Information Standard:** Todo evento registrado hacia Plane contiene una tabla visual limpia para lectura humana ([líder técnico], gerencia) y un bloque JSON estructurado oculto (`<!-- PLANE_WORKLOG_METADATA ... -->`) para telemetría analítica.
+2. **Dual-Layer Information Standard:** Todo evento registrado hacia Plane contiene una tabla visual limpia para lectura humana (líder técnico, gerencia) y un bloque JSON estructurado oculto (`<!-- PLANE_WORKLOG_METADATA ... -->`) para telemetría analítica.
 3. **Verdad Matemática Incontrovertible (Klee's Measure):** Las horas no se suman escalarmente. La unión matemática de intervalos de 1D garantiza que el tiempo reloj activo reportado sea estricto, mientras que el esfuerzo paralelo de subagentes se visibiliza en el **AI Leverage Multiplier**.
 4. **Respeto a la Taxonomía N:M:** Los IDs de tickets pertenecen a los metadatos de Plane (`identifier`, `sequence_id`), las fases del SDLC pertenecen a los prefijos de título `[{FASE}]`, y los módulos funcionales pertenecen a las etiquetas indexadas de Plane (`sms`, `whatsapp`, `backend`), protegiendo el espacio útil de las tarjetas Kanban.
 
@@ -116,7 +116,7 @@ En bugs o incidentes, exigir soluciones o criterios de aceptación al inicio es 
    - Publicación de la Bitácora Dual-Layer como comentario final.
 
 ### 3.4 Protocolo de Relevo Asíncrono (Task Handoff)
-Permite que un ticket sea iniciado por [líder técnico], transferido a [persona] y viceversa, sin pérdida de contexto ni contaminación de horas:
+Permite que un ticket sea iniciado por una persona, transferido a otra y viceversa, sin pérdida de contexto ni contaminación de horas:
 
 1. **Recepción del Relevo (Handoff Ingest):**
    - Al ejecutar `plane-tracker get <TICKET>`, el CLI descarga la descripción y los comentarios recientes.
@@ -126,10 +126,10 @@ Permite que un ticket sea iniciado por [líder técnico], transferido a [persona
      * *¿Cuáles son los stoppers y dependencias?*
      * *¿Cuál es el siguiente paso inmediato?*
 2. **Aislamiento de Telemetría:**
-   - [persona] trabaja en su propia rama Git.
-   - [persona] imputa sus horas efectivas exclusivamente bajo su propio usuario y track mediante `plane-tracker comment add`. Las horas de [líder técnico] quedan asociadas a su usuario.
+   - Quien retoma trabaja en su propia rama Git.
+   - Quien retoma imputa sus horas efectivas exclusivamente bajo su propio usuario y track mediante `plane-tracker comment add`. Las horas del autor anterior quedan asociadas a su usuario.
 3. **Entrega del Relevo (Si se deja a medias):**
-   - Si [persona] debe suspender la tarea o devolverla a [líder técnico], publica un comentario estructurado de relevo (*Handoff Snapshot*):
+   - Si quien retoma debe suspender la tarea o devolverla al autor anterior, publica un comentario estructurado de relevo (*Handoff Snapshot*):
      ```markdown
      ### 🔄 Relevo de Tarea (Handoff Snapshot)
      - **Avance realizado:** Qué se probó o diagnosticó en esta sesión.
@@ -144,11 +144,11 @@ Para no crear 20 micro-tickets a la semana que destruyan las métricas de sprint
 1. **En `OPS` (Soporte y Toil):**  
    `Tareas Rápidas y Soporte - W{XX}`  
    *Balde:* `toil_support` | *Labels:* `externo`, `infra`.  
-   *Uso:* Atender consultas de usuarios de [cliente], revisar un log en Caddy, reiniciar un worker.
+   *Uso:* Atender consultas de usuarios de un cliente, revisar un log en Caddy, reiniciar un worker.
 2. **En `OPS` (Coordinación de Equipo):**  
    `Reuniones de Equipo y Acuerdos - W{XX}`  
    *Balde:* `coordination` | *Labels:* `docs`.  
-   *Uso:* Daily meeting matutino, reuniones 1:1 con [líder técnico], balance de sprint.
+   *Uso:* Daily meeting matutino, reuniones 1:1 con el líder técnico, balance de sprint.
 
 ---
 
@@ -160,7 +160,7 @@ Cuando múltiples sesiones o subagentes trabajan en paralelo sobre el mismo tick
 El algoritmo implementado en `scripts/plane_cli/timeutil.py` ordena todos los intervalos temporales $[s_i, e_i]$ y calcula su unión matemática continua:
 $$\mu\left(\bigcup_{i=1}^n [s_i, e_i]\right)$$
 
-* **Wall-Clock Time:** El tiempo real de reloj que [persona] estuvo activo frente a la máquina.
+* **Wall-Clock Time:** El tiempo real de reloj que la persona estuvo activa frente a la máquina.
 * **Total Compute Effort:** La suma escalar del trabajo humano más el trabajo de los subagentes.
 * **AI Leverage Multiplier:**
   $$\text{AI Leverage} = \frac{\text{Total Compute Effort}}{\text{Wall-Clock Time}}$$
@@ -172,7 +172,7 @@ $$\mu\left(\bigcup_{i=1}^n [s_i, e_i]\right)$$
 2. **Pausas Pasivas (Build de Docker / Subagente background pesado):**
    - Se registran como `standby_reason = "Docker build"`.
    - No computan como foco cognitivo humano, pero sí computan en el esfuerzo de cómputo de la IA (apalancamiento).
-3. **Stoppers Explícitos (Bloqueo externo de Meta / Esperando a [líder técnico]):**
+3. **Stoppers Explícitos (Bloqueo externo de Meta / Esperando al líder técnico):**
    - El ticket se mueve a `Pausado`.
    - Se reporta en el resumen diario como `⏸️ Standby externo: Meta API Webhook (2h 15m)`, justificando el Lead Time ante la gerencia.
 
@@ -257,9 +257,9 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 1. **Ahorro Masivo de Context Window (90% menos tokens):**  
    Un tool call de MCP inyecta esquemas JSON gigantescos en cada turno del LLM. Con `plane-tracker`, el asistente ejecuta un comando Bash determinista de 1 línea, consumiendo apenas 30-50 tokens.
 2. **Independencia de Modelos:**  
-   Funciona de manera idéntica en Gemini CLI (`agy`), Claude Code, OpenCode o en un script de bash propio de [persona] sin IA.
+   Funciona de manera idéntica en Gemini CLI (`agy`), Claude Code, OpenCode o en un script de bash propio sin IA.
 3. **Convivencia Armónica con OMNIFY-197:**  
-   Cuando se despliegue el MCP remoto de OMNIFY-197, será utilizado exclusivamente por `claude.ai` en web/móvil para gestión conversacional de producto. En la máquina de desarrollo de [persona], `plane-tracker` sigue siendo el motor de ingeniería local de alto rendimiento.
+   Cuando se despliegue el MCP remoto de OMNIFY-197, será utilizado exclusivamente por `claude.ai` en web/móvil para gestión conversacional de producto. En la máquina de desarrollo del usuario, `plane-tracker` sigue siendo el motor de ingeniería local de alto rendimiento.
 
 ---
-*Documento de arquitectura maestro consolidado y verificado en el entorno de producción de [mantenedor].*
+*Documento de arquitectura maestro consolidado y verificado en el entorno de producción del mantenedor.*

@@ -22,7 +22,7 @@ Cada ticket debe poseer **al menos dos etiquetas**: una de capa técnica y una d
 | `deuda-tecnica`| `#A16207` | Naturaleza | Refactorizaciones, código legado, tipados incompletos. |
 | `seguridad` | `#DC2626` | Naturaleza | Autenticación, tokens, endpoints expuestos, sanitización. |
 | `docs` | `#46A758` | Naturaleza | Documentación técnica, especificaciones RFC, bitácoras. |
-| `question` | `#F78DA7` | Naturaleza | Preguntas de producto, decisiones pendientes con [líder técnico]. |
+| `question` | `#F78DA7` | Naturaleza | Preguntas de producto, decisiones pendientes con el líder técnico. |
 | `sms` | `#8B5CF6` | Módulo Funcional | Envíos SMS, webhook de estados, proveedores de telefonía. |
 | `whatsapp` | `#25D366` | Módulo Funcional | API de Meta, plantillas de WhatsApp, webhooks de mensajes. |
 | `whatsapp-sender`| `#128C7E` | Módulo Funcional | Microservicio dedicado a la cola y despacho de WhatsApp. |
@@ -37,7 +37,7 @@ Cada ticket debe poseer **al menos dos etiquetas**: una de capa técnica y una d
 
 | Etiqueta | Código Hex | Categoría | Uso / Cuándo aplicarla |
 | :--- | :---: | :--- | :--- |
-| `externo` | `#7BDCB5` | Clasificación | Solicitudes originadas por clientes (ej. [cliente], [cliente]). |
+| `externo` | `#7BDCB5` | Clasificación | Solicitudes originadas por clientes (ej. cliente A, cliente B). |
 | `meta` | `#0866FF` | Clasificación | Cuentas comerciales de Meta, WABA, líneas bloqueadas. |
 | `backend` | `#5E6AD2` | Capa Técnica | Revisión de scripts, fixes operativos en APIs. |
 | `bd` | `#F59E0B` | Capa Técnica | Consultas manuales de saldos, dumps, reconciliación. |
@@ -57,7 +57,7 @@ Para el reporte dual-layer y el análisis de distribución de tiempo del desarro
 | :--- | :--- | :--- | :---: |
 | `deep_work` | 🧠 Deep Work | Programación dura, arquitectura, resolución de bugs complejos. | **50% - 60%** |
 | `toil_support` | 🔧 Toil & Soporte | Atención ad-hoc a usuarios, consultas manuales, tareas repetitivas. | **15% - 20%** |
-| `coordination` | 🤝 Coordinación | Dailies, 1:1s con [líder técnico], syncs de equipo, demos. | **10% - 15%** |
+| `coordination` | 🤝 Coordinación | Dailies, 1:1s con el líder técnico, syncs de equipo, demos. | **10% - 15%** |
 | `tooling_dx` | 🚀 Tooling & DX | Creación de scripts CLI, mejoras de dotfiles, optimización de agentes. | **5% - 10%** |
 | `research_rd` | 🔬 Research & I+D| Investigación de librerías, evaluación de protocolos, benchmarks. | **5% - 10%** |
 | `tech_debt_paydown`| 🧹 Tech Debt | Refactorización activa y saneamiento de código obsoleto. | **5% - 10%** |

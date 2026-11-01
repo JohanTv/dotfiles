@@ -1,9 +1,9 @@
 # Estrategia Integral de Gestión de Tiempos, Work Items y Productividad para TI
 ## De "Hombre Orquesta" a Ingeniero de Alto Rendimiento Visible
 
-> **Autor:** [mantenedor] & Asistentes de Ingeniería (AI Architecture)  
+> **Autor:** el mantenedor del repositorio y asistentes de ingeniería (AI Architecture)  
 > **Ubicación:** `agents/skills/work/plane-tracker/references/ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md`  
-> **Plataforma:** Plane Community Edition v1.2.3 (`mi-workspace` / Omnify)  
+> **Plataforma:** Plane Community Edition v1.2.3 (`mi-workspace`)  
 > **Versión:** 1.0.0 — Octubre 2026  
 
 ---
@@ -91,7 +91,7 @@ flowchart LR
 ## 4. Gestión de Reuniones y Preguntas de Usuarios: ¿Proyecto Aparte o Mismo Proyecto?
 
 ### ¿Crear un proyecto personal aparte?
-* **Riesgo:** Si creas un proyecto "Personal" o "Privado", la gerencia y [líder técnico] no lo ven en el tablero general. Para ellos sigues sin avanzar en el producto oficial.
+* **Riesgo:** Si creas un proyecto "Personal" o "Privado", la gerencia y el líder técnico no lo ven en el tablero general. Para ellos sigues sin avanzar en el producto oficial.
 * **Solución Óptima:** **Estructura Híbrida en Plane**.
 
 ### La Estrategia de "Tickets Paraguas" (Umbrella Issues)
@@ -101,13 +101,13 @@ Para no crear 15 tickets de 10 minutos cada día por llamadas o preguntas en Sla
 Crea un ticket semanal recurrente para soporte y mantenimiento:
 * **Título:** `Tareas Rápidas y Soporte - W44`
 * **Cómo se usa:** Cada vez que atiendes a un usuario o haces una consulta rápida de BD, agregas un comentario rápido o acumulas el tiempo en el log de la sesión:
-  > *"Atención a usuario Comercial: verificación de estado de campaña [cliente] (30m). Revisión de logs en Caddy por timeout reportado (20m)."*
+  > *"Atención a usuario Comercial: verificación de estado de una campaña de un cliente (30m). Revisión de logs en Caddy por timeout reportado (20m)."*
 
 #### B. En el Proyecto `Operaciones` (`OPS`), balde `coordination`:
 Crea un segundo ticket semanal, también en `OPS` (el proyecto `OMNIFY` queda limpio de tickets de proceso):
 * **Título:** `Reuniones de Equipo y Acuerdos - W44`
 * **Cómo se usa:** Se imputan las horas reales de reuniones con el equipo o jefatura:
-  > *"Reunión de equipo (15m), Sync de priorización con [líder técnico] (45m), Demo de avance (30m)."*
+  > *"Reunión de equipo (15m), Sync de priorización con el líder técnico (45m), Demo de avance (30m)."*
 
 ---
 
@@ -189,7 +189,7 @@ Y la herramienta genera automáticamente el texto exacto que ellos esperan:
 ```text
 ================ REPORTE DE TIEMPOS ================
 Fecha: 2026-10-28
-Desarrollador: [mantenedor]
+Desarrollador: <nombre>
 
 [OMNIFY] Auditoría y Reconciliación de Créditos SMS
 - Inicio: 10:00 | Fin: 13:30 (3h 30m)
@@ -201,7 +201,7 @@ Desarrollador: [mantenedor]
 
 [OPERACIONES] Soporte y Dudas de Usuarios
 - Inicio: 17:30 | Fin: 18:30 (1h 00m)
-- Notas: Atención de incidencias reportadas en campañas [cliente] y verificación de Caddy.
+- Notas: Atención de incidencias reportadas en campañas de un cliente y verificación de Caddy.
 =====================================================
 Total Dedicado: 7h 15m | Entregables: 4 scripts SQL, 2 informes técnicos
 ```

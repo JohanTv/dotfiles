@@ -6,7 +6,7 @@
 
 ---
 
-## 1. El Ciclo de 4 Fases (SDLC de [persona])
+## 1. El Ciclo de 4 Fases (SDLC propio)
 
 Todo requerimiento técnico en la organización se clasifica en una de las 4 fases:
 
@@ -119,7 +119,7 @@ Explicación técnica precisa del fallo estructural o bug identificado tras la a
 ## Entregables Verificables
 - Archivo modificado: `src/controllers/webhook.controller.ts`
 - Script de validación: `scripts/reconcile_campaign_credits.py`
-- Pull Request: PR #42 (esperando revisión técnica de [líder técnico])
+- Pull Request: PR #42 (esperando revisión técnica del líder técnico)
 ```
 
 Al marcar la Fase 3, se publica el comentario final con la bitácora corta (formato en `SKILL.md` §4):

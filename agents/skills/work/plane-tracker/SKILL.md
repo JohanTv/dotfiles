@@ -20,7 +20,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | `Pendiente` | Asignado, aún no comenzado. |
 | `Progreso` | Auditoría, Spike, RFC, tooling o desarrollo activo. |
 | `Pruebas` | Código/script listo; ejecutando dry-run, test suite o réplica. |
-| `Revisión` | PR subido o Staging esperando aprobación del líder técnico ([líder técnico]). |
+| `Revisión` | PR subido o Staging esperando aprobación del líder técnico. |
 | `Pausado` | Stopper externo activo (Meta, credenciales, accesos). |
 | `Completado` | PR mergeado, migración aplicada o entregable validado en producción. |
 | `Backlog` | Idea, deuda descubierta o requerimiento sin fecha. |

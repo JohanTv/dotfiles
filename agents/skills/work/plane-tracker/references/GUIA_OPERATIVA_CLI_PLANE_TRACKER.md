@@ -121,7 +121,7 @@ plane-tracker create "Tareas Rápidas y Soporte - W44" \
 🎉 Ticket creado exitosamente: OMNIFY-202
    • Título: [FEAT] Validaciones de formulario de campaña SMS
    • Prioridad: HIGH
-   • Enlace: http://plane.example.com/mi-workspace/projects/<uuid-proyecto>.../issues/...
+   • Enlace: https://plane.example.com/mi-workspace/projects/<uuid>/issues/...
    • Sugerencia de rama Git: feat/OMNIFY-202-validaciones-de-formulario-de-c
 ```
 
@@ -278,7 +278,7 @@ Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite
 
 > **Formato vigente:** texto corto (máx. 700 caracteres visibles, sin tablas ni JSON; `--long` solo para relevos o informes pedidos) y telemetría por flags (`--track`, `--capacity`, `--worker-type`, `--duration`). El bloque `PLANE_WORKLOG_METADATA` lo agrega la CLI; el agente no lo escribe. Reglas completas: `SKILL.md` §4.
 
-> ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale a [persona] cuánto demoró antes de comentar.
+> ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale al usuario cuánto demoró antes de comentar.
 
 ```bash
 # Publicar archivo de bitácora
@@ -297,7 +297,7 @@ plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_suppo
 Genera el consolidado diario o semanal utilizando la **Unión de Intervalos de Klee** para evitar duplicar horas en paralelo.
 
 ```bash
-# Reporte del día actual (formato para [líder técnico] a las 6:00 pm)
+# Reporte del día actual (formato para la jefatura a las 6:00 pm)
 plane-tracker report --today
 
 # Reporte semanal (balance de sprint los viernes)

@@ -1,16 +1,16 @@
 # 🤝 Protocolo de Relevo Asíncrono de Tareas (Task Handoff)
 ## Continuidad Operativa, Ingestión de Contexto y Aislamiento de Telemetría
 
-**Ámbito:** Trabajo colaborativo entre miembros del equipo (`[colega]`, `[mantenedor]`, etc.) y agentes de IA.  
+**Ámbito:** Trabajo colaborativo entre miembros del equipo (por ejemplo, el líder técnico y un ingeniero) y agentes de IA.  
 **Propósito:** Retomar tareas iniciadas por otros desarrolladores sin perder contexto, destilando notas de handoff y manteniendo aislada la autoría de las horas en Plane CE v1.2.3.
 
 ---
 
 ## 1. El Problema Operativo del Relevo
 En un equipo ágil de ingeniería:
-1. [líder técnico] crea un ticket, realiza pruebas preliminares, encuentra dificultades o blockers, deja comentarios y asigna el ticket a [persona].
-2. Si [persona] abre una sesión y el agente no sabe leer los comentarios previos, [persona] gasta 30 minutos re-investigando lo que [líder técnico] ya descubrió.
-3. Si el agente computa horas sobre el ticket, arriesga mezclar las horas de [líder técnico] con las de [persona], distorsionando el reporte de las 6:00 pm para la jefatura.
+1. El colega A crea un ticket, realiza pruebas preliminares, encuentra dificultades o blockers, deja comentarios y asigna el ticket al colega B.
+2. Si el colega B abre una sesión y el agente no sabe leer los comentarios previos, gasta 30 minutos re-investigando lo que el colega A ya descubrió.
+3. Si el agente computa horas sobre el ticket, arriesga mezclar las horas del colega A con las del colega B, distorsionando el reporte de las 6:00 pm para la jefatura.
 
 ---
 
@@ -33,8 +33,8 @@ En un equipo ágil de ingeniería:
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 3. Ejecución & Telemetría Aislada:                                     │
 │    git checkout -b {tipo}/{TICKET-ID}-{kebab}                          │
-│    [persona] trabaja y registra sus horas con plane-tracker comment add    │
-│    (Las horas se imputan a [persona]; el historial de [líder técnico] no se toca)   │
+│    El colega B trabaja y registra sus horas con comment add            │
+│    (Las horas se imputan al colega B; el historial del A no se toca)   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                   ¿Se termina o se vuelve a dejar a medias?
@@ -44,7 +44,7 @@ En un equipo ágil de ingeniería:
                  ▼                                     ▼
    ┌───────────────────────────┐         ┌───────────────────────────┐
    │ Marcar DoD [x]            │         │ Publicar Handoff Snapshot │
-   │ Bitácora dual de cierre   │         │ [líder técnico] retoma en 5 seg    │
+   │ Bitácora dual de cierre   │         │ El colega A retoma en 5 s │
    └───────────────────────────┘         └───────────────────────────┘
 ```
 
@@ -73,7 +73,7 @@ El CLI devuelve en la terminal la descripción y los comentarios cronológicos l
 
 ### Reglas de Extracción para Asistentes de IA:
 El asistente debe destilar la información ignorando logs crudos extensos y respondiendo con 4 puntos:
-1. **Qué intentó el colega anterior:** (ej. *"[líder técnico] probó el modo HTTP en puerto 8211"*).
+1. **Qué intentó el colega anterior:** (ej. *"El colega A probó el modo HTTP en un puerto distinto"*).
 2. **Qué funcionó:** (ej. *"El arranque y rechazo funcionaron en local"*).
 3. **Stoppers / Prerrequisitos identificados:** (ej. *"Falta token de bot y HTTPS"*).
 4. **Próximo paso de ingeniería:** (ej. *"Probar autenticación del bot token y armar Dockerfile"*).
@@ -87,13 +87,13 @@ El asistente debe destilar la información ignorando logs crudos extensos y resp
 * **Cálculo en SQLite:**  
   La base de datos local `worklogs.db` asocia cada bloque de trabajo a la sesión activa.
 * **Reporte a Jefatura (`plane-tracker report --today`):**  
-  A las 6:00 pm, [persona] solo le reporta a [líder técnico] el tiempo que **[persona]** efectivamente dedicó durante ese día a ese ticket, garantizando transparencia absoluta.
+  A las 6:00 pm, el colega B solo reporta a la jefatura el tiempo que **él** efectivamente dedicó durante ese día a ese ticket, garantizando transparencia absoluta.
 
 ---
 
 ## 5. El Relevo Inverso: Plantilla de Handoff Snapshot
 
-Si [persona] no concluye la tarea durante su turno y debe suspenderla o devolvérsela a [líder técnico], debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión (si supera los 700 caracteres visibles, publícalo con `--long`):
+Si el colega B no concluye la tarea durante su turno y debe suspenderla o devolvérsela al colega A, debe publicar obligatoriamente un **Handoff Snapshot** antes de cerrar la sesión (si supera los 700 caracteres visibles, publícalo con `--long`):
 
 ```bash
 plane-tracker comment add OMNIFY-197 --duration 10 -m "### 🔄 Relevo de Tarea (Handoff Snapshot)

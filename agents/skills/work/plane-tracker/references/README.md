@@ -1,6 +1,6 @@
 # 📚 Suite de Documentación: Tracking, Telemetría y Plane CE v1.2.3
 
-Bienvenido a la especificación técnica y operativa del ecosistema de tracking y telemetría de ingeniería de [mantenedor], diseñado para operar de forma transparente con **Plane CE v1.2.3** y asistentes de IA (**Antigravity CLI / agy**, **Claude Code**, **OpenCode**).
+Bienvenido a la especificación técnica y operativa del ecosistema de tracking y telemetría de ingeniería de un equipo, diseñado para operar de forma transparente con **Plane CE v1.2.3** y asistentes de IA (**Antigravity CLI / agy**, **Claude Code**, **OpenCode**).
 
 ---
 
@@ -11,7 +11,7 @@ Bienvenido a la especificación técnica y operativa del ecosistema de tracking 
 2. [🔄 **Protocolo de Living Tickets y Fases del SDLC**](./PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
    * El ciclo de 4 fases (`[SPIKE]`, `[RFC]`, `[FEAT/FIX]`, `[QA]`), la regla de los 15 minutos y las 3 plantillas evolutivas para gestionar la incertidumbre.
 3. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](./PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
-   * Cómo tomar tickets iniciados por [líder técnico] o el equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
+   * Cómo tomar tickets iniciados por otra persona del equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
 4. [🛠️ **Guía Operativa del CLI `plane-tracker`**](./GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
    * Manual exhaustivo de comandos (`search`, `create`, `get`, `update`, `comment`, `labels`, `projects`, `report`) con flags, ejemplos y salidas JSON.
 5. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
@@ -30,9 +30,9 @@ plane-tracker search "validaciones formulario"
 # Crear ticket con sugerencia de rama según fase
 plane-tracker create "[FEAT] Validaciones de esquema SMS" -p OMNIFY --priority high --labels "backend,sms"
 
-# Inspeccionar ticket con comentarios y contexto de [líder técnico]
+# Inspeccionar ticket con comentarios y contexto del equipo
 plane-tracker get OMNIFY-197
 
-# Reporte para [líder técnico] a las 6:00 pm (Interval Merging de Klee)
+# Reporte para la jefatura a las 6:00 pm (Interval Merging de Klee)
 plane-tracker report --today
 ```
