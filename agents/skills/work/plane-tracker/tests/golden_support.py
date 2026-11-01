@@ -157,6 +157,15 @@ class _NullHandler:
         pass
 
 
+class QuietServer(ThreadingHTTPServer):
+    """Servidor falso que no imprime la traza de las conexiones que los fallos simulados cortan a propósito."""
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class FakePlane:
     """Servidor Plane mínimo con datos enlatados; registra cada petición recibida."""
 
@@ -189,9 +198,10 @@ class FakePlane:
         self._listen()
 
     def _listen(self):
-        self.server = ThreadingHTTPServer(("127.0.0.1", self.port), self.handler_class)
+        self.server = QuietServer(("127.0.0.1", self.port), self.handler_class)
         self.port = self.server.server_port
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        # poll_interval corto: shutdown() espera un ciclo de sondeo y con el valor por defecto (0.5 s) cada cierre costaba medio segundo
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
         self.thread.start()
         self.closed = False
 
