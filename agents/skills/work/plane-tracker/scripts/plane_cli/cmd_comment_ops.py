@@ -16,7 +16,7 @@ from plane_cli.config import add_json_flag
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.proposal_store import load_recent_proposal, save_group, save_proposal
 from plane_cli.proposals import build_proposal, build_split, current_session_id, print_proposal, print_split
-from plane_cli.resolve import get_actor_uuid, get_project_identifier, resolve_issue, resolve_project_and_seq
+from plane_cli.resolve import get_actor_uuid, get_project_identifier, known_actor, resolve_issue, resolve_project_and_seq
 from plane_cli.worklog import (
     corrected_metadata,
     extract_metadata_from_comment,
@@ -154,10 +154,12 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
                     "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": args.track or "main",
                     "worker_type": args.worker_type or "human", "capacity_bucket": args.capacity_bucket or "deep_work",
                     "notes": notes, "stoppers": [], "phase": "dev", "measured_by": {"kind": "declared", "worker_type": args.worker_type or "human"}}
+        previous = conn.execute("SELECT author_id FROM worklogs WHERE plane_comment_id = ?", (cid,)).fetchone()
+        author = (previous["author_id"] if previous else None) or known_actor(conn, workspace)
         with conn:  # un worklog por comentario: se reemplaza por id de comentario (no por clave primaria)
             conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,))
         upsert_worklog(conn, {**meta, "ticket_id": f"{proj_ident}-{issue.get('sequence_id') or seq_id}",
-                              "issue_name": issue.get("name", ""), "plane_comment_id": cid, "raw_payload": meta})
+                              "issue_name": issue.get("name", ""), "plane_comment_id": cid, "author_id": author, "raw_payload": meta})
         api_request(url, api_key, method="PATCH", data={"comment_html": replace_metadata_block(current_html, meta)})
         print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {meta['track']}, {meta['capacity_bucket']})")
     elif content is None and not getattr(args, "embed_metadata", False):

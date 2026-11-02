@@ -18,8 +18,8 @@ def memory_db():
 
 def put_issue(conn, n, updated="2026-10-20T10:00:00Z"):
     with conn:
-        conn.execute("INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, updated_at, plane_updated_at) "
-                     "VALUES (?, ?, ?, 'p', 't', 'Progreso', 'started', 'none', 0, ?)", (f"i{n}", n, f"X-{n}", updated))
+        conn.execute("INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, updated_at, plane_updated_at, assignees_json) "
+                     "VALUES (?, ?, ?, 'p', 't', 'Progreso', 'started', 'none', 0, ?, '[]')", (f"i{n}", n, f"X-{n}", updated))
     return conn.execute("SELECT * FROM issues_cache WHERE id = ?", (f"i{n}",)).fetchone()
 
 

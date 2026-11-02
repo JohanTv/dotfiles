@@ -18,7 +18,7 @@ from plane_cli.mdhtml import markdown_to_html
 from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
-from plane_cli.resolve import get_project_identifier, local_ticket_label, resolve_issue, resolve_project_and_seq
+from plane_cli.resolve import get_project_identifier, known_actor, local_ticket_label, resolve_issue, resolve_project_and_seq
 from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders, strip_metadata_block
 from plane_cli import clock
 
@@ -222,6 +222,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "stoppers": meta.get("stoppers", []),
         "plane_comment_id": None,
         "created_at": now.isoformat(),
+        "author_id": known_actor(conn, workspace),
         "raw_payload": meta
     }
     draft = Draft(base_url, api_key, workspace, project_id, issue, ticket_label, comment_html, meta, entry, unavailable)

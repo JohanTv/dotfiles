@@ -5,7 +5,7 @@ No hace: escribir en Plane. Sin filtros `list` sigue pidiendo a la API (cmd_read
 Qué significa cada modo (ver docs/decisions/0019):
   --mine      asignado ahora (según la última sincronización de la caché);
   --created   creador del ticket;
-  --involved  la unión de asignado, creador, con horas registradas en la base local y asignado alguna vez (historial medido), con la razón de cada uno.
+  --involved  la unión de asignado, creador, con horas tuyas (autor registrado en la base local) y asignado alguna vez (historial medido), con la razón de cada uno.
 Nunca se afirma lo que no se midió: el aviso de cobertura dice cuántos tickets tienen el historial verificado y que las horas salen solo de la base local.
 """
 
@@ -31,7 +31,7 @@ def add_list_filter_flags(parser):
     who = parser.add_mutually_exclusive_group()
     who.add_argument("--mine", action="store_true", help="Solo los asignados a ti (según la última sincronización)")
     who.add_argument("--created", action="store_true", help="Solo los creados por ti")
-    who.add_argument("--involved", action="store_true", help="Asignados, creados, con horas registradas o asignados alguna vez, con la razón de cada uno")
+    who.add_argument("--involved", action="store_true", help="Asignados, creados, con horas tuyas o asignados alguna vez, con la razón de cada uno")
     parser.add_argument("--open", action="store_true", help="Sin completados, cancelados ni archivados")
     parser.add_argument("--all-projects", action="store_true", help="Todos los proyectos del workspace")
     parser.add_argument("--limit", type=positive_int, default=DEFAULT_LIMIT, metavar="N", help=f"Máximo de tickets a mostrar (por defecto {DEFAULT_LIMIT})")
@@ -83,7 +83,12 @@ def _select(conn, project_ids, mode, actor, open_only):
     """(tickets que cumplen el modo, cuántos se saltaron por no tener datos de asignación). Cada uno con sus razones."""
     marks = ",".join("?" for _ in project_ids)
     rows = conn.execute(f"SELECT * FROM issues_cache WHERE project_id IN ({marks}) ORDER BY sequence_id DESC", project_ids).fetchall()
-    minutes = {r["ticket_id"]: r["m"] for r in conn.execute("SELECT ticket_id, SUM(duration_minutes) AS m FROM worklogs GROUP BY ticket_id")}
+    mine_min, unsigned_min = {}, {}
+    for r in conn.execute("SELECT ticket_id, author_id, SUM(duration_minutes) AS m FROM worklogs GROUP BY ticket_id, author_id"):
+        if r["author_id"] is None:
+            unsigned_min[r["ticket_id"]] = r["m"]
+        elif r["author_id"] == actor:
+            mine_min[r["ticket_id"]] = r["m"]
     ever = {r["issue_id"] for r in conn.execute("SELECT DISTINCT issue_id FROM assignment_events WHERE user_id = ? AND kind = 'added'", (actor,))} if actor else set()
     out, unknown = [], 0
     for row in rows:
@@ -99,8 +104,10 @@ def _select(conn, project_ids, mode, actor, open_only):
         if actor and row["created_by"] == actor:
             reasons.append("creador")
         if mode == "involved":
-            if minutes.get(row["ticket_id"]):
-                reasons.append(f"horas registradas ({minutes[row['ticket_id']]} min)")
+            if mine_min.get(row["ticket_id"]):
+                reasons.append(f"horas tuyas ({mine_min[row['ticket_id']]} min)")
+            elif unsigned_min.get(row["ticket_id"]):
+                reasons.append(f"horas sin autor registrado ({unsigned_min[row['ticket_id']]} min)")
             if row["id"] in ever and "asignado" not in reasons:
                 reasons.append("fue asignado")
         keep = {None: True, "mine": "asignado" in reasons, "created": "creador" in reasons, "involved": bool(reasons)}[mode]
@@ -176,7 +183,10 @@ def cmd_list_filtered(args, conn, base_url, api_key, workspace, default_project_
             f"SELECT id FROM issues_cache WHERE project_id IN ({','.join('?' for _ in project_ids)})", project_ids)])
         coverage = {"verified": covered, "total": total}
         notes.append(f"Historial de asignación verificado en {covered} de {total} tickets" + ("; `--refresh-history` lo amplía." if covered < total else "."))
-        notes.append("Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).")
+        notes.append("Las horas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).")
+        unsigned = conn.execute("SELECT COUNT(*) FROM worklogs WHERE author_id IS NULL").fetchone()[0]
+        if unsigned:
+            notes.append(f"{unsigned} registro(s) de horas sin autor registrado (anteriores a esta versión o sin identidad); `report --refresh` los completa si están en Plane.")
 
     if getattr(args, "json", False):
         print(json.dumps({"mode": mode, "scope": [i for i, _ in scope], "count": len(entries), "total": len(items), "cached_at": iso_utc(oldest) if oldest else None,

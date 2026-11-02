@@ -79,7 +79,7 @@ Vista filtrada desde la caché local; funciona sin conexión y avisa de la antig
 ```bash
 plane-tracker list --mine --open               # asignados a ti ahora (según la última sincronización), sin cerrados
 plane-tracker list --created --all-projects    # creados por ti, en todos los proyectos
-plane-tracker list --involved --open           # asignado, creador, con horas registradas o asignado alguna vez, con la razón de cada uno
+plane-tracker list --involved --open           # asignado, creador, con horas tuyas o asignado alguna vez, con la razón de cada uno
 plane-tracker list --involved --refresh-history --budget 25   # trae el historial de asignación de hasta 25 tickets pendientes (reanuda; no repite lo ya traído)
 ```
 *Qué NO afirma:* `--involved` muestra "Historial de asignación verificado en X de Y tickets": que un ticket no aparezca no prueba que nunca estuviste asignado. Las horas registradas salen solo de la base local de esta máquina. Detalle y límites en `docs/decisions/0019`.

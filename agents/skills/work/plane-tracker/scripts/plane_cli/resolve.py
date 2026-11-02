@@ -1,7 +1,7 @@
 """Resolución de proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite.
 
 Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(),
-get_states_map(), get_labels_map(), get_actor_uuid(), require_actor(), get_members_map(), sync_issues(), detect_ticket_from_git().
+get_states_map(), get_labels_map(), get_actor_uuid(), known_actor(), require_actor(), get_members_map(), sync_issues(), detect_ticket_from_git().
 No hace: imprimir resultados ni escribir en Plane. Ante PlaneUnavailable, proyectos, estados y etiquetas se sirven de la
 caché local aunque haya vencido (con aviso), y sin caché lanzan PlaneUnavailable (código 3 en el CLI).
 """
@@ -278,6 +278,16 @@ def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh
                 """, (lb["id"], project_id, lb["name"], lb.get("color", ""), now))
 
     return mapping
+
+
+def known_actor(conn, workspace):
+    """UUID de quien usa la herramienta si se sabe SIN red (variable de entorno o resuelto antes por PLANE_USERNAME); None si no. Nunca bloquea una escritura."""
+    explicit = os.environ.get("PLANE_ACTOR_UUID")
+    if explicit:
+        return explicit.strip()
+    username = os.environ.get("PLANE_USERNAME", "").strip().lower()
+    row = conn.execute("SELECT value FROM sync_metadata WHERE key = ?", (f"actor:{workspace}:{username}",)).fetchone() if username else None
+    return row["value"] if row else None
 
 
 def _remember_actor(conn, key, value):

@@ -136,6 +136,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                             "stoppers": meta.get("stoppers", []),
                             "plane_comment_id": c.get("id"),
                             "created_at": c.get("created_at"),
+                            "author_id": author,
                             "raw_payload": meta
                         }
                         owner = owner_of(conn, ticket_label, entry["track"], entry["date"], entry["start_time"])

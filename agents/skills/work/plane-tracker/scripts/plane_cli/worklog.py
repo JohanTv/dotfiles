@@ -90,6 +90,7 @@ def upsert_worklog(conn, entry):
     comment_id = entry.get("plane_comment_id") or entry.get("id")
     raw_payload = json.dumps(entry.get("raw_payload", entry), ensure_ascii=False)
     created_at = entry.get("created_at", moment.isoformat())
+    author_id = entry.get("author_id")
 
     with conn:
         conn.execute("""
@@ -97,8 +98,8 @@ def upsert_worklog(conn, entry):
                 ticket_id, track, date, start_time, end_time, duration_minutes,
                 plane_comment_id, project_id, issue_name, worker_type,
                 capacity_bucket, phase, role, notes, stoppers_json, raw_payload,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, updated_at, author_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ticket_id, track, date, start_time) DO UPDATE SET
                 end_time = excluded.end_time,
                 duration_minutes = excluded.duration_minutes,
@@ -111,12 +112,13 @@ def upsert_worklog(conn, entry):
                 notes = excluded.notes,
                 stoppers_json = excluded.stoppers_json,
                 raw_payload = excluded.raw_payload,
+                author_id = COALESCE(excluded.author_id, worklogs.author_id),
                 updated_at = excluded.updated_at;
         """, (
             t_id, track, d_str, s_time, e_time, dur,
             comment_id, p_id, i_name, w_type,
             bucket, phase, role, notes, stoppers, raw_payload,
-            created_at, now
+            created_at, now, author_id
         ))
 
 

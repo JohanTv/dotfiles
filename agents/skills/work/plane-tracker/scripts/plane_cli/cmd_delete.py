@@ -71,10 +71,17 @@ def _assess(conn, label, found, actor):
     """Horas en juego: remotas por autor (propias solo si el actor está confirmado) más las filas locales sin comentario en Plane."""
     remote_ids = {f["id"] for f in found}
     mine = [f for f in found if actor and f["author"] == actor]
-    rows = conn.execute("SELECT plane_comment_id, duration_minutes FROM worklogs WHERE ticket_id = ?", (label,)).fetchall()
+    rows = conn.execute("SELECT plane_comment_id, duration_minutes, author_id FROM worklogs WHERE ticket_id = ?", (label,)).fetchall()
     local_only = [r for r in rows if r["plane_comment_id"] not in remote_ids]
-    return {"hours_foreign": len(found) - len(mine), "hours_own": len(mine) + len(local_only), "hours_local_only": len(local_only),
-            "own_minutes": sum(f["minutes"] for f in mine) + sum(r["duration_minutes"] for r in local_only), "actor_known": bool(actor)}
+    # Una fila local sin autor registrado se trata como propia (se creó en esta máquina); con autor, solo si es el actor confirmado.
+    own_local = [r for r in local_only if r["author_id"] is None or (actor and r["author_id"] == actor)]
+    return {"hours_foreign": len(found) - len(mine) + len(local_only) - len(own_local), "hours_own": len(mine) + len(own_local),
+            "hours_local_only": len(local_only), "own_minutes": sum(f["minutes"] for f in mine) + sum(r["duration_minutes"] for r in own_local),
+            "actor_known": bool(actor)}
+
+
+def _has_signed_local_hours(conn, label):
+    return bool(conn.execute("SELECT 1 FROM worklogs WHERE ticket_id = ? AND author_id IS NOT NULL LIMIT 1", (label,)).fetchone())
 
 
 def _identify(conn, base_url, api_key, workspace, project_id, issue, issue_ref):
@@ -125,7 +132,7 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
     base = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_id}/"
     comments = _read_comments(args, base + "comments/", api_key) if issue else []
     found = _hour_comments(comments)
-    plan = _assess(conn, label, found, get_actor_uuid(base_url, api_key, workspace, conn) if found else None)
+    plan = _assess(conn, label, found, get_actor_uuid(base_url, api_key, workspace, conn) if found or _has_signed_local_hours(conn, label) else None)
     summary = {"ticket": label, "title": issue.get("name") if issue else None, "comments": len(comments), "already_gone": not issue,
                **{k: plan[k] for k in ("hours_own", "hours_foreign", "hours_local_only", "own_minutes")}}
 

@@ -14,7 +14,7 @@ GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "d
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
 NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJECT_ID", "PLANE_ACTOR_UUID")
 WORKLOG_COLS = ("ticket_id", "track", "date", "start_time", "end_time", "duration_minutes", "plane_comment_id", "project_id", "issue_name",
-                "worker_type", "capacity_bucket", "phase", "role", "notes", "stoppers_json", "raw_payload", "created_at")
+                "worker_type", "capacity_bucket", "phase", "role", "notes", "stoppers_json", "raw_payload", "created_at", "author_id")
 WORKLOGS = ("worklogs", "SELECT * FROM worklogs ORDER BY ticket_id, track, duration_minutes, notes, date", WORKLOG_COLS)
 ASSIGNMENTS = ("assignment_events", "SELECT * FROM assignment_events ORDER BY issue_id, at_utc, event_id", ("event_id", "issue_id", "ticket_id", "at_utc", "kind", "user_id", "user_name"))
 RANDOM_FIELDS = ("client_id", "external_id")  # ids al azar; las fechas y horas NO se enmascaran: el reloj está congelado

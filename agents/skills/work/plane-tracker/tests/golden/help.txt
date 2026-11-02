@@ -96,8 +96,8 @@ options:
   --mine                Solo los asignados a ti (según la última
                         sincronización)
   --created             Solo los creados por ti
-  --involved            Asignados, creados, con horas registradas o asignados
-                        alguna vez, con la razón de cada uno
+  --involved            Asignados, creados, con horas tuyas o asignados alguna
+                        vez, con la razón de cada uno
   --open                Sin completados, cancelados ni archivados
   --all-projects        Todos los proyectos del workspace
   --limit N             Máximo de tickets a mostrar (por defecto 30)

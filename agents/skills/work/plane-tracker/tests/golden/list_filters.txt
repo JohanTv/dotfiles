@@ -78,12 +78,12 @@ $ plane.py list --involved
 
 📋 Tickets en los que estás involucrado en OMNIFY (2) · caché de hace 1 min:
   • OMNIFY-3     Cancelado    [LOW]     Webhook SMS duplicado
-      ↳ asignados: sin asignar · razones: horas registradas (10 min)
+      ↳ asignados: sin asignar · razones: horas tuyas (10 min)
   • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
       ↳ asignados: tester · razones: asignado, creador
   ℹ La asignación es la de la última sincronización de la caché.
   ℹ Historial de asignación verificado en 0 de 3 tickets; `--refresh-history` lo amplía.
-  ℹ Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
+  ℹ Las horas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
   ℹ Solo este proyecto; `--all-projects` incluye los demás.
 --- stderr ---
 
@@ -94,14 +94,14 @@ $ plane.py list --involved --refresh-history --budget 2
 
 📋 Tickets en los que estás involucrado en OMNIFY (3) · caché de hace 1 min:
   • OMNIFY-3     Cancelado    [LOW]     Webhook SMS duplicado
-      ↳ asignados: sin asignar · razones: horas registradas (10 min)
+      ↳ asignados: sin asignar · razones: horas tuyas (10 min)
   • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
       ↳ asignados: tester · razones: asignado, creador
   • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
       ↳ asignados: otro · razones: fue asignado
   ℹ La asignación es la de la última sincronización de la caché.
   ℹ Historial de asignación verificado en 2 de 3 tickets; `--refresh-history` lo amplía.
-  ℹ Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
+  ℹ Las horas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
   ℹ Solo este proyecto; `--all-projects` incluye los demás.
 --- stderr ---
 🔄 Historial de asignación: 2 ticket(s) traído(s); quedan 1 pendiente(s)
@@ -124,7 +124,7 @@ $ plane.py list --involved --refresh-history --budget 5 --json
   "notes": [
     "La asignación es la de la última sincronización de la caché.",
     "Historial de asignación verificado en 3 de 3 tickets.",
-    "Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017)."
+    "Las horas salen solo de la base local de esta máquina y pueden faltar (defecto 0017)."
   ],
   "results": [
     {
@@ -135,7 +135,7 @@ $ plane.py list --involved --refresh-history --budget 5 --json
       "assignees": [],
       "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
       "reasons": [
-        "horas registradas (10 min)"
+        "horas tuyas (10 min)"
       ],
       "plane_updated_at": "2026-10-06T12:00:00Z",
       "assignment_events": []

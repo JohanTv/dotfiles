@@ -85,7 +85,11 @@ def init_outbox_tables(conn):
 
 
 def init_people_tables(conn):
-    """Personas del workspace e historial de asignación medido (ver assignments.py)."""
+    """Personas: miembros del workspace, historial de asignación medido (ver assignments.py) y las columnas que registran quién hizo qué."""
+    # Quién registró las horas (UUID del autor del comentario). NULL = sin autor registrado (filas anteriores o sin identidad): nunca se supone propio.
+    ensure_columns(conn, "worklogs", {"author_id": "TEXT"})
+    # Marca de que el historial de asignación de ese ticket ya se trajo (cachés previas solo traían las transiciones de estado).
+    ensure_columns(conn, "flow_fetch", {"assignments_fetched": "INTEGER NOT NULL DEFAULT 0"})
     # Personas del workspace (UUID -> nombre) para mostrar asignados sin consultar Plane cada vez.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS members (
@@ -245,8 +249,6 @@ def init_db(conn):
             # Quién tiene el ticket y quién lo creó (lista JSON de UUID y UUID) y cuándo lo tocó Plane (updated_at de Plane, no de la sincronización).
             "assignees_json": "TEXT", "created_by": "TEXT", "plane_updated_at": "TEXT",
         })
-        # Marca de que el historial de asignación de ese ticket ya se trajo (cachés previas solo traían las transiciones de estado).
-        ensure_columns(conn, "flow_fetch", {"assignments_fetched": "INTEGER NOT NULL DEFAULT 0"})
 
         init_snapshot_table(conn)
         init_outbox_tables(conn)
