@@ -20,3 +20,6 @@ __pycache__/
 # Artefactos compilados y estado de perfil de agentes
 /agents/rules/dist/
 .active-profile
+
+# Worktrees de git para trabajo en paralelo
+.worktrees/
