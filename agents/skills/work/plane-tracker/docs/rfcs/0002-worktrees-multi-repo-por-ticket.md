@@ -1,9 +1,9 @@
 ---
 id: "0002"
 title: Gestión de worktrees multi-repo por ticket
-status: propuesto
+status: implementado
 created: 2026-10-31
-summary: Script independiente que crea, por ticket, un worktree en cada repo implicado con rama y base verificadas; sin implementar.
+summary: Script independiente que crea, por ticket, un worktree en cada repo implicado con rama y base verificadas.
 ---
 
 # 0002 · Gestión de worktrees multi-repo por ticket
@@ -46,10 +46,12 @@ Layout deseado:
 | `--description` derivada del título | Descartada | Genera slugs mutilados. |
 | `PLANE_REPOS` (nombre → ruta) | Descartada | Segunda fuente de verdad, ya ambigua. |
 | `origin/dev` por defecto sin verificar | Descartada | Falla en repos que no tienen `dev`. |
-| `list` / `remove` | Descartadas | `git worktree list` y `git worktree remove` ya existen; reimplementarlos añade superficie destructiva. |
+| `remove` destructivo ciego | Descartada | Borrar carpetas sin auditar estado destruye cambios no guardados. |
+| `list`, `audit` y `prune` asistido | Adoptadas | Visibilidad multi-repo agregada, detección de squash-merge con `git merge-tree`, consulta offline a Plane SQLite, modo dry-run por defecto y respaldo automático `.tar.gz` para ramas abandonadas/canceladas con cambios (`--include-stale`). |
 | `README.md` generado en el padre | Descartada | Plantilla que se desincroniza; el ticket ya es la fuente. |
-| `--reuse-branch` | Descartada | La semántica de git ya distingue rama libre (attach) de rama ocupada (error). |
-| `--json` | Descartada | Sin consumidor máquina hoy. |
+| `--reuse-branch` | Adoptada como salvaguarda | En lugar de un attach silencioso (que reviviría código zombie si la rama local diverge de origin/<base>), el pre-flight verifica si la rama local diverge; si diverge, exige `--reuse-branch` explícitamente para proceder. |
+| Validación de carpeta base | Adoptada | Exige que `.worktrees` (o `--dir`) exista previamente antes de crear worktrees, evitando contaminar subcarpetas con repositorios anidados no deseados. |
+| Flag companion `--branch-slug` | Adoptada en `create` | Permite especificar el slug en inglés al crear el ticket en Plane, desacoplándolo del título en español y limpiando acentos con Unicode NFKD. |
 | `--no-fetch` | Se mantiene | Sin él no hay uso offline ni test determinista. |
 | Extraer `branch.py` | Aplazada | Unificaría 3 sitios, pero obliga a regenerar goldens de `create` y `search`. |
 
@@ -60,21 +62,32 @@ Layout deseado:
 
 **Decisión:** script independiente. La diferencia no es la lógica (es la misma), es la puerta de entrada y su precio.
 
-## Contrato mínimo (si se implementa)
+## Contrato
 
 ```bash
+# Alta y orquestación multi-repo
 plane-worktree add TICKET DESCRIPTION REPO[=SLUG]... \
-  [--type feat] [--base dev] [--dir .worktrees] [--no-fetch]
+  [--type feat] [--base dev] [--dir .worktrees] [--reuse-branch] [--no-fetch]
+
+# Inspección centralizada de worktrees y estado git
+plane-worktree list [--dir .worktrees] [--json]
+
+# Auditoría de salud y podabilidad (Filesystem + Git merge-tree + Plane SQLite)
+plane-worktree audit [TARGET] [--dir .worktrees] [--json]
+
+# Poda asistida segura (Dry-run por defecto, --include-stale con respaldo .tar.gz)
+plane-worktree prune [TARGET] [--dir .worktrees] [--execute] [--include-stale] [--backup-dir DIR]
 ```
 
 | Elemento | Regla |
 | :--- | :--- |
-| Carpeta padre | `<dir>/<TICKET>-<DESCRIPTION>`; `--dir` se resuelve contra el cwd y se imprime en absoluto. |
+| Carpeta padre | `<dir>/<TICKET>-<DESCRIPTION>`; `--dir` se resuelve contra el cwd y se imprime en absoluto. Exige que `<dir>` exista previamente. |
 | Carpeta hija | `basename(git rev-parse --show-toplevel)` del repo. |
 | Rama | `<type>/<TICKET>-<SLUG>`, con `SLUG` propio del repo o el `DESCRIPTION` compartido. |
 | `--type` | Explícito, default `feat`. No se deriva del título. |
 | `--base` | Default `dev`. Se verifica `refs/remotes/origin/<base>` antes de crear. |
 | `--repo` | Ruta a un clon; un nombre suelto se resuelve contra el cwd y sus hermanos exigiendo una única coincidencia. |
+| `--reuse-branch` | Permite hacer attach a una rama local existente que diverge de `origin/<base>`. Sin este flag, falla en pre-flight como salvaguarda. |
 | Fetch | Best-effort: si falla, aviso y se continúa con refs locales. |
 
 Matriz de comportamiento:
@@ -82,10 +95,13 @@ Matriz de comportamiento:
 | Situación | Resultado |
 | :--- | :--- |
 | El destino ya es un worktree de ese repo en esa rama | Aviso "ya existe", exit 0 (idempotente). |
-| La rama existe y no está checkouteada | `git worktree add <dest> <rama>` (attach). |
-| La rama está checkouteada en otro worktree | Error indicando esa ruta. |
-| `origin/<base>` no existe | Error listando las ramas remotas disponibles. |
-| El destino existe, no está vacío y no es worktree | Error, sin tocar nada. |
+| La rama existe, coincide con `origin/<base>` y no está checkouteada | `git worktree add <dest> <rama>` (attach seguro). |
+| La rama existe, diverge de `origin/<base>` y se pasó `--reuse-branch` | Aviso de reutilización y `git worktree add <dest> <rama>` (attach permitido). |
+| La rama existe, diverge de `origin/<base>` y NO se pasó `--reuse-branch` | Error en Fase 1 abortando la operación (protección contra ramas zombies). |
+| La rama está checkouteada en otro worktree | Error en Fase 1 indicando la ruta ocupada. |
+| `origin/<base>` no existe | Error en Fase 1 listando las ramas remotas disponibles. |
+| El directorio base (`.worktrees`) no existe | Error en Fase 1 advirtiendo que debe crearse en la raíz del workspace (con pista de ruta si se ejecutó en subcarpeta). |
+| El destino existe, no está vacío y no es worktree | Error en Fase 1, sin tocar nada. |
 
 ## Riesgos
 
@@ -111,6 +127,10 @@ Matriz de comportamiento:
 | Script (`bin/work/`) | ~70 líneas | ~150 líneas | Documentar en `README.md` de dotfiles |
 | CLI | ~90 líneas + refactor del gate | ~150 líneas | 5 puntos de documentación + goldens |
 
-## Condición de activación
+## Estado de implementación (Noviembre 2026)
 
-Se implementa cuando se cree un segundo worktree multi-repo a mano, o se vuelva a teclear el layout dos veces. Si no ocurre, la propuesta se descarta: el valor no está en ahorrar contexto (el ahorro estimado es de una invocación, no de una sesión), sino en no reescribir el layout y no colisionar con ramas existentes.
+Implementado y validado en producción:
+1. **Script independiente:** `bin/work/plane-worktree` (permisos 0755, Python 3 stdlib pura, sin red ni dependencias de Plane).
+2. **Arquitectura:** Validación pre-flight atómica en dos fases: Fase 1 valida todos los repos, existencia de ramas remotas, disponibilidad de carpetas, estado de ramas locales y preexistencia de `.worktrees` antes de realizar ninguna mutación en filesystem o git. Fase 2 ejecuta de forma atómica usando rutas absolutas.
+3. **Companion en `plane-tracker`:** `plane-tracker create --branch-slug <slug>` para desacoplar títulos en español de slugs de rama en inglés, con normalización Unicode NFKD en `cmd_tickets_write.py`.
+4. **Pruebas:** 17 tests unitarios en `tests/test_worktree.py` usando repositorios remotos bare efímeros en `tempfile`. Integrado en la suite de regresión paralela `tests/run_parallel.py`.

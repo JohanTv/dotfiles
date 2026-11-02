@@ -35,7 +35,7 @@ Procedimientos estandarizados (*runbooks*) que los agentes cargan **bajo demanda
 | **`find-session`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/find-session/SKILL.md`](skills/common/find-session/SKILL.md) | Localización instantánea de IDs de conversaciones previas en Gemini, Claude Code y OpenCode. |
 | **`dotfiles-sync`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/dotfiles-sync/SKILL.md`](skills/common/dotfiles-sync/SKILL.md) | Diagnóstico, auditoría de symlinks y detección de cambios locales con `dotfiles-doctor`. |
 | **`wmctrl-focus`** | `desktop-linux/` | 🐧 Desktop Linux<br>*(Ubuntu GNOME X11)* | [`skills/desktop-linux/wmctrl-focus/SKILL.md`](skills/desktop-linux/wmctrl-focus/SKILL.md) | Procedimiento estándar para crear atajos de enfoque de ventanas con `wmctrl`. |
-| **`plane-tracker`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/plane-tracker/SKILL.md`](skills/work/plane-tracker/SKILL.md) | Registro de bitácoras de sesión, tiempos y entregables en Plane con formato dual-layer. |
+| **`plane-tracker`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/plane-tracker/SKILL.md`](skills/work/plane-tracker/SKILL.md) | Registro de bitácoras de sesión, tiempos en Plane y orquestación de worktrees multi-repo con `plane-worktree`. |
 
 ---
 

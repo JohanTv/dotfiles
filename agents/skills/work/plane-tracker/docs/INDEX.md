@@ -25,7 +25,7 @@
 
 | ID | Título | Estado | Resumen |
 | :--- | :--- | :--- | :--- |
-| 0002 | [Gestión de worktrees multi-repo por ticket](rfcs/0002-worktrees-multi-repo-por-ticket.md) | propuesto | Script independiente que crea, por ticket, un worktree en cada repo implicado con rama y base verificadas; sin implementar. |
+| 0002 | [Gestión de worktrees multi-repo por ticket](rfcs/0002-worktrees-multi-repo-por-ticket.md) | implementado | Script independiente que crea, por ticket, un worktree en cada repo implicado con rama y base verificadas. |
 | 0005 | [Vista personal de actividades (agenda) y registro de diferimiento del backlog](rfcs/0005-vista-personal-agenda-y-backlog/README.md) | borrador | `list --mine`, panel `agenda` con carga, vencidos y backlog propio, y registro del motivo por el que se difiere algo importante. |
 | 0006 | [Decidir la fuente de datos del "Standby externo"](rfcs/0006-standby-externo-fuente-de-datos.md) | borrador | Quitar la línea de bloqueos del reporte o alimentarla (flag, o tiempo en Pausado desde las transiciones). |
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
