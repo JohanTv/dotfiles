@@ -51,57 +51,49 @@ stateDiagram-v2
 ```
 
 ### FASE 1: Estado Inicial (Triage & Incertidumbre)
-**Cuándo se usa:** Al crear un bug, incidente o spike donde aún no se conoce la causa raíz ni la solución.
+**Cuándo se usa:** Al crear un bug, incidente o spike donde aún no se conoce la causa raíz ni la solución. Aplica estrictamente la **Pirámide Invertida (≤200 palabras)**:
 
 ```markdown
-## Contexto & Detección
-- Reportado por: [Área comercial / Monitoreo / Alerta de logs]
-- Entorno: Producción / Staging
-- Componentes involucrados: `módulo_afectado` (ej. Webhook Detonador SMS, Worker RabbitMQ)
+**Resumen:** [Qué falla exactamente y qué anomalía se investiga].
 
-## Comportamiento Observado (Síntoma)
-Descripción detallada de la anomalía observada: mensajes de error en logs, códigos HTTP anómalos (504, 500) o discrepancias de conteo.
+**Contexto & Síntoma:**
+- Módulo: `nombre_modulo` (ej. Webhook Detonador SMS)
+- Anomalía: [1 párrafo conciso con códigos o discrepancias clave].
 
-## Comportamiento Esperado
-Qué debería suceder si el flujo transaccional operara de manera correcta según las reglas de negocio.
+**Hipótesis Preliminares:**
+- [ ] Hipótesis A: [Posible causa 1]
+- [ ] Hipótesis B: [Posible causa 2]
 
-## Evidencia Inicial & Datos de Muestra
-- IDs de muestra / Campañas / Fechas: `ID-XXXX`
-- Errores de logs o snippets forenses preliminares.
+**Plan de Investigación (Spike Checklist):**
+- [ ] Reproducir con payload idéntico en réplica de BD.
+- [ ] Aislar la condición de carrera o línea exacta en logs.
 
-## Hipótesis Preliminares & Puntos de Entrada
-- [ ] Hipótesis A: Posible lock concurrente o saturación de pool de conexiones en Postgres/MySQL.
-- [ ] Hipótesis B: Timeout de red por reintentos masivos de Meta / Proveedor SMS.
-
-## Plan de Investigación (Spike Checklist)
-- [ ] Reproducir el incidente con payload idéntico en réplica de base de datos.
-- [ ] Inspeccionar queries lentas y transacciones concurrentes en el horario del reporte.
-- [ ] Aislar la línea exacta de código o condición de carrera que detona la falla.
+*Evidencia forense, queries y datos de muestra: ver comentario [1] o adjunto.*
 ```
+*(Toda traza extensa, snippet de código o query SQL se publica de inmediato como primer comentario con `plane-tracker comment add`, nunca dentro de la descripción).*
 
 ---
 
 ### FASE 2: Estado Intermedio (Causa Raíz Aislada ➔ Diseño y Solución)
-**Cuándo se usa:** En cuanto el desarrollador o el agente identifican el origen exacto del problema. Se edita la descripción del ticket en Plane mediante `plane-tracker update` o la interfaz web.
+**Cuándo se usa:** En cuanto se identifica el origen exacto del problema. Se actualiza la descripción en Plane mediante `plane-tracker update <TICKET> -d "..."`:
 
 ```markdown
-## Causa Raíz Confirmada (RCA - Root Cause Analysis)
-Explicación técnica precisa del fallo estructural o bug identificado tras la auditoría forense.
+**Resumen:** [Qué falla y qué se implementará para resolverlo].
 
-## Solución Propuesta (Diseño Técnico & Arquitectura)
-- Enfoque de implementación técnica (patrón transaccional, middleware defensivo, índices en BD).
-- Contratos de API o cambios de esquema de base de datos.
+**Contexto & Causa Raíz:**
+[1 párrafo conciso explicando el fallo estructural aislado; referenciar ticket origen si aplica sin duplicar texto].
 
-## Requisitos y Restricciones Técnicas
-- Compatibilidad con Plane CE v1.2.3, Docker, versiones de runtime (Node.js/Python).
-- Variables de entorno o accesos de terceros requeridos.
-- Impacto colateral en otros módulos o tablas.
+**Solución Propuesta:**
+1. [Enfoque técnico 1: patrón, middleware o índice]
+2. [Enfoque técnico 2: clave de idempotencia o mitigación]
 
-## Criterios de Aceptación Técnicos (Definition of Done)
-- [ ] Parche defensivo implementado en el controlador o servicio respectivo.
-- [ ] Migración o query ejecutada exitosamente en entorno controlado con `ROLLBACK` seguro.
-- [ ] Rama Git creada bajo el patrón corporativo `{tipo}/{TICKET-ID}-{kebab}`.
-- [ ] Pruebas unitarias / de integración pasando sin regresiones.
+**Criterios de Aceptación Técnicos (DoD):**
+- [ ] Parche defensivo implementado en controlador o servicio.
+- [ ] Migración o query ejecutada exitosamente con rollback seguro.
+- [ ] Rama Git bajo patrón `{tipo}/{TICKET-ID}-{kebab}`.
+- [ ] Pruebas unitarias / de integración pasando sin regresión.
+
+*Detalle forense y análisis previo: ver comentarios o tickets enlazados.*
 ```
 
 ---
@@ -110,13 +102,15 @@ Explicación técnica precisa del fallo estructural o bug identificado tras la a
 **Cuándo se usa:** El código está mergeado, validado en réplica o staging, y listo para dar el ticket por concluido.
 
 ```markdown
-## Criterios de Aceptación Técnicos (Definition of Done)
+**Resumen:** [Resumen de la solución completada].
+
+**Criterios de Aceptación Técnicos (DoD):**
 - [x] Parche defensivo implementado en el controlador o servicio respectivo.
 - [x] Migración o query ejecutada exitosamente en entorno controlado con `ROLLBACK` seguro.
 - [x] Rama Git creada bajo el patrón `fix/OMNIFY-180-mitigar-timeout-webhook`.
 - [x] Pruebas transaccionales en réplica ejecutadas satisfactoriamente (Dry-Run exitoso).
 
-## Entregables Verificables
+**Entregables Verificables:**
 - Archivo modificado: `src/controllers/webhook.controller.ts`
 - Script de validación: `scripts/reconcile_campaign_credits.py`
 - Pull Request: PR #42 (esperando revisión técnica del líder técnico)

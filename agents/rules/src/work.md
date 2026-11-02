@@ -30,6 +30,12 @@
 ### Detección y Momento Cero (Zero-Moment Discovery):
 - **Búsqueda Instantánea:** Al iniciar una sesión o recibir una intención de trabajo (ej. *"arreglemos las validaciones del formulario"*), el agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` para comprobar si ya existe un ticket (también cerrado o cancelado) o si se debe proponer uno nuevo. Solo concluye "no hay duplicado" si `coverage.complete` es `true`; si no, el resultado no prueba ausencia y debe decirlo.
 - **Acción Rápida:** Si hay un ticket coincidente, preguntar brevemente para confirmar y cambiar a la rama respectiva (`git checkout -b feat/OMNIFY-XXX-...`). Si no existe, proponer el work item con título, prioridad y etiquetas.
+- **Lectura Escalonada y Economía de Tokens:**
+  - *Descubrimiento:* Usa `plane-tracker list --text "..." --brief --json` (mínimo consumo de tokens).
+  - *Inspección inicial:* Usa `plane-tracker get <TICKET>` (sin `--full`). El truncado por defecto a 300 caracteres es suficiente para confirmar contexto gracias a la primera línea de resumen.
+  - *Inspección profunda del ticket activo:* Solo al trabajar activamente en él, invoca `--full` podando datos innecesarios: `--no-comments` (si solo requieres la descripción completa y DoD) o `--last 3` (para contexto de relevo reciente). Nunca re-pidas en la misma sesión tickets ni comentarios ya cargados en contexto si no han variado.
+- **Respuesta Ejecutiva en Consultas de Estado ("Revisa el Plane"):**
+  - Ante peticiones de revisión de estado o tickets, responde en **6 a 8 líneas máximo**: Ticket/Título/Estado Kanban, resumen del contrato vivo, siguiente paso inmediato o stopper crítico, y advertencia de cobertura (`coverage`) si aplica. Desgloses forenses y comentarios solo se detallan bajo demanda explícita.
 
 ### Estándar de Creación y Ciclo de Vida de Work Items:
 - **Título:** Estructurado como `[{FASE}] {Acción o resumen conciso en español}`
@@ -42,7 +48,16 @@
   - Consulta etiquetas vivas en SQLite con `plane-tracker labels`.
 - **Living Ticket Pattern (Regla de los 15 Minutos):**
   - **Tareas < 15 min (Toil/Soporte):** No crear ticket formal en el proyecto activo; absorber en el ticket paraguas semanal de `OPS`.
-  - **Tareas > 15 min:** Crear ticket formal en Plane. Si se inicia en incertidumbre (`[SPIKE]` o `[FIX]`), la descripción inicial documenta *Contexto*, *Síntoma observado*, *Comportamiento esperado* e *Hipótesis*. Al aislar la causa raíz, se actualiza con la *Solución Propuesta* y *Criterios de Aceptación (DoD)*.
+  - **Tareas > 15 min:** Crear ticket formal en Plane. La descripción es el **contrato vivo** (lo que sigue siendo cierto mientras el ticket esté abierto):
+    - **Presupuesto y Anatomía (≤200 palabras, Pirámide Invertida):**
+      1. *Primera línea (Resumen obligatorio):* Qué falla y qué se implementará. Garantiza legibilidad inmediata en Kanban y en `plane-tracker get` estándar (truncado a 300 caracteres).
+      2. *Contexto & Causa raíz:* 1 párrafo conciso (enfoque arquitectónico).
+      3. *Solución propuesta:* 2-3 viñetas técnicas.
+      4. *Criterios de Aceptación (DoD):* Checklist verificable `[ ]`.
+    - **Separación de Evidencia y No Duplicidad:**
+      - La descripción NUNCA contiene dumps SQL, tablas forenses, snippets extensos ni números de líneas de código.
+      - Toda evidencia circunstancial va en comentarios acumulativos (`plane-tracker comment add`) o archivos adjuntos (`plane-tracker attachment add`); la descripción solo enlaza a ellos ("ver comentario [1]", "ver adjunto X").
+      - Si un ticket deriva de otro (ej. `[FEAT]` o `[FIX]` derivado de `[SPIKE]`), se prohíbe duplicar texto: referenciar directamente ("Origen: OMNIFY-XXX; ver análisis allí") y centrar la descripción en la solución y DoD del nuevo work item.
 - **Tickets Paraguas Semanales (Cadencia W{ISO_WEEK}, ambos viven en `OPS`):** El identifier del proyecto ya aporta el contexto, por eso el título no repite `[OPS]` ni usa jerga de gestión (evitar `L2/L3`, `SYNC`, `Ceremonias`).
   - Soporte / toil: `Tareas Rápidas y Soporte - W{XX}` (capacidad: `toil_support`).
   - Coordinación de equipo: `Reuniones de Equipo y Acuerdos - W{XX}` (capacidad: `coordination`).
