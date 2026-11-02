@@ -28,7 +28,7 @@
 - **Proyectos Personales / Sin Plane:** Si el contexto es un proyecto personal, de código abierto o no vinculado a Plane, no forzar ticket ID; usar el formato convencional estándar: `{tipo}/{kebab-case-descripcion}`.
 
 ### Detección y Momento Cero (Zero-Moment Discovery):
-- **Búsqueda Instantánea:** Al iniciar una sesión o recibir una intención de trabajo (ej. *"arreglemos las validaciones del formulario"*), el agente debe ejecutar `plane-tracker search "<intención>"` para comprobar en < 2ms si ya existe un ticket abierto en Plane o si se debe proponer uno nuevo.
+- **Búsqueda Instantánea:** Al iniciar una sesión o recibir una intención de trabajo (ej. *"arreglemos las validaciones del formulario"*), el agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` para comprobar si ya existe un ticket (también cerrado o cancelado) o si se debe proponer uno nuevo. Solo concluye "no hay duplicado" si `coverage.complete` es `true`; si no, el resultado no prueba ausencia y debe decirlo.
 - **Acción Rápida:** Si hay un ticket coincidente, preguntar brevemente para confirmar y cambiar a la rama respectiva (`git checkout -b feat/OMNIFY-XXX-...`). Si no existe, proponer el work item con título, prioridad y etiquetas.
 
 ### Estándar de Creación y Ciclo de Vida de Work Items:

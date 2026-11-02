@@ -34,6 +34,12 @@ Cambios de fondo respecto al texto vigente:
 
 El bullet siguiente ("Acción Rápida": confirmar con el usuario y crear la rama del ticket, o proponer uno nuevo) **no cambia**: el consejo de rama que hoy imprime `search` pasa a vivir solo en esa regla y en `SKILL.md`.
 
+## Texto aplicado (2026-11-02)
+
+El dueño autorizó ejecutar el cambio y consideró largo el texto objetivo; se aplicó una **versión corta** con lo imprescindible: el comando (obligatorio, `search` ya no existe), cerrados y cancelados incluidos, y la condición `coverage.complete` para concluir ausencia (que cubre `unavailable` y `stale`, porque ambos dejan `complete` en `false` o `null`). Quedaron fuera la lectura de `state`/`state_group`, la aclaración de título y etiquetas y la promesa de latencia, que el agente ve en el propio resultado. Con `truncated` siempre visible (V20) no hace falta mencionar `total` y `count`. Se recompiló con `make compile-rules` (solo regenera `dist/active-rules.md`; `make work` además enlaza skills y binarios).
+
+> **Búsqueda Instantánea:** … ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` para comprobar si ya existe un ticket (también cerrado o cancelado) o si se debe proponer uno nuevo. Solo concluye "no hay duplicado" si `coverage.complete` es `true`; si no, el resultado no prueba ausencia y debe decirlo.
+
 ## Referencias reales a retirar (verificadas con `rg`)
 
 `plane-tracker search` aparece en **14 líneas de 6 archivos** del árbol de dotfiles (sin contar `.worktrees`): `rules/src/work.md` (1), `SKILL.md` (2) y, en `references/`, `GUIA_OPERATIVA_CLI_PLANE_TRACKER.md` (7), `ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md` (2), `PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md` (1) y `README.md` (1). Además hay **menciones sin el prefijo** que también deben revisarse: `ARCHITECTURE.md` (regla 1 y mapa de módulos), `scripts/plane_cli/__init__.py`, `cmd_read.py` (docstring), `GUIA_OPERATIVA` (tabla de nomenclatura) y `ARQUITECTURA_SISTEMA` (líneas de lectura).
