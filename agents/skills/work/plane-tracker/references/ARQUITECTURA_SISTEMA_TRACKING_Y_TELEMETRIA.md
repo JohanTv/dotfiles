@@ -60,9 +60,9 @@ Existe una distinción vital entre la **base de datos de Plane**, las **ramas Gi
 Al abrir una sesión de terminal en cualquier asistente (`agy`, `Claude Code`, `OpenCode`), el desarrollador expresa una intención en lenguaje natural:
 ```bash
 # Ejemplo: "oye, arreglemos las validaciones del formulario de campaña"
-plane-tracker search "validaciones formulario"
+plane-tracker list --text "validaciones formulario" --all-projects --limit 5 --brief --json
 ```
-* **Tiempo de respuesta:** `< 0.08 segundos` (vía SQLite Virtual Table FTS5 con tokenizador `unicode61 remove_diacritics 2`).
+* **Origen:** SQLite local (tabla virtual FTS5 con tokenizador `unicode61 remove_diacritics 2`), refrescada por TTL; el resultado declara su cobertura (`coverage`).
 * **Comportamiento:**
   - Si encuentra coincidencia: Muestra el ticket existente (ej. `OMNIFY-175`), su estado actual y sugiere hacer checkout a su rama.
   - Si no existe: Confirma que es un requerimiento nuevo y propone el comando de creación con título, prioridad y etiquetas sugeridas.
@@ -229,7 +229,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 
 | Comando | Sintaxis | Descripción y Rendimiento |
 | :--- | :--- | :--- |
-| **`search`** | `plane-tracker search "validaciones"` | Búsqueda ultra-rápida FTS5 en Momento Cero (**< 80ms**). |
+| **`list --text`** | `plane-tracker list --text "validaciones" --all-projects --brief` | Búsqueda en Momento Cero sobre la caché local (título y etiquetas); declara su cobertura. |
 | **`create`** | `plane-tracker create "[FIX] Titulo" -p OMNIFY -d "..."` | Crea issue en Plane y autogenera rama Git según la fase. |
 | **`get`** | `plane-tracker get OMNIFY-197` | Muestra metadata, descripción y **contexto de comentarios / handoff**. |
 | **`update`** | `plane-tracker update OMNIFY-162 --state "Progreso"` | Actualiza estado, prioridad o etiquetas en Plane. |

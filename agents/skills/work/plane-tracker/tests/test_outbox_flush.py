@@ -35,8 +35,8 @@ class Base(unittest.TestCase):
         return out, err
 
     def warm(self):
-        self.cli("search", "formulario")
-        self.cli("search", "soporte", "-p", "OPS")
+        self.cli("list")
+        self.cli("list", "-p", "OPS")
         self.fake.requests.clear()
 
     def queue(self, text, start="08:00", ticket="OMNIFY-1"):

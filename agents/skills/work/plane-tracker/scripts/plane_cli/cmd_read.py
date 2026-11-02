@@ -1,6 +1,6 @@
-"""Comandos de lectura: `get`, `list`, `search`, `labels`, `projects` y `whoami`.
+"""Comandos de lectura: `get`, `list`, `labels`, `projects` y `whoami`.
 
-Expone: register_get(), register_list(), register_search(), register_labels(), register_projects(), register_whoami(),
+Expone: register_get(), register_list(), register_labels(), register_projects(), register_whoami(),
 y los cmd_* correspondientes.
 No hace: escribir en Plane.
 """
@@ -25,7 +25,6 @@ from plane_cli.resolve import (
     get_states_map,
     resolve_issue,
     resolve_project_and_seq,
-    sync_issues,
 )
 from plane_cli import clock
 from plane_cli.scope import PERSON_FLAGS, resolve_scope
@@ -203,97 +202,6 @@ def cmd_projects(args, conn, base_url, api_key, workspace, default_project_id):
     print(f"   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.\n")
 
 
-def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
-    """Búsqueda ultra-rápida FTS5 (< 2ms) en el Momento Cero para detectar tickets existentes."""
-    project_id = default_project_id
-    project_ident = "OMNIFY"
-    projects_map = get_projects_map(conn, base_url, api_key, workspace)
-
-    if getattr(args, "project", None):
-        p_upper = args.project.upper()
-        if p_upper in projects_map:
-            project_id = projects_map[p_upper]["id"]
-            project_ident = p_upper
-        else:
-            sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado.\n")
-            sys.exit(1)
-    else:
-        for k, v in projects_map.items():
-            if v["id"] == project_id:
-                project_ident = k
-                break
-
-    sync_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=getattr(args, "refresh", False))
-
-    raw_query = args.query.strip()
-    matches = []
-
-    # Fast-path si la consulta es un número o identificador directo (ej: "197" o "OMNIFY-197")
-    seq_match = re.match(r"^(?:[A-Za-z]+-)?(\d+)$", raw_query)
-    if seq_match:
-        target_seq = int(seq_match.group(1))
-        row = conn.execute("SELECT ticket_id, title, state_name, state_group, priority FROM issues_cache WHERE sequence_id = ? AND project_id = ?", (target_seq, project_id)).fetchone()
-        if row:
-            matches = [dict(row)]
-
-    if not matches:
-        stop_words = {"de", "del", "la", "las", "el", "los", "en", "un", "una", "unos", "unas", "por", "para", "con", "y", "o", "a", "al", "que", "se", "es"}
-        tokens = [re.sub(r"[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]", "", t) for t in raw_query.split()]
-        tokens = [t for t in tokens if t and t.lower() not in stop_words]
-
-        if tokens:
-            fts_query = " OR ".join(f'"{t}"*' for t in tokens)
-            try:
-                sql = """
-                    SELECT c.ticket_id, c.title, c.state_name, c.state_group, c.priority
-                    FROM issues_fts f
-                    JOIN issues_cache c ON f.ticket_id = c.ticket_id
-                    WHERE issues_fts MATCH ? AND c.project_id = ?
-                    ORDER BY rank
-                    LIMIT 5;
-                """
-                rows = conn.execute(sql, (fts_query, project_id)).fetchall()
-                matches = [dict(r) for r in rows]
-            except Exception:
-                pass
-
-    if not matches and tokens:
-        like_clauses = " OR ".join("title LIKE ?" for _ in tokens[:3])
-        params = [f"%{t}%" for t in tokens[:3]] + [project_id]
-        sql = f"""
-            SELECT ticket_id, title, state_name, state_group, priority
-            FROM issues_cache
-            WHERE ({like_clauses}) AND project_id = ?
-            LIMIT 5;
-        """
-        try:
-            rows = conn.execute(sql, params).fetchall()
-            matches = [dict(r) for r in rows]
-        except Exception:
-            pass
-
-    if getattr(args, "json", False):
-        print(json.dumps({
-            "query": raw_query,
-            "project": project_ident,
-            "count": len(matches),
-            "results": matches
-        }, indent=2))
-        return
-
-    if matches:
-        print(f"\n🔍 Coincidencias encontradas en {project_ident} ({len(matches)}):")
-        for m in matches:
-            prio = f"[{m['priority'].upper()}]"
-            state = f"({m['state_name']})"
-            print(f"  • {m['ticket_id']:<12} {state:<14} {prio:<9} {m['title']}")
-        print(f"\n💡 Para trabajar en uno existente: git checkout -b feat/{matches[0]['ticket_id']}-descripcion")
-        print(f"   O crea uno nuevo si es diferente: plane-tracker create \"[FEAT] ...\"\n")
-    else:
-        print(f"\nℹ No se encontraron tickets similares a '{raw_query}' en {project_ident}.")
-        print(f"💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create \"[FEAT] {raw_query}\"\n")
-
-
 def cmd_whoami(args, conn, base_url, api_key, workspace, default_project_id):
     """Muestra la configuración activa y verifica que el usuario esté resuelto en Plane."""
     print(f"🌐 PLANE_BASE_URL  : {base_url}")
@@ -352,16 +260,6 @@ def register_list(sub):
     p_list.add_argument("--budget", type=positive_int, default=25, metavar="N", help="Máximo de tickets por ejecución de --refresh-history (por defecto 25)")
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
-
-
-def register_search(sub):
-    p_search = sub.add_parser("search", help="Buscar tickets por texto (caché local)",
-                                description="Búsqueda FTS5 (< 2 ms) sobre la caché local de tickets; úsala antes de crear uno nuevo.")
-    p_search.add_argument("query", help="Texto de búsqueda (ej: 'validaciones formulario', 'webhook sms')")
-    p_search.add_argument("-p", "--project", help="Identificador del proyecto (por defecto OMNIFY)")
-    p_search.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane")
-    add_json_flag(p_search)
-    p_search.set_defaults(handler=cmd_search)
 
 
 def register_labels(sub):

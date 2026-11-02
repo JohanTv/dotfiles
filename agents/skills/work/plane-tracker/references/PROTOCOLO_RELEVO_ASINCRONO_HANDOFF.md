@@ -19,7 +19,7 @@ En un equipo ágil de ingeniería:
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 1. Localización del Ticket (Momento Cero):                             │
-│    plane-tracker search "<tema>" ➔ Detecta OMNIFY-XXX (< 80ms)         │
+│    plane-tracker list --text "<tema>" ➔ Detecta OMNIFY-XXX          │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                                     ▼

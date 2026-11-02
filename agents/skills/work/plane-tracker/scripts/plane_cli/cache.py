@@ -1,7 +1,7 @@
 """Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets y snapshots.
 
 Expone: warn_stale(), serve_stale(), fail_no_cache(), sync_project_issues(), needs_sync(), last_sync(), sync_issues_cache(), save_snapshot(), offline_issue(),
-cached_issues(), issue_stub().
+issue_stub().
 No hace: formatear la salida de los comandos ni decidir cuándo estar sin conexión (eso lo señala PlaneUnavailable).
 Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen mandando.
 """
@@ -14,7 +14,7 @@ import urllib.parse
 from plane_cli import api, clock
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.errors import CliError
-from plane_cli.timeutil import age_text, iso_utc
+from plane_cli.timeutil import age_text
 
 ISSUES_TTL = 1800  # 30 minutos
 ISSUES_MAX_PAGES = 20
@@ -22,7 +22,6 @@ RATE_RESERVE = 3  # peticiones que se dejan sin gastar de cada ventana de tasa
 ISSUE_FIELDS = "id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels"
 SNAPSHOT_KEEP_DAYS = 90
 SNAPSHOT_MAX_ROWS = 300
-LIST_LIMIT = 50
 
 
 def warn_stale(updated_at):
@@ -211,14 +210,6 @@ def offline_issue(conn, project_id, seq_id, uuid_ref, ticket_id):
     issue = {"id": row["id"], "sequence_id": row["sequence_id"], "name": row["title"], "priority": row["priority"], "state": None,
              "created_at": row["created_at"], "completed_at": row["completed_at"], "start_date": row["start_date"], "target_date": row["target_date"]}
     return {"issue": issue, "comments": None, "fetched_at": row["updated_at"], "metadata_only": True, "state_name": row["state_name"]}
-
-
-def cached_issues(conn, project_id):
-    """Hasta LIST_LIMIT tickets de la caché (sequence_id descendente) con la forma que usa `list` sin conexión."""
-    rows = conn.execute("SELECT id, sequence_id, title, priority, state_name, updated_at FROM issues_cache WHERE project_id = ? "
-                        "ORDER BY sequence_id DESC LIMIT ?", (project_id, LIST_LIMIT)).fetchall()
-    return [{"id": r["id"], "sequence_id": r["sequence_id"], "name": r["title"], "priority": r["priority"], "state_name": r["state_name"],
-             "cached_at": iso_utc(r["updated_at"])} for r in rows], (min(r["updated_at"] for r in rows) if rows else None)
 
 
 def issue_stub(conn, project_id, seq_id, uuid_ref, ticket_label):

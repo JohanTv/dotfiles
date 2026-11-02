@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from plane_cli.cli import build_parser, command_tree  # noqa: E402
 
 TREE = {
-    "search": (), "get": (), "list": (), "create": (), "update": (), "delete": (),
+    "get": (), "list": (), "create": (), "update": (), "delete": (),
     "comment": ("add", "edit", "delete"),
     "attachment": ("add", "list", "delete", "replace"),
     "link": ("add",),
@@ -22,7 +22,7 @@ TREE = {
 }
 
 LEAF_ARGS = {
-    ("search",): ["q"], ("create",): ["t"], ("delete",): ["OMNIFY-1"], ("link", "add"): ["https://x.example"], ("focus", "set"): ["OMNIFY-1"], ("outbox", "drop"): ["1"],
+    ("create",): ["t"], ("delete",): ["OMNIFY-1"], ("link", "add"): ["https://x.example"], ("focus", "set"): ["OMNIFY-1"], ("outbox", "drop"): ["1"],
     ("attachment", "add"): ["OMNIFY-1", "f"], ("attachment", "delete"): ["OMNIFY-1", "d0000000-0000-4000-8000-000000000001"],
     ("attachment", "replace"): ["OMNIFY-1", "d0000000-0000-4000-8000-000000000001", "f"],
 }

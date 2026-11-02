@@ -78,8 +78,8 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | Fase | Estado | Commit o decisión |
 | :---: | :--- | :--- |
 | 0 | cerrada | Decisión [0025](../../decisions/0025-contrato-json-de-lectura.md); commits `daf88ef`, `84f96bc`, `82a360c`, `f0add02`, `c5b3187`, `6d0f7d8`, `609f839`. Hallazgos V15-V22 en la [revisión](./revision-adversarial.md) (V20 abierto) |
-| 1 | cerrada | Commit «feat(plane-tracker): rebuild list on the query model (phase 1)»; hallazgos V23-V28 en la [revisión](./revision-adversarial.md) |
-| 2 | pendiente | |
+| 1 | cerrada | Commit `a9b4150` «feat(plane-tracker): rebuild list on the query model (phase 1)»; hallazgos V23-V28 en la [revisión](./revision-adversarial.md) |
+| 2 | en curso | Código, pruebas y documentos de la skill hechos (commit «feat(plane-tracker)!: retire search in favor of list --text (phase 2)»). **Falta** cambiar `agents/rules/src/work.md` y ejecutar `make work` (fuera del alcance autorizado hasta ahora): el `rg` del criterio solo devuelve ese archivo. Hallazgos V29-V30 |
 | 3 | pendiente | |
 | 4 | pendiente | |
 | 5 | pendiente | |

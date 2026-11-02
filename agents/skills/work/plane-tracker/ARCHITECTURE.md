@@ -42,7 +42,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`. |
 | `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
 | `plane_cli/cmd_delete.py` | Comando `delete`: decide con los comentarios del ticket (paginados) unidos a lo local, falla cerrado y limpia lo local; sin `--yes` solo informa. |
-| `plane_cli/cmd_read.py` | Comandos `get`, `list` (orquesta catálogos, alcance, frescura, consulta y sobre), `search`, `labels`, `projects` y `whoami`. |
+| `plane_cli/cmd_read.py` | Comandos `get`, `list` (orquesta catálogos, alcance, frescura, consulta y sobre; absorbe al retirado `search`), `labels`, `projects` y `whoami`. |
 | `plane_cli/scope.py` | `Scope`, `ProjectRef` y `resolve_scope()`: alcance validado, **puro** (sin red ni SQLite), contra catálogos ya cargados; lanza `CliError` (`unknown_project`, `actor_unknown`) con pista. |
 | `plane_cli/scope_flags.py` | `add_scope_args()` y `flags_for()`: cada vista solo declara los flags de sus dimensiones y controles. |
 | `plane_cli/freshness.py` | `Env`, `catalogs()` y `ensure()`: única vía a la red de las vistas, solo GET; cada proyecto por separado (403 y caídos pasan a la cobertura). |
@@ -99,7 +99,7 @@ verbo es obligatorio (`dest="verb"`, `required=True`) y el usage lista los verbo
 
 Reglas:
 
-1. La raíz solo tiene los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en
+1. La raíz solo tiene los verbos del ticket (`get`, `list`, `create`, `update`), `handoff`, los catálogos en
    plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
 2. Toda otra familia es un grupo `<sustantivo singular> <verbo>`, aunque tenga un solo verbo (`link add`).
 3. Un flag nunca elige la operación: la operación es el verbo (o la vista posicional `report flow`).
@@ -130,7 +130,7 @@ El circuito (`<CACHE_DIR>/circuit.json`, compartido entre procesos con flock) se
 120 s; abierto, las llamadas fallan sin tocar la red hasta que vence el enfriamiento (30, 60, 120 y 300 s según las sondas
 fallidas), cuando un solo proceso sondea `GET /users/me/`. `outbox flush` sondea siempre (`probe_plane(force=True)`).
 
-**Lecturas (`cache`).** Con red, los TTL siguen mandando. Ante `PlaneUnavailable`, `search`, `list`, `get`, `labels` y
+**Lecturas (`cache`).** Con red, los TTL siguen mandando. Ante `PlaneUnavailable`, `list`, `get`, `labels` y
 `projects` responden con lo local aunque haya vencido, con el aviso de antigüedad en stderr; sin nada local terminan con
 código 3.
 

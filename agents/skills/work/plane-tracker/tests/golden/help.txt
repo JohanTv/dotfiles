@@ -7,7 +7,6 @@ CLI de Plane CE para agentes de IA
 
 positional arguments:
   <comando>
-    search      Buscar tickets por texto (caché local)
     get         Ver un ticket con sus comentarios
     list        Listar y buscar tickets (caché)
     create      Crear un ticket
@@ -29,27 +28,6 @@ positional arguments:
 options:
   -h, --help    show this help message and exit
   --json        Salida en JSON
---- stderr ---
-
-
-$ plane.py search --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py search [-h] [-p PROJECT] [--refresh] [--json] query
-
-Búsqueda FTS5 (< 2 ms) sobre la caché local de tickets; úsala antes de crear
-uno nuevo.
-
-positional arguments:
-  query                 Texto de búsqueda (ej: 'validaciones formulario',
-                        'webhook sms')
-
-options:
-  -h, --help            show this help message and exit
-  -p, --project PROJECT
-                        Identificador del proyecto (por defecto OMNIFY)
-  --refresh             Forzar sincronización remota con Plane
-  --json                Salida en JSON
 --- stderr ---
 
 

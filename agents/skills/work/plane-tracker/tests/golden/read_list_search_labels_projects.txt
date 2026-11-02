@@ -45,121 +45,18 @@ Error: Proyecto 'nope' no encontrado.
 Opciones: OMNIFY, OPS. Usa -p OMNIFY.
 
 $ plane.py search formulario
-[exit 0]
+[exit 2]
 --- stdout ---
 
-🔍 Coincidencias encontradas en OMNIFY (1):
-  • OMNIFY-1     (Progreso)     [HIGH]    Validaciones de formulario SMS
-
-💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-1-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
 --- stderr ---
-
-
-$ plane.py search 3
-[exit 0]
---- stdout ---
-
-🔍 Coincidencias encontradas en OMNIFY (1):
-  • OMNIFY-3     (Cancelado)    [LOW]     Webhook SMS duplicado
-
-💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-3-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
---- stderr ---
-
-
-$ plane.py search OMNIFY-2
-[exit 0]
---- stdout ---
-
-🔍 Coincidencias encontradas en OMNIFY (1):
-  • OMNIFY-2     (Completado)   [MEDIUM]  Acortador de enlaces
-
-💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-2-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
---- stderr ---
-
-
-$ plane.py search zzz
-[exit 0]
---- stdout ---
-
-ℹ No se encontraron tickets similares a 'zzz' en OMNIFY.
-💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create "[FEAT] zzz"
---- stderr ---
-
+plane-tracker: error: 'search' ya no existe; usa: plane-tracker list --text formulario
 
 $ plane.py search validaciones --json -p OMNIFY
-[exit 0]
---- stdout ---
-{
-  "query": "validaciones",
-  "project": "OMNIFY",
-  "count": 1,
-  "results": [
-    {
-      "ticket_id": "OMNIFY-1",
-      "title": "Validaciones de formulario SMS",
-      "state_name": "Progreso",
-      "state_group": "started",
-      "priority": "high"
-    }
-  ]
-}
---- stderr ---
-
-
-$ plane.py search x -p NOPE
-[exit 1]
+[exit 2]
 --- stdout ---
 
 --- stderr ---
-Error: Proyecto 'NOPE' no encontrado.
-
-$ plane.py search de la --refresh
-[exit 0]
---- stdout ---
-
-ℹ No se encontraron tickets similares a 'de la' en OMNIFY.
-💡 Es un requerimiento NUEVO. Créalo con: plane-tracker create "[FEAT] de la"
---- stderr ---
-
-
-$ plane.py search soporte -p OPS
-[exit 0]
---- stdout ---
-
-🔍 Coincidencias encontradas en OPS (1):
-  • OPS-13       (Progreso)     [NONE]    Tareas Rápidas y Soporte - W43
-
-💡 Para trabajar en uno existente: git checkout -b feat/OPS-13-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
---- stderr ---
-
-
-$ plane.py search backend
-[exit 0]
---- stdout ---
-
-🔍 Coincidencias encontradas en OMNIFY (1):
-  • OMNIFY-1     (Progreso)     [HIGH]    Validaciones de formulario SMS
-
-💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-1-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
---- stderr ---
-
-
-$ plane.py search bug
-[exit 0]
---- stdout ---
-
-🔍 Coincidencias encontradas en OMNIFY (1):
-  • OMNIFY-2     (Completado)   [MEDIUM]  Acortador de enlaces
-
-💡 Para trabajar en uno existente: git checkout -b feat/OMNIFY-2-descripcion
-   O crea uno nuevo si es diferente: plane-tracker create "[FEAT] ..."
---- stderr ---
-
+plane-tracker: error: 'search' ya no existe; usa: plane-tracker list --text validaciones --json -p OMNIFY
 
 $ plane.py list --text formulario
 [exit 0]
@@ -274,8 +171,7 @@ $ plane.py list enlaces
 --- stdout ---
 
 --- stderr ---
-usage: plane.py [-h] [--json] <comando> ...
-plane.py: error: unrecognized arguments: enlaces
+plane-tracker: error: 'list' no acepta texto posicional; usa: plane-tracker list --text enlaces
 
 $ plane.py labels
 [exit 0]
@@ -366,8 +262,6 @@ GET /api/v1/workspaces/ws/members/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/

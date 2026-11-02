@@ -38,7 +38,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 
 | Tarea | Comando |
 | :--- | :--- |
-| Buscar antes de crear | `plane-tracker search "<intención>"` |
+| Buscar antes de crear | `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` (lee `coverage`: si `complete` no es `true`, `stale` es `true` o `unavailable` no está vacío, no prueba que no exista) |
 | Ver ticket | `plane-tracker get T [--last N] [--history]` |
 | Listar tickets | `plane-tracker list -p OMNIFY` (sin filtros, desde la API) |
 | Mis tickets | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` (caché local; necesita `PLANE_ACTOR_UUID` o `PLANE_USERNAME`) |
@@ -58,7 +58,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 
 Convenciones: en la raíz viven los verbos del ticket, `handoff`, los catálogos en plural, los diagnósticos y `report`; toda otra familia es `<sustantivo singular> <verbo>`. Un flag nunca elige la operación. `--json` es global. Un nombre antiguo o un verbo faltante termina con exit 2 y el comando correcto.
 
-- **Duplicados:** `plane-tracker create` rechaza (exit 1) el mismo título creado en el proyecto en las últimas 24 h. Tras un error de red incierto, comprueba con `plane-tracker search` antes de reintentar; `--allow-duplicate` lo permite a propósito.
+- **Duplicados:** `plane-tracker create` rechaza (exit 1) el mismo título creado en el proyecto en las últimas 24 h. Tras un error de red incierto, comprueba con `plane-tracker list --text "<título>" --brief` antes de reintentar; `--allow-duplicate` lo permite a propósito.
 - **Plane caído (exit 3):** no insistas y sigue trabajando. Las lecturas responden con lo local y avisan su antigüedad; `comment add` guarda comentario y tiempo y los encola (`⏳ En cola`, exit 0); `update`, `create`, `link add`, `attachment` y `comment edit|delete` fallan con exit 3 y se repiten luego. Al terminar la sesión, `plane-tracker outbox flush` publica la cola; nunca hay envío automático.
 
 ## 4. Bitácora de cierre (corta)

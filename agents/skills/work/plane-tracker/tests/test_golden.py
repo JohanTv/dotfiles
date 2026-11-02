@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-ROOT_COMMANDS = ["search", "get", "list", "create", "update", "delete", "report", "handoff", "labels", "projects", "whoami", "health"]
+ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "report", "handoff", "labels", "projects", "whoami", "health"]
 GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
           "focus": ("set", "clear", "status"), "worklog": ("propose", "check")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
@@ -72,7 +72,7 @@ class Golden(unittest.TestCase):
                             ("GET", r"/projects/%s/labels/$" % gs.P1, 404, {"detail": "nada"}),
                             ("POST", r"/comments/$", 400, {"detail": "malo"}),
                             ("GET", r"/projects/%s/states/$" % gs.P2, 403, {"detail": "prohibido"})]
-        steps = [["list"], ["labels"], ["search", "formulario"], ["get", "OMNIFY-1"], ["get", "OPS-13"],
+        steps = [["list"], ["labels"], ["list", "--text", "formulario"], ["get", "OMNIFY-1"], ["get", "OPS-13"],
                  ["comment", "add", "OPS-13", "-m", "hola", "--duration", "5"]]
         self.golden("errors_http", steps, setup=setup, scrub=RANDOM_FIELDS)
 
@@ -89,8 +89,7 @@ class Golden(unittest.TestCase):
 
     def test_list_search_labels_projects(self):
         steps = [["list"], ["list", "--json"], ["--json", "list"], ["list", "-p", "OPS"], ["list", "-p", "nope"],
-                 ["search", "formulario"], ["search", "3"], ["search", "OMNIFY-2"], ["search", "zzz"], ["search", "validaciones", "--json", "-p", "OMNIFY"],
-                 ["search", "x", "-p", "NOPE"], ["search", "de la", "--refresh"], ["search", "soporte", "-p", "OPS"], ["search", "backend"], ["search", "bug"],
+                 ["search", "formulario"], ["search", "validaciones", "--json", "-p", "OMNIFY"],  # nombre retirado: pista y código 2
                  ["list", "--text", "formulario"], ["list", "--text", "3"], ["list", "--text", "OMNIFY-2"], ["list", "--text", "zzz"],
                  ["list", "--text", "validaciones", "--json", "-p", "OMNIFY"], ["list", "--text", "x", "-p", "NOPE"], ["list", "--text", "de la", "--refresh"],
                  ["list", "--text", "soporte", "-p", "OPS"], ["list", "--text", "backend"], ["list", "--text", "bug"],

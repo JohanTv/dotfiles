@@ -13,7 +13,7 @@ Bienvenido a la especificación técnica y operativa del ecosistema de tracking 
 3. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](./PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
    * Cómo tomar tickets iniciados por otra persona del equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
 4. [🛠️ **Guía Operativa del CLI `plane-tracker`**](./GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
-   * Manual exhaustivo de comandos (`search`, `create`, `get`, `update`, `comment`, `labels`, `projects`, `report`) con flags, ejemplos y salidas JSON.
+   * Manual exhaustivo de comandos (`list`, `create`, `get`, `update`, `comment`, `labels`, `projects`, `report`) con flags, ejemplos y salidas JSON.
 5. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
    * Catálogo de 16 etiquetas en Omnify, 11 en OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
 6. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
@@ -24,8 +24,8 @@ Bienvenido a la especificación técnica y operativa del ecosistema de tracking 
 ## ⚡ Comandos Rápidos de Referencia
 
 ```bash
-# Momento Cero: Búsqueda instantánea FTS5 (< 2ms)
-plane-tracker search "validaciones formulario"
+# Momento Cero: búsqueda en la caché local (título y etiquetas)
+plane-tracker list --text "validaciones formulario" --all-projects --limit 5 --brief --json
 
 # Crear ticket con sugerencia de rama según fase
 plane-tracker create "[FEAT] Validaciones de esquema SMS" -p OMNIFY --priority high --labels "backend,sms"

@@ -39,30 +39,31 @@ class Offline(unittest.TestCase):
     def mark(self):
         return len(self.sb.fake.requests)
 
-    # --- search / list --------------------------------------------------------
-    def test_search_with_open_circuit_serves_the_stale_cache(self):
-        self.cli("search", "formulario")
+    # --- list --------------------------------------------------------------
+    def test_list_text_with_open_circuit_serves_the_stale_cache_and_says_so_in_the_output(self):
+        self.cli("list", "--text", "formulario")
         self.age("issues_cache", 2 * 3600)
         before = self.mark()
         self.sb.write_circuit(opened_ago=5)
-        code, out, err = self.cli("search", "formulario")
+        code, out, err = self.cli("list", "--text", "formulario")
         self.assertIn("OMNIFY-1", out)
-        self.assertIn("⚠ Datos locales de hace 2 h; Plane no responde.", err)
+        self.assertIn("Datos locales de hace 2 h; Plane no respondió.", out)
+        self.assertEqual(err, "")
         self.assertEqual(self.mark(), before)
 
-    def test_search_without_cache_exits_3(self):
+    def test_list_text_without_cache_exits_3(self):
         self.cli("projects")
-        code, out, err = self.cli("search", "formulario", offline=True, ok=False)
+        code, out, err = self.cli("list", "--text", "formulario", offline=True, ok=False)
         self.assertEqual(code, 3)
         self.assertIn("Plane no responde y no hay caché local de los tickets de OMNIFY.", err)
 
     def test_fresh_cache_never_warns(self):
-        self.cli("search", "formulario")
-        code, out, err = self.cli("search", "formulario", offline=True)
+        self.cli("list", "--text", "formulario")
+        code, out, err = self.cli("list", "--text", "formulario", offline=True)
         self.assertEqual(err, "")
 
     def test_list_offline_from_cache(self):
-        self.cli("search", "formulario")
+        self.cli("list")
         self.age("issues_cache", 90 * 60)
         before = self.mark()
         code, out, err = self.cli("list", "--json", offline=True)
@@ -134,7 +135,7 @@ class Offline(unittest.TestCase):
         self.assertIn("Avance del formulario", out)
 
     def test_get_falls_back_to_issue_metadata(self):
-        self.cli("search", "formulario")
+        self.cli("list")
         code, out, err = self.cli("get", "OMNIFY-2", offline=True)
         self.assertIn("Solo metadatos del listado", out)
         self.assertIn("Acortador de enlaces", out)
@@ -163,7 +164,7 @@ class Offline(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertNotIn("terminal", err)
         self.assertEqual(sb.fake.requests, [])
-        self.assertEqual(sb.run(["search", "x"])[0], 0)
+        self.assertEqual(sb.run(["list", "--text", "x"])[0], 0)
         code, out, err = sb.run(["focus", "set", "OPS-13", *sess], env_set=OFF)
         code, out, err = sb.run(["focus", "set", "OMNIFY-2", *sess], env_set=OFF)
         self.assertEqual(code, 0, err)

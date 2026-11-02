@@ -45,7 +45,7 @@ Módulos:
   render_issues   texto de `list` a partir del sobre
   views           View y VIEWS: registro de vistas de lectura
   history_sweep   barrido de `list --refresh-history` (se retira en la fase 6)
-  cmd_read        `get`, `list`, `search`, `labels`, `projects`, `whoami`
+  cmd_read        `get`, `list`, `labels`, `projects`, `whoami`
   cmd_report      `report`, `worklog check`
   cmd_outbox      `outbox list|flush|drop`
   cmd_ops         `health`, `focus set|clear|status`, `handoff`

@@ -60,6 +60,12 @@ ROWS = [
     ("outbox --json", "falta el verbo (list|flush|drop); ej: plane-tracker outbox flush"),
     ("outbox sync --limit 5", "'outbox sync' no existe; usa: plane-tracker outbox flush --limit 5"),
     ("outbox discard 3", "'outbox discard' no existe; usa: plane-tracker outbox drop 3"),
+    ("search formulario", "'search' ya no existe; usa: plane-tracker list --text formulario"),
+    ("search 'validaciones formulario' -p OPS --json --refresh", "'search' ya no existe; usa: plane-tracker list --text 'validaciones formulario' -p OPS --json --refresh"),
+    ("--json search x", "'search' ya no existe; usa: plane-tracker --json list --text x"),
+    ("search", "'search' ya no existe; usa: plane-tracker list --text TEXTO"),
+    ("list enlaces", "'list' no acepta texto posicional; usa: plane-tracker list --text enlaces"),
+    ("list a b -p OPS --open", "'list' no acepta texto posicional; usa: plane-tracker list --text 'a b' -p OPS --open"),
     ("outbox flsh", "verbo 'flsh' desconocido en 'outbox'; ¿quisiste decir 'flush'?"),
 ]
 
@@ -67,7 +73,7 @@ ROWS = [
 SILENT = ["", "--json", "-h", "--help", "get OPS-13", "list --json", "report --week", "report flow --refresh", "comment add OPS-13 -m '--check'",
           "comment edit OPS-1 --force", "comment --json add OPS-1", "comment --help", "comment -h", "attachment list OPS-1", "attachment delete OPS-1 x",
           "focus set OPS-1", "outbox flush --retry-failed", "outbox drop 3 --force", "focus status --agent claude", "focus clear", "worklog check --week", "link add OPS-1 https://x.example",
-          "zzzzzz", "attachment list attachments", "comment add -m '--off'"]
+          "list --text x", "list -p OPS --open --limit 5", "list --text 'a b'", "zzzzzz", "attachment list attachments", "comment add -m '--off'"]
 
 
 def run_main(argv):
@@ -78,6 +84,17 @@ def run_main(argv):
         except SystemExit as exc:
             return exc.code, err.getvalue()
     return None, err.getvalue()
+
+
+GROUP_ROWS = [  # con `report` convertido en grupo (fase 5): la vista es obligatoria y ninguna entrada lanza KeyError
+    ("report", "falta la vista (time|flow); ej: plane-tracker report time --week"),
+    ("report --week", "falta la vista (time|flow); ej: plane-tracker report time --week"),
+    ("report -p OPS --refresh", "falta la vista (time|flow); ej: plane-tracker report time -p OPS --refresh"),
+    ("report --check", "'report --check' ya no existe; usa: plane-tracker worklog check"),
+    ("report --flow --week", "'report --flow' ya no existe; usa: plane-tracker report flow --week"),
+    ("report --sync", "'--sync' ya no existe; usa: plane-tracker report time --refresh"),
+]
+GROUP_SILENT = ["report time", "report flow --refresh", "report time --week", "report -h", "report --help", "--json report time"]
 
 
 class Renamed(unittest.TestCase):
@@ -109,6 +126,15 @@ class Renamed(unittest.TestCase):
                     self.assertEqual(err.splitlines()[-1], f"plane-tracker: error: {expected}")  # avisos ajenos del GC no cuentan
         finally:
             os.environ.update(saved)
+
+    def test_report_as_a_group_never_raises_and_requires_the_view(self):
+        tree = {**self.tree, "report": ("time", "flow")}
+        for line, expected in GROUP_ROWS:
+            with self.subTest(argv=line):
+                self.assertEqual(renamed.suggestion(shlex.split(line), tree), expected)
+        for line in GROUP_SILENT:
+            with self.subTest(argv=line):
+                self.assertIsNone(renamed.suggestion(shlex.split(line), tree))
 
     def test_valid_input_has_no_hint(self):
         for line in SILENT:

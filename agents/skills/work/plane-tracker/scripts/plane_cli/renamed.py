@@ -11,15 +11,16 @@ import shlex
 # Formas retiradas: nombre plano -> (grupo, verbo).
 RETIRED = {"comment-edit": ("comment", "edit"), "comment-delete": ("comment", "delete"),
            "propose-duration": ("worklog", "propose"), "attach": ("attachment", "add"), "attachments": ("attachment", "list")}
-# Sinónimos habituales de cada verbo.
+# Sinónimos habituales de cada verbo (dentro de un grupo: `outbox sync` -> `flush`; no chocan con un comando raíz `sync`, que no es un grupo).
 SYNONYMS = {"create": "add", "new": "add", "post": "add", "rm": "delete", "remove": "delete", "del": "delete",
             "ls": "list", "show": "list", "update": "edit", "modify": "edit", "off": "clear", "stop": "clear", "unset": "clear",
             "on": "set", "start": "set", "send": "flush", "publish": "flush", "sync": "flush", "push": "flush", "discard": "drop"}
 # Ejemplo de uso por grupo cuando no hay argumentos de los que partir.
-EXAMPLES = {"comment": "comment add OPS-13 -m x --duration 5", "attachment": "attachment list OPS-13",
+EXAMPLES = {"report": "report time --week", "comment": "comment add OPS-13 -m x --duration 5", "attachment": "attachment list OPS-13",
             "link": "link add OPS-13 https://example.com", "focus": "focus set OPS-13", "worklog": "worklog propose OPS-13",
             "outbox": "outbox flush"}
 EDIT_FLAGS = ("--comment-id", "--embed-metadata", "--force")
+VALUE_FLAGS = ("-p", "--project", "--text", "--limit", "--budget", "--from", "--to", "--week", "--track", "--worker-type", "--date")  # flags que llevan valor
 HELP_FLAGS = ("-h", "--help")
 
 
@@ -54,16 +55,53 @@ def _retired(old, argv):
     return f"'{old}' ya no existe; usa: plane-tracker {shlex.join(argv)}"
 
 
-def _report(prefix, rest):
-    """`report --check|--flow|--sync` -> `worklog check`, `report flow`, `report --refresh`."""
+def _split(tokens):
+    """(posicionales, flags con sus valores) de `tokens`, en su orden."""
+    positional, flags, i = [], [], 0
+    while i < len(tokens):
+        token = tokens[i]
+        if token in VALUE_FLAGS:
+            flags += tokens[i:i + 2]
+            i += 2
+        elif token.startswith("-"):
+            flags.append(token)
+            i += 1
+        else:
+            positional.append(token)
+            i += 1
+    return positional, flags
+
+
+def _search(prefix, rest):
+    """`search TEXTO [-p P] [--refresh] [--json]` -> `list --text TEXTO ...`."""
+    positional, flags = _split(rest)
+    return _retired("search", [*prefix, "list", "--text", " ".join(positional) or "TEXTO", *flags])
+
+
+def _list(prefix, rest):
+    """`list TEXTO` no existe: el texto va con --text (con `--text X` y posicionales, no se sabe cuál valía)."""
+    positional, flags = _split(rest)
+    if not positional or "--text" in flags:
+        return None
+    return f"'list' no acepta texto posicional; usa: plane-tracker {shlex.join([*prefix, 'list', '--text', ' '.join(positional), *flags])}"
+
+
+def _report(prefix, rest, verbs=()):
+    """`report --check|--flow|--sync` -> `worklog check`, `report flow`, `report time --refresh`; con `report` como grupo, la vista es obligatoria."""
     if "--check" in rest:
         kept = _drop(rest, {"--check": 0, "--flow": 0, "--sync": 0, "--refresh": 0, "--track": 1, "--worker-type": 1})
         return _retired("report --check", [*prefix, "worklog", "check", *kept])
-    labels = [name for flag, name in (("--flow", "report --flow"), ("--sync", "--sync")) if flag in rest]
-    if not labels:
+    core = [t for t in rest if t != "--json"]
+    if verbs and core and (core[0] in verbs or core[0] in HELP_FLAGS):
         return None
+    labels = [name for flag, name in (("--flow", "report --flow"), ("--sync", "--sync")) if flag in rest]
     kept = ["--refresh" if t == "--sync" else t for t in rest if t != "--flow"]
-    return _retired(labels[0], [*prefix, "report", *(["flow"] if "--flow" in rest else []), *kept])
+    view = ["flow"] if "--flow" in rest else ["time"] if verbs else []
+    if labels:
+        return _retired(labels[0], [*prefix, "report", *view, *kept])
+    if verbs:
+        return f"falta la vista ({'|'.join(verbs)}); ej: plane-tracker {shlex.join([*prefix, 'report', *view, *kept]) if rest else EXAMPLES['report']}"
+    return None
 
 
 def _attachment(prefix, cmd, rest, verbs):
@@ -137,10 +175,14 @@ def suggestion(argv, tree):
     if start is None or argv[start].startswith("-"):
         return None
     prefix, cmd, rest = argv[:start], argv[start], argv[start + 1:]
+    if cmd == "search" and "search" not in tree:
+        return _search(prefix, rest)
     if cmd in tree:
+        if cmd == "report":
+            return _report(prefix, rest, tree[cmd])
         if tree[cmd]:
             return _group(prefix, cmd, tree[cmd], rest)
-        return _report(prefix, rest) if cmd == "report" else None
+        return _list(prefix, rest) if cmd == "list" else None
     if cmd in ("attach", "attachments"):
         return _attachment(prefix, cmd, rest, tree.get("attachment", ()))
     if cmd in RETIRED:

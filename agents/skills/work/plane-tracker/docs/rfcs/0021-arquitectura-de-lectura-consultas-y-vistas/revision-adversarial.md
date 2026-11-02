@@ -99,3 +99,10 @@ Cada uno se resolvió con el supuesto más conservador y espera confirmación; n
 | V26 | BAJO | `text_looks_like_id` es `info`: un agente que busca `PRJ-12` y recibe 0 resultados no ve la pista al `get` sin `--verbose`. Misma familia que V20. | Propuesta | Se mantiene `info` hasta decidir V20; la prueba comprueba la nota con `--verbose`. |
 | V27 | BAJO | El presupuesto de la ayuda global (280 tokens) está exacto: la descripción nueva de `list` no cabe. | Corregido | `list` se describe como "Listar y buscar tickets (caché)" (280,0 medido); la fase 2 libera espacio al retirar `search`. |
 | V28 | MEDIO | `search` y `create` (guarda de duplicados) siguen sincronizando tickets con la función antigua: el recorte por presupuesto de tasa y el 403 también les afectan. | Corregido | `cache.sync_issues_cache` queda como envoltura de `sync_project_issues` que avisa por stderr (`stale`/`rate_limited`) o falla (`unavailable`, `forbidden`); desaparece con `search` en la fase 2. |
+
+## Hallazgos de la implementación de la fase 2 (2026-11-02)
+
+| Id | Sev. | Hallazgo | Estado | Dónde se atiende |
+| :--- | :---: | :--- | :--- | :--- |
+| V29 | ALTO | La fase 2 manda cambiar `agents/rules/src/work.md` y regenerar con `make work`, pero esa entrega choca con la barrera de esta implementación (no editar `agents/rules/` ni `~/.claude/CLAUDE.md`): el criterio `grep` no puede cumplirse sin esa edición, y la regla vigente sigue mandando a un comando retirado (los agentes reciben código 2 con la pista traducida). | **Abierto** | Todo lo demás de la fase 2 está hecho; la fase queda `en curso` hasta que el dueño autorice o haga el cambio con el texto objetivo de [`cambio-de-regla-momento-cero.md`](./cambio-de-regla-momento-cero.md). |
+| V30 | BAJO | El plan dice reescribir `renamed.py` por `report` como grupo, que no ocurre hasta la fase 5; y `SYNONYMS` ya contiene `sync` -> `flush` dentro de `outbox`, que no choca con un comando raíz `sync` (no es un grupo). | Corregido | `renamed.py` funciona con `report` como hoja o como grupo (prueba con árbol sintético) y traduce `search` y `list TEXTO`; `SYNONYMS` solo se anota. |

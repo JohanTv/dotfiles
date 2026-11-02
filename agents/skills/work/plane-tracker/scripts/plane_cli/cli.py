@@ -24,7 +24,6 @@ from plane_cli.errors import CliError
 from plane_cli.outbox import pending_notice
 
 COMMANDS = (
-    cmd_read.register_search,
     cmd_read.register_get,
     cmd_read.register_list,
     cmd_tickets_write.register_create,

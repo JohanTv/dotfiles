@@ -32,8 +32,8 @@ Onboarding del agente (primera invocación o error de configuración):
 ## 1. Resumen de Comandos Principales
 
 ```bash
-# 1. Búsqueda instantánea FTS5 en Momento Cero (< 2ms)
-plane-tracker search "<términos de búsqueda>"
+# 1. Búsqueda en Momento Cero (caché local, título y etiquetas; incluye cerrados y cancelados)
+plane-tracker list --text "<términos de búsqueda>" --all-projects --limit 5 --brief --json
 
 # 2. Creación de ticket con sugerencia automática de rama Git
 plane-tracker create "[FEAT] Título descriptivo" -p OMNIFY --priority high --labels "backend,sms"
@@ -61,7 +61,7 @@ plane-tracker report --week
 
 ### Convenciones de nombrado
 
-* En la raíz viven los verbos del ticket (`search`, `get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
+* En la raíz viven los verbos del ticket (`get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
 * Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `outbox`, `focus`, `worklog`.
 * Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección (p. ej. `get --history`, `report --refresh`).
 * Verbos: `add` / `list` / `edit` / `delete` / `replace` / `flush`; marcas `set` / `clear` / `status`; derivados `propose` / `check`.
@@ -84,23 +84,24 @@ plane-tracker list --involved --refresh-history --budget 25   # trae el historia
 ```
 *Qué NO afirma:* `--involved` muestra "Historial de asignación verificado en X de Y tickets": que un ticket no aparezca no prueba que nunca estuviste asignado. Las horas registradas salen solo de la base local de esta máquina. Detalle y límites en `docs/decisions/0019`.
 
-### A. `plane-tracker search` (Búsqueda Momento Cero)
-Permite saber en **menos de 0.08 segundos** si un requerimiento ya existe en Plane antes de codificar o duplicar tickets.
+### A. `plane-tracker list --text` (Búsqueda Momento Cero)
+Permite saber si un requerimiento ya existe en Plane antes de codificar o duplicar tickets. `search` ya no existe: la búsqueda es `list --text`, que busca en **título y etiquetas** (no en la descripción), ordena por relevancia y se combina con cualquier otro filtro. Responde desde la caché local (refrescada por TTL de 30 min con solo GET).
 
 ```bash
-# Búsqueda en el proyecto por defecto (OMNIFY)
-plane-tracker search "validaciones formulario"
-plane-tracker search "webhook sms"
+# Búsqueda en todos los proyectos accesibles, 5 filas breves, para un agente
+plane-tracker list --text "validaciones formulario" --all-projects --limit 5 --brief --json
 
-# Búsqueda en otro proyecto (ej: Operaciones)
-plane-tracker search "soporte ripley" -p OPS
+# Solo un proyecto (ej: Operaciones) y solo lo abierto
+plane-tracker list --text "soporte ripley" -p OPS --open
 
-# Forzar refresco desde Plane API si se crearon tickets muy recientemente
-plane-tracker search "caddy" --refresh
+# Forzar refresco desde Plane si se crearon tickets muy recientemente
+plane-tracker list --text "caddy" --refresh
 
-# Salida estructurada en JSON para agentes de IA
-plane-tracker search "mcp" --json
+# Solo lo local, sin red
+plane-tracker list --text "mcp" --offline
 ```
+
+**Antes de concluir "no hay duplicado", lee `coverage`:** si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado no prueba ausencia. Un identificador como texto (`OMNIFY-12`) no se busca como ticket: usa `plane-tracker get OMNIFY-12` (con `--verbose` la nota `text_looks_like_id` lo recuerda).
 
 ---
 
