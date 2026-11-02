@@ -16,6 +16,7 @@
 | 0013 | [La cola de salida no registra a qué instancia pertenece cada comentario](defects/0013-cola-de-salida-sin-instancia-de-destino.md) | abierto | `outbox flush` publica con las credenciales del entorno actual; con dos instancias y una sola base local, un comentario podría publicarse en la instancia equivocada. |
 | 0016 | [El bloque oculto de telemetría se escapa y queda visible al publicar o editar comentarios](defects/0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md) | corregido | `markdown_to_html` escapa `<!-- PLANE_WORKLOG_METADATA ... -->`; `comment edit -m` pierde la telemetría y `comment add -m` publica el bloque visible además del real. |
 | 0017 | [La sincronización de worklogs consulta solo los 15 tickets más recientes por proyecto](defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md) | abierto | `sync` pide `limit=15` sin paginar; un periodo con más tickets tocados, o uno ya pasado, produce un reporte parcial presentado como completo. |
+| 0020 | [Las etiquetas de la caché de tickets se guardan siempre vacías](defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) | abierto | `sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco. |
 
 ## RFC
 
@@ -36,3 +37,4 @@
 | 0012 | [Estrategia de pruebas rápidas - paralelo por procesos, servidor falso ágil y lanzador sin esperas](decisions/0012-estrategia-de-pruebas-rapidas/README.md) | aceptado | La suite pasó de 157 s a 97 s en secuencial y a 33-48 s en paralelo, sin tocar el código de producción ni añadir dependencias. |
 | 0015 | [Reloj central en producción y reloj congelado en las pruebas](decisions/0015-reloj-central-y-reloj-congelado-en-las-pruebas.md) | aceptado | Toda lectura de la hora pasa por un único módulo y las pruebas golden congelan la hora desde un lanzador, sin variable de entorno en producción. |
 | 0018 | [Eliminar tickets sin destruir horas por accidente](decisions/0018-eliminar-tickets-sin-destruir-horas.md) | aceptado | `delete` decide leyendo en vivo todos los comentarios del ticket unidos a lo local, falla cerrado y rechaza siempre las horas ajenas; conservar con Cancelado es la vía por defecto. |
+| 0019 | [Filtros de persona en list y historial de asignación medido](decisions/0019-filtros-de-persona-y-historial-de-asignacion.md) | aceptado | `list --mine\|--created\|--involved` sobre la caché; `--involved` une asignado, creador, horas registradas y asignado alguna vez, con razón y cobertura declaradas. |
