@@ -32,7 +32,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/outbox.py` | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
 | `plane_cli/outbox_flush.py` | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
 | `plane_cli/create_guard.py` | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
-| `plane_cli/sync.py` | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola, para los proyectos accesibles, paginando con `per_page`, deteniéndose antes de agotar el presupuesto de tasa y marcando la sincronización por proyecto y periodo (`worklog_sync`); nada se inventa y lo no medido consta en `defaulted_json`. |
+| `plane_cli/sync.py` | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola, para los proyectos accesibles, paginando con `per_page`, deteniéndose antes de agotar el presupuesto de tasa y marcando la sincronización por proyecto y periodo (`worklog_sync`) y leyendo los comentarios de forma incremental por ticket (`worklog_issue_sync`), de modo que una sincronización cortada converge; nada se inventa y lo no medido consta en `defaulted_json`. |
 | `plane_cli/store_worklogs.py` | Solo lectura: proyectos accesibles y `hours_status()` (si el periodo está verificado contra Plane, por proyecto). |
 | `plane_cli/proposal_store.py` | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |

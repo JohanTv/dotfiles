@@ -96,6 +96,41 @@ class Coverage(Base):
         self.assertFalse([p for p in self.paths() if "/comments/" in p], "no se gastó el presupuesto en comentarios")
         self.assertEqual({r["complete"] for r in self.rows("SELECT complete FROM worklog_sync")}, {0})
 
+    def test_a_sync_cut_by_the_budget_advances_on_every_run_and_converges(self):
+        for seq in range(10, 22):  # 12 tickets nuevos + los 2 del servidor con actividad = 14 lecturas de comentarios
+            add_issue(self.fake, gs.P1, seq, [full(f"{8 + seq % 10:02d}:00", client=str(seq))])
+        self.fake.rate_budget = 12  # con la reserva, unas 6 lecturas de comentarios por ventana
+        runs, seen = 0, []
+        while True:
+            runs += 1
+            self.fake.new_window()
+            self.cli("report", "--date", DAY)
+            marks = {r["project_ident"]: r["complete"] for r in self.rows("SELECT * FROM worklog_sync")}
+            seen.append(len(self.rows("SELECT 1 FROM worklog_issue_sync")))
+            if marks and all(marks.values()):
+                break
+            self.assertLess(runs, 8, "no converge")
+        self.assertGreater(runs, 1, "el presupuesto no alcanzaba en una sola ejecución")
+        self.assertEqual(seen, sorted(seen), "cada ejecución avanza, no vuelve a empezar")
+        self.assertEqual(len({r["ticket_id"] for r in self.rows("SELECT ticket_id FROM worklogs WHERE ticket_id LIKE 'OMNIFY-1_' OR ticket_id LIKE 'OMNIFY-2_'")}), 12)
+
+    def test_only_what_changed_is_read_again_and_refresh_reads_everything(self):
+        add_issue(self.fake, gs.P1, 10, [full("08:00")])
+        self.cli("report", "--date", DAY)
+        self.sb.advance(10 * 60)
+        mark = len(self.fake.requests)
+        self.cli("report", "--date", DAY)
+        self.assertFalse([p for p in self.paths(mark) if "/comments/" in p], "los tickets sin cambios no se vuelven a pedir")
+        issue = self.fake.data["issues"][gs.P1][-1]
+        issue["updated_at"] = "2026-10-21T09:00:00Z"
+        self.sb.advance(10 * 60)
+        mark = len(self.fake.requests)
+        self.cli("report", "--date", DAY)
+        self.assertEqual([p for p in self.paths(mark) if "/comments/" in p], [f"/api/v1/workspaces/ws/projects/{gs.P1}/issues/{issue['id']}/comments/"])
+        mark = len(self.fake.requests)
+        self.cli("report", "--date", DAY, "--refresh")
+        self.assertGreater(len([p for p in self.paths(mark) if "/comments/" in p]), 1, "--refresh vuelve a leerlo todo")
+
     def test_a_failed_comment_read_leaves_that_project_incomplete(self):
         self.fake.fail = [("GET", r"/issues/%s/comments/$" % "10000000-0000-4000-8000-000000000001", 404, {"detail": "no"})]
         self.cli("report", "--date", DAY, "--refresh")
@@ -122,7 +157,8 @@ class Freshness(Base):
         self.assertNotIn("⚠", err)
         self.sb.advance(10 * 60)
         self.cli("report", "--date", DAY)
-        self.assertTrue([p for p in self.paths(mark) if "/comments/" in p], "pasado el enfriamiento se vuelve a comparar con Plane")
+        self.assertTrue([p for p in self.paths(mark) if "/issues/?" in p], "pasado el enfriamiento se vuelve a comparar con Plane (listado de tickets)")
+        self.assertFalse([p for p in self.paths(mark) if "/comments/" in p], "pero los comentarios de lo que no cambió no se releen")
 
     def test_without_plane_the_report_says_the_period_was_never_synced(self):
         out, err = self.cli("report", "--date", DAY, env_set=OFFLINE)

@@ -144,7 +144,7 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     now = clock.timestamp()
     if force_sync or not (status.verified and now - status.as_of <= SYNC_COOLDOWN):
         try:
-            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=project)
+            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=project, force=force_sync)
         except PlaneUnavailable as exc:
             sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); se omite la sincronización y se usan los datos locales.\n")
         status = hours_status(conn, accessible_idents(conn, workspace, project), s_str, e_str)

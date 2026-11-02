@@ -189,6 +189,8 @@ class FakePlane:
         self.fail = []  # [(método, regex de ruta, estado, cuerpo)]
         self.faults = []
         self.extra_headers = {}  # cabeceras añadidas a toda respuesta normal (p. ej. X-RateLimit-*); vacío por defecto
+        self.rate_budget = None  # con un número, simula la ventana de tasa: X-RateLimit-Remaining baja con cada petición hasta new_window()
+        self.window_count = 0
         self.store_comments = False
         self.ext_id = True
         self.committed = []
@@ -233,6 +235,9 @@ class FakePlane:
     def add_fault(self, method, path, kind, arg=None, n=None):
         self.faults.append({"method": method, "path": path, "kind": kind, "arg": arg, "n": n, "hits": 0})
 
+    def new_window(self):
+        self.window_count = 0
+
     def clear_faults(self):
         self.faults.clear()
 
@@ -248,6 +253,9 @@ class FakePlane:
         handler.send_header("Content-Length", str(len(body)))
         for name, value in self.extra_headers.items():
             handler.send_header(name, value)
+        if self.rate_budget is not None:
+            handler.send_header("X-RateLimit-Remaining", str(max(0, self.rate_budget - self.window_count)))
+            self.window_count += 1
         handler.end_headers()
         if body:
             handler.wfile.write(body)

@@ -5,7 +5,8 @@ No hace: imprimir reportes. Cubre los proyectos ACCESIBLES (no una lista fija), 
 filtros de fecha), lee los comentarios solo de los tickets con actividad en el periodo y se detiene antes de agotar el presupuesto de tasa dejando la sincronización marcada como
 incompleta. La marca de sincronización es por proyecto y periodo (tabla `worklog_sync`). Nada se inventa: sin fecha u hora medidas el comentario no entra (se cuenta); balde, fase,
 rol, tipo de trabajador, pista y notas que no vengan en el comentario se guardan con su procedencia (`defaulted_json`). Dos sincronizaciones del mismo comentario dan filas idénticas.
-Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina
+La lectura de comentarios es incremental por ticket (`worklog_issue_sync`): un ticket cuyo `updated_at` no cambió desde la última lectura completa de sus comentarios no se vuelve a pedir, así
+una sincronización cortada por el presupuesto de tasa AVANZA en la siguiente y converge; `force=True` (`report --refresh`) relee todo. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina
 con un aviso y sin marcarlo.
 """
 
@@ -40,6 +41,7 @@ class SyncResult:
     unmeasured: int = 0          # con duración pero sin fecha u hora medidas: no entran (no se derivan del reloj)
     unmeasured_by: dict = field(default_factory=dict)  # lo mismo por proyecto
     pending: int = 0
+    unchanged: int = 0           # tickets cuyos comentarios no se releyeron porque no cambiaron desde la última lectura
     unavailable: list = field(default_factory=list)   # PlaneUnavailable que cortaron la sincronización
     incomplete: set = field(default_factory=set)      # proyectos que quedaron a medias (presupuesto de tasa, 403, error de lectura)
     marked: dict = field(default_factory=dict)        # proyecto -> complete
@@ -152,6 +154,18 @@ def _ingest(conn, ident, issue, comments, actor_uuid, result):
         result.synced += 1
 
 
+def _unchanged(conn, tasks):
+    """Índices de `tasks` cuyo ticket no cambió desde la última lectura completa de sus comentarios."""
+    known = {r["issue_id"]: r["issue_updated_at"] for r in conn.execute("SELECT issue_id, issue_updated_at FROM worklog_issue_sync")}
+    return {n for n, (_ident, _pid, issue) in enumerate(tasks) if issue.get("updated_at") and known.get(issue["id"]) == issue["updated_at"]}
+
+
+def _remember_read(conn, issue):
+    with conn:
+        conn.execute("INSERT INTO worklog_issue_sync (issue_id, issue_updated_at, as_of) VALUES (?, ?, ?) "
+                     "ON CONFLICT(issue_id) DO UPDATE SET issue_updated_at = excluded.issue_updated_at, as_of = excluded.as_of", (issue["id"], issue.get("updated_at"), clock.timestamp()))
+
+
 def _record_marks(conn, targets, date_from, date_to, result):
     """Una marca por proyecto y periodo; `complete` solo si ese proyecto se leyó entero. Sin red no se marca nada."""
     now = clock.timestamp()
@@ -178,8 +192,8 @@ def _report(result):
         sys.stderr.write("ℹ Sincronización completa: sin nuevos registros telemétricos.\n")
 
 
-def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None):
-    """Sincroniza los comentarios de Plane de los tickets con actividad en el periodo y los persiste en SQLite; devuelve el SyncResult."""
+def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None, force=False):
+    """Sincroniza los comentarios de Plane de los tickets con actividad en el periodo y los persiste en SQLite; devuelve el SyncResult. `force` relee también los tickets sin cambios."""
     sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
     targets = _targets(conn, base_url, api_key, workspace, filter_project)
     actor_uuid = get_actor_uuid(base_url, api_key, workspace, conn)  # solo mis comentarios alimentan mi reporte
@@ -200,9 +214,12 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
             result.incomplete.add(ident)
         tasks += [(ident, project_id, issue) for issue in issues]
 
-    if not result.unavailable and tasks:
+    skip = set() if force else _unchanged(conn, tasks)
+    result.unchanged = len(skip)
+    pending_tasks = [t for n, t in enumerate(tasks) if n not in skip]
+    if not result.unavailable and pending_tasks:
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(_comments, base_url, api_key, workspace, pid, issue): (ident, issue) for ident, pid, issue in tasks}
+            futures = {executor.submit(_comments, base_url, api_key, workspace, pid, issue): (ident, issue) for ident, pid, issue in pending_tasks}
             for future in as_completed(futures):
                 ident, issue = futures[future]
                 comments, state = future.result()
@@ -211,6 +228,8 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                 elif state != "ok":
                     result.incomplete.add(ident)
                 _ingest(conn, ident, issue, comments, actor_uuid, result)
+                if state == "ok":
+                    _remember_read(conn, issue)
 
     if result.unavailable:
         sys.stderr.write(f"⚠ Sincronización incompleta: Plane no responde ({result.unavailable[0].cause}); se usan los datos locales.\n")

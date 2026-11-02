@@ -142,3 +142,9 @@ Notas de alcance: el endpoint de 1 GET por etiqueta (`workspaces/{ws}/issues/{PR
 | Id | Sev. | Hallazgo | Estado | Dónde se atiende |
 | :--- | :---: | :--- | :--- | :--- |
 | V44 | BAJO | La fila de `cmd_read`, `cmd_report` y `cmd_sync` de la tabla de capas (modelo de consulta) solo permite `views`, `scope`, `scope_flags`, `freshness` y `errors`, pero un comando necesita además `config` (flags comunes), `envelope` y `output` (construir y emitir el sobre) y `vocabulary` (valores de `--include`). | Corregido | `COMMAND_DEPS` en la tabla `DEPENDENCIES` de `tests/test_architecture.py` (con `history_sweep` solo en `cmd_read`, hasta la fase 6). |
+
+## Hallazgo de la validación real de la fase 4 (2026-11-02)
+
+| Id | Sev. | Hallazgo | Estado | Dónde se atiende |
+| :--- | :---: | :--- | :--- | :--- |
+| V45 | ALTO | Con la API real (60 peticiones por ventana) un periodo pasado con muchos tickets activos queda siempre parcial: la sincronización respetaba el presupuesto (0 respuestas 429) pero cada ejecución volvía a empezar por los tickets más recientes y volvía a agotarlo, así que **nunca convergía**; con el servidor falso (sin límite) las pruebas no lo mostraban. Incumplía el criterio del 0017 "un periodo ya pasado se reconstruye completo". | Corregido | Lectura de comentarios incremental por ticket (`worklog_issue_sync`, por `updated_at`); `--refresh` relee todo. El servidor falso simula la ventana de tasa (`rate_budget`, `new_window()`) y una prueba comprueba la convergencia. **Sin verificar:** que editar un comentario existente cambie el `updated_at` del ticket (si no lo hiciera, la edición se vería con `report --refresh`, no con el incremental). |

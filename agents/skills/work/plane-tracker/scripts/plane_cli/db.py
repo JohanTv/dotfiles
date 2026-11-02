@@ -283,6 +283,14 @@ def init_sync_state(conn):
         );
     """)
     ensure_columns(conn, "worklogs", {"defaulted_json": "TEXT NOT NULL DEFAULT '[]'"})
+    # Comentarios ya leídos por ticket (para que una sincronización a medias avance en la siguiente en vez de repetir los más recientes): el ticket no cambió desde entonces.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS worklog_issue_sync (
+            issue_id TEXT PRIMARY KEY,
+            issue_updated_at TEXT,
+            as_of REAL NOT NULL
+        );
+    """)
 
 
 def init_search_index(conn):
