@@ -26,7 +26,7 @@ summary: Un modelo común (alcance, cobertura, almacenes, consultas, vistas y so
 | [`plan-de-migracion.md`](./plan-de-migracion.md) | **El plan de implementación**: nueve fases entregables con aceptación y riesgos. |
 | [`cambio-de-regla-momento-cero.md`](./cambio-de-regla-momento-cero.md) | El cambio de la regla externa y cuándo ejecutarlo. |
 | [`alternativas.md`](./alternativas.md) | Lo evaluado y descartado, y lo que queda abierto. |
-| [`revision-adversarial.md`](./revision-adversarial.md) | Los 25 hallazgos de la revisión, los 14 de la validación contra la API real y los de la implementación de las fases 0 (V15-V22) y 1 (V23-V28), con su resolución. |
+| [`revision-adversarial.md`](./revision-adversarial.md) | Los 25 hallazgos de la revisión, los 14 de la validación contra la API real y los de la implementación de las fases 0 (V15-V22) 1 (V23-V28), 2 (V29-V30) y 3 (V31-V36), con su resolución. |
 
 ## Contexto (evidencia verificada en el código)
 

@@ -32,8 +32,8 @@ Promueve [`contrato-json.md`](../rfcs/0021-arquitectura-de-lectura-consultas-y-v
 | Clave | Tipo | Regla |
 | :--- | :--- | :--- |
 | `schema` | cadena | `plane-tracker/<n>`; un cambio incompatible sube `<n>` y exige una decisión. |
-| `view` | cadena | una de las vistas registradas: `list`, `get`, `report time`, `report flow`, `worklog check`, `labels`, `projects`. |
-| `scope` | objeto | el alcance **resuelto**, solo con las dimensiones que la vista acepta. **Opcional**: `get` no lo lleva (su alcance es un ticket, en `results`). |
+| `view` | cadena | una de las vistas registradas: `list`, `get`, `report time`, `report flow`, `worklog check`, `labels`, `projects`, `whoami`, `attachment list`, `outbox list`. |
+| `scope` | objeto | el alcance **resuelto**, solo con las dimensiones que la vista acepta. **Opcional**: `get`, `whoami` y `attachment list` no lo llevan (su alcance es un ticket o la identidad, en `results`). |
 | `total` | entero | recuento antes del límite. |
 | `count` | entero | `len(results)`; nunca mayor que `total` ni que `scope.limit`; sin límite (reportes) `count == total`. |
 | `results` | lista | filas con **solo** campos del vocabulario de su familia. |
@@ -51,7 +51,7 @@ Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara 
 - Claves de `coverage`: `source`, `as_of`, `age_s`, `stale`, `complete`, `unavailable`, `detail`
 - Valores de `coverage.source`: `cache`, `api`, `snapshot`, `local`, `mixed`
 - Notas siempre visibles: `truncated`, `text_looks_like_id`
-- Claves de `coverage.detail`: `history`, `text_fields`, `hours_scope`, `hours_verified`, `capped`, `legacy`, `forbidden`, `rate_budget_exhausted`, `assignment_snapshot`, `count_mismatch`
+- Claves de `coverage.detail`: `history`, `text_fields`, `hours_scope`, `hours_verified`, `capped`, `legacy`, `forbidden`, `rate_budget_exhausted`, `assignment_snapshot`, `count_mismatch`, `comments`, `metadata_only`
 
 `person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas). Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
 
@@ -132,16 +132,17 @@ Vista `report flow`. Son los nombres vigentes de `flow_metrics.py`, que se conse
 | `flags` | `list` | marcas de calidad del dato |
 | `created` | `str?` | creación |
 | `closed` | `str?` | cierre |
-| `lead_minutes` | `int?` | lead time |
-| `cycle_active_minutes` | `int?` | cycle time activo |
-| `cycle_gross_minutes` | `int?` | cycle time bruto |
+| `lead_minutes` | `num?` | lead time |
+| `cycle_active_minutes` | `num?` | cycle time activo |
+| `cycle_gross_minutes` | `num?` | cycle time bruto |
 | `by_state_minutes` | `dict` | minutos por estado |
-| `effort_compute_minutes` | `int?` | esfuerzo calculado |
-| `effort_clock_minutes` | `int?` | esfuerzo registrado |
+| `effort_compute_minutes` | `num?` | esfuerzo calculado |
+| `effort_clock_minutes` | `num?` | esfuerzo registrado |
 | `worklogs` | `int` | registros de horas |
 | `worklogs_before_created` | `int` | registros anteriores a la creación |
 | `worklogs_after_closed` | `int` | registros posteriores al cierre |
 | `effort_clock_over_cycle` | `num?` | esfuerzo registrado sobre el cycle time |
+| `transitions` | `list` | solo en `get --history`: `{at, from, to}` con nombres de estado |
 
 ### Familia `check`
 
@@ -174,6 +175,52 @@ Vista `projects`.
 | `identifier` | `str!` | identificador (`PRJ`) |
 | `name` | `str!` | nombre |
 
+### Familia `whoami`
+
+Vista `whoami`: una sola fila con la configuración activa. `source` indica de dónde sale la identidad: `actor_env` (`PLANE_ACTOR_UUID`), `username` (resuelta por `PLANE_USERNAME`) o `unset`. `status` es `ok`, `unresolved` (el usuario no coincide con ningún miembro; salida 1) o `unset`.
+
+| Campo | Tipo | Significado |
+| :--- | :--- | :--- |
+| `workspace` | `str!` | workspace activo |
+| `base_url` | `str` | URL de Plane |
+| `actor` | `str?` | UUID resuelto |
+| `username` | `str?` | `PLANE_USERNAME`, si está definido |
+| `source` | `str!` | origen de la identidad |
+| `status` | `str!` | resultado de la comprobación |
+
+### Familia `attachment`
+
+Vista `attachment list`.
+
+| Campo | Tipo | Significado |
+| :--- | :--- | :--- |
+| `ticket` | `str!` | ticket al que pertenece |
+| `id` | `str!` | UUID del adjunto |
+| `name` | `str?` | nombre del archivo |
+| `size` | `int?` | tamaño en bytes |
+| `created_at` | `str?` | ISO UTC |
+
+### Familia `outbox_item`
+
+Vista `outbox list`: registros de la cola de salida de `comment add`. `scope.state` es `open` o `all` (`--all`).
+
+| Campo | Tipo | Significado |
+| :--- | :--- | :--- |
+| `id` | `int!` | número del registro |
+| `client_id` | `str!` | clave de idempotencia |
+| `state` | `str!` | `pending`, `sending`, `sent`, `failed` o `dropped` |
+| `ticket` | `str!` | etiqueta del ticket |
+| `track` | `str` | pista |
+| `date` | `str` | fecha del registro de horas |
+| `start_time` | `str` | hora de inicio |
+| `minutes` | `int?` | duración |
+| `attempts` | `int` | intentos de envío |
+| `maybe_delivered` | `bool` | pudo haberse enviado |
+| `last_error` | `str?` | último error |
+| `plane_comment_id` | `str?` | comentario publicado |
+| `created_at` | `str` | creación |
+| `preview` | `str` | vista previa de 80 caracteres |
+
 ### Resumen `hours_summary`
 
 `summary` de `report time`. `by_day`, `by_project` y `by_capacity` son listas de `{key, minutes}`; lo no medido por defecto va en `by_capacity` bajo la clave `undeclared`, nunca sumado a `deep_work`.
@@ -199,8 +246,8 @@ Vista `projects`.
 | `excluded` | `int` | excluidos |
 | `n_lead` | `int` | muestras de lead time |
 | `n_cycle` | `int` | muestras de cycle time |
-| `median_lead_minutes` | `int?` | mediana de lead time |
-| `median_cycle_minutes` | `int?` | mediana de cycle time |
+| `median_lead_minutes` | `num?` | mediana de lead time |
+| `median_cycle_minutes` | `num?` | mediana de cycle time |
 
 ### Resumen `check_summary`
 
@@ -220,6 +267,7 @@ Claves permitidas de cada elemento de estas listas dentro de una fila.
 | `assignees` | `id`, `name` |
 | `assignment_events` | `at`, `kind`, `user_id`, `user_name` |
 | `comments` | `id`, `author`, `created_at`, `text` |
+| `transitions` | `at`, `from`, `to` |
 
 ## Códigos de comprobación (`worklog check`)
 

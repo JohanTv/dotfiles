@@ -2,12 +2,11 @@ $ plane.py projects
 [exit 0]
 --- stdout ---
 
-📂 Proyectos en el workspace 'ws':
+📂 Proyectos del workspace (2):
   • OMNIFY         ➔  Omnify
   • OPS            ➔  Operaciones
 
-💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').
-   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.
+💡 Usa 'plane-tracker projects --refresh' para forzar la sincronización con el servidor Plane.
 --- stderr ---
 
 

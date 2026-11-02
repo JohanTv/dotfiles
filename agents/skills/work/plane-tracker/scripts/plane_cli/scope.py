@@ -68,6 +68,14 @@ def _projects(args, catalogs, view):
     return (default,) if default else ()
 
 
+def single_project(args, catalogs):
+    """El proyecto de `-p` (o el de por defecto) para las vistas de catálogo de un solo proyecto; unknown_project con la lista de opciones."""
+    projects = _projects(args, catalogs, None)
+    if not projects:
+        raise CliError("unknown_project", "No hay proyecto por defecto accesible.", f"Opciones: {', '.join(p.ident for p in catalogs.projects)}. Usa -p PRJ.")
+    return projects[0]
+
+
 def resolve_scope(args, catalogs, view):
     """Scope validado de `args` para `view` (View con dims, controls y defaults) frente a `catalogs` (proyectos accesibles, proyecto por defecto y actor)."""
     person = next((relation for flag, relation in PERSON_FLAGS if getattr(args, flag, False)), None) if "person" in view.dims else None

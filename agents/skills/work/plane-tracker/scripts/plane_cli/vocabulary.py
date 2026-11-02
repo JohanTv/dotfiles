@@ -24,7 +24,7 @@ COVERAGE_SOURCES = ("cache", "api", "snapshot", "local", "mixed")
 COVERAGE_KEYS = {"source": "str!", "as_of": "str?!", "age_s": "int?!", "stale": "bool!", "complete": "bool?!", "unavailable": "list!", "detail": "dict!"}
 # Claves conocidas de coverage.detail (por vista); las que alimentan notas derivadas están en coverage.py.
 DETAIL_KEYS = frozenset({"history", "text_fields", "hours_scope", "capped", "legacy", "forbidden", "rate_budget_exhausted", "assignment_snapshot",
-                         "count_mismatch", "hours_verified"})
+                         "count_mismatch", "hours_verified", "comments", "metadata_only"})
 NOTE_KEYS = {"code": "str!", "text": "str!", "hint": "str"}
 ERROR_KEYS = {"schema": "str!", "status": "str!", "code": "str!", "message": "str!", "hint": "str", "exit": "int!", "detail": "dict"}
 
@@ -33,10 +33,10 @@ BRIEF_FIELDS = ("ticket", "title", "state", "state_group", "project")  # filas b
 _TICKET = {"ticket": "str!", "uuid": "str", "title": "str!", "state": "str!", "state_group": "str!", "priority": "str", "project": "str!",
            "assignees": "list", "created_by": "str?", "labels": "list", "start_date": "str?", "target_date": "str?", "created_at": "str?",
            "completed_at": "str?", "plane_updated_at": "str?", "reasons": "list", "assignment_events": "list"}
-_FLOW = {"ticket": "str!", "title": "str", "outcome": "str!", "flags": "list", "created": "str?", "closed": "str?", "lead_minutes": "int?",
-         "cycle_active_minutes": "int?", "cycle_gross_minutes": "int?", "by_state_minutes": "dict", "effort_compute_minutes": "int?",
-         "effort_clock_minutes": "int?", "worklogs": "int", "worklogs_before_created": "int", "worklogs_after_closed": "int",
-         "effort_clock_over_cycle": "num?"}
+_FLOW = {"ticket": "str!", "title": "str", "outcome": "str!", "flags": "list", "created": "str?", "closed": "str?", "lead_minutes": "num?",
+         "cycle_active_minutes": "num?", "cycle_gross_minutes": "num?", "by_state_minutes": "dict", "effort_compute_minutes": "num?",
+         "effort_clock_minutes": "num?", "worklogs": "int", "worklogs_before_created": "int", "worklogs_after_closed": "int",
+         "effort_clock_over_cycle": "num?", "transitions": "list"}
 FAMILIES = {
     "ticket": _TICKET,
     "ticket_detail": {**_TICKET, "description": "str?", "comments": "list", "links": "list", "attachments": "list",
@@ -46,22 +46,29 @@ FAMILIES = {
     "flow": _FLOW,
     "check": {"code": "str!", "ticket": "str!", "comment_id": "str?", "detail": "str"},
     "label": {"id": "str!", "name": "str!", "color": "str"},
+    "whoami": {"workspace": "str!", "base_url": "str", "actor": "str?", "username": "str?", "source": "str!", "status": "str!"},
+    "attachment": {"ticket": "str!", "id": "str!", "name": "str?", "size": "int?", "created_at": "str?"},
+    "outbox_item": {"id": "int!", "client_id": "str!", "state": "str!", "ticket": "str!", "track": "str", "date": "str", "start_time": "str",
+                    "minutes": "int?", "attempts": "int", "maybe_delivered": "bool", "last_error": "str?", "plane_comment_id": "str?",
+                    "created_at": "str", "preview": "str"},
     "project": {"id": "str!", "identifier": "str!", "name": "str!"},
 }
 # Objetos anidados dentro de una fila: nombre del campo -> claves permitidas de cada elemento.
-NESTED = {"assignees": {"id", "name"}, "assignment_events": {"at", "kind", "user_id", "user_name"}, "comments": {"id", "author", "created_at", "text"}}
+NESTED = {"assignees": {"id", "name"}, "assignment_events": {"at", "kind", "user_id", "user_name"}, "comments": {"id", "author", "created_at", "text"},
+          "transitions": {"at", "from", "to"}}
 # Agregados (`summary`) por familia de resumen. `report time` lleva listas de {key, minutes}; `undeclared` va en by_capacity, nunca sumado a deep_work.
 SUMMARIES = {
     "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int"},
     "flow_summary": {"tickets": "int", "completed": "int", "cancelled": "int", "open": "int", "excluded": "int", "n_lead": "int", "n_cycle": "int",
-                     "median_lead_minutes": "int?", "median_cycle_minutes": "int?"},
+                     "median_lead_minutes": "num?", "median_cycle_minutes": "num?"},
     "check_summary": {"ok": "bool", "unreachable": "int"},
 }
 SUMMARY_ITEM_KEYS = {"key", "minutes"}  # elementos de by_day, by_project y by_capacity
 # vista -> (familia de filas, familia de resumen o None, lleva `scope`). `get` no lleva alcance: el alcance es un ticket, en `results`.
 VIEWS = {"list": ("ticket", None, True), "get": ("ticket_detail", None, False), "report time": ("hours", "hours_summary", True),
          "report flow": ("flow", "flow_summary", True), "worklog check": ("check", "check_summary", True), "labels": ("label", None, True),
-         "projects": ("project", None, True)}
+         "projects": ("project", None, True), "whoami": ("whoami", None, False), "attachment list": ("attachment", None, False),
+         "outbox list": ("outbox_item", None, True)}
 
 # Nombre de hoy -> nombre del contrato (columna "Sustituye a"), por familia. Sirve para validar el vocabulario contra los JSON reales (F4).
 REPLACES = {
@@ -70,12 +77,13 @@ REPLACES = {
     "hours": {"ticket": ("ticket_id",), "project": ("project_id",), "minutes": ("duration_minutes",), "capacity": ("capacity_bucket",),
               "author": ("author_id",)},
     "assignment_events": {"at": ("at_utc",)},
+    "outbox_item": {"minutes": ("duration_minutes",)},
     "comments": {"author": ("actor", "created_by"), "text": ("comment_html",)},
 }
 # Campos de hoy que el contrato no lleva y que se descartan a propósito (registrados en la revisión adversarial, V18).
 DROPPED = {
     "ticket": ("sequence_id", "updated_by"),  # sequence_id ya va dentro de `ticket`
-    "ticket_detail": ("total_comments", "comments_skipped"),
+    "ticket_detail": ("total_comments", "comments_skipped", "stale", "fetched_at", "metadata_only"),
     "hours": ("issue_name", "stoppers_json", "raw_payload", "plane_comment_id", "created_at", "updated_at"),
 }
 

@@ -2,12 +2,11 @@ $ plane.py projects
 [exit 0]
 --- stdout ---
 
-📂 Proyectos en el workspace 'ws':
+📂 Proyectos del workspace (2):
   • OMNIFY         ➔  Omnify
   • OPS            ➔  Operaciones
 
-💡 Proyecto principal por defecto: OMNIFY (ej: OMNIFY-175 o solo '175').
-   Usa 'plane-tracker projects --refresh' para forzar sincronización con el servidor Plane.
+💡 Usa 'plane-tracker projects --refresh' para forzar la sincronización con el servidor Plane.
 --- stderr ---
 
 
@@ -48,40 +47,7 @@ $ plane.py outbox list
 $ plane.py outbox list --json
 [exit 0]
 --- stdout ---
-[
-  {
-    "id": 1,
-    "client_id": "<VOLATIL>",
-    "state": "pending",
-    "ticket": "OMNIFY-1",
-    "track": "mm",
-    "date": "2026-10-21",
-    "start_time": "08:00",
-    "duration_minutes": 20,
-    "attempts": 0,
-    "maybe_delivered": false,
-    "last_error": "modo sin conexión (PLANE_OFFLINE=1)",
-    "plane_comment_id": null,
-    "created_at": "2026-11-02T12:00:00+00:00",
-    "preview": "Primero"
-  },
-  {
-    "id": 2,
-    "client_id": "<VOLATIL>",
-    "state": "pending",
-    "ticket": "OMNIFY-1",
-    "track": "mm",
-    "date": "2026-10-21",
-    "start_time": "08:30",
-    "duration_minutes": 20,
-    "attempts": 0,
-    "maybe_delivered": false,
-    "last_error": "modo sin conexión (PLANE_OFFLINE=1)",
-    "plane_comment_id": null,
-    "created_at": "2026-11-02T12:00:00+00:00",
-    "preview": "Segundo"
-  }
-]
+{"count":2,"coverage":{"age_s":null,"as_of":null,"complete":true,"detail":{},"source":"local","stale":false,"unavailable":[]},"notes":[],"results":[{"attempts":0,"client_id":"<VOLATIL>","created_at":"2026-11-02T12:00:00+00:00","date":"2026-10-21","id":1,"last_error":"modo sin conexión (PLANE_OFFLINE=1)","maybe_delivered":false,"minutes":20,"plane_comment_id":null,"preview":"Primero","start_time":"08:00","state":"pending","ticket":"OMNIFY-1","track":"mm"},{"attempts":0,"client_id":"<VOLATIL>","created_at":"2026-11-02T12:00:00+00:00","date":"2026-10-21","id":2,"last_error":"modo sin conexión (PLANE_OFFLINE=1)","maybe_delivered":false,"minutes":20,"plane_comment_id":null,"preview":"Segundo","start_time":"08:30","state":"pending","ticket":"OMNIFY-1","track":"mm"}],"schema":"plane-tracker/1","scope":{"order":"id","state":"open"},"summary":null,"total":2,"view":"outbox list"}
 --- stderr ---
 
 

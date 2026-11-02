@@ -48,7 +48,7 @@ $ plane.py whoami   [sin PLANE_ACTOR_UUID]
 ❌ No se pudo resolver el UUID para PLANE_USERNAME='nadie'
    Verifica que el nombre o email coincida exactamente con tu perfil en Plane.
 --- stderr ---
-⚠ PLANE_USERNAME='nadie' no coincide con ningún miembro del workspace.
+
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/members/

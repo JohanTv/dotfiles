@@ -47,8 +47,8 @@ options:
   --no-comments     No traer ni mostrar comentarios (ahorra tokens)
   --last N          Mostrar solo los últimos N comentarios (por defecto:
                     todos)
-  --full            Sin truncar descripción ni comentarios (por defecto 300
-                    caracteres)
+  --full            Sin truncar descripción ni comentarios en el texto (por
+                    defecto 300 caracteres)
   --no-description  Omitir la descripción
   --history         Añadir flujo: lead/cycle time, tiempo por estado, esfuerzo
                     y transiciones
@@ -237,16 +237,18 @@ options:
 $ plane.py labels --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py labels [-h] [-p PROJECT] [--refresh] [--json]
+usage: plane.py labels [-h] [-p PROJECT] [--refresh] [--offline] [--json]
 
 Etiquetas disponibles en un proyecto, desde la caché local (--refresh la
-actualiza).
+actualiza; --offline no consulta Plane).
 
 options:
   -h, --help            show this help message and exit
   -p, --project PROJECT
-                        Identificador del proyecto (por defecto OMNIFY)
-  --refresh             Forzar sincronización remota con la API de Plane
+                        Identificador del proyecto (por defecto, el del
+                        entorno)
+  --refresh             Forzar la sincronización con Plane
+  --offline             No consultar Plane: solo lo local
   --json                Salida en JSON
 --- stderr ---
 
@@ -254,13 +256,15 @@ options:
 $ plane.py projects --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py projects [-h] [--refresh] [--json]
+usage: plane.py projects [-h] [--refresh] [--offline] [--json]
 
-Proyectos disponibles en Plane, desde la caché local (--refresh la actualiza).
+Proyectos disponibles en Plane, desde la caché local (--refresh la actualiza;
+--offline no consulta Plane).
 
 options:
   -h, --help  show this help message and exit
-  --refresh   Forzar sincronización remota con la API de Plane
+  --refresh   Forzar la sincronización con Plane
+  --offline   No consultar Plane: solo lo local
   --json      Salida en JSON
 --- stderr ---
 
@@ -268,12 +272,13 @@ options:
 $ plane.py whoami --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py whoami [-h]
+usage: plane.py whoami [-h] [--json]
 
 Verifica la configuración activa: workspace, usuario y UUID resuelto.
 
 options:
   -h, --help  show this help message and exit
+  --json      Salida en JSON
 --- stderr ---
 
 

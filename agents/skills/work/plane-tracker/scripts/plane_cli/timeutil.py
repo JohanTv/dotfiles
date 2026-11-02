@@ -1,7 +1,7 @@
 """Aritmética de horarios y fusión de intervalos (medida de Klee) para los reportes de actividad.
 
 Expone: time_to_minutes(), minutes_to_time(), calculate_klee_union_minutes(), expand_segments(),
-merge_daily_worklogs(), format_minutes(), render_day_block(), age_text(), iso_utc(), iso_z(), DIAS_SEMANA.
+merge_daily_worklogs(), format_minutes(), render_day_block(), age_text(), iso_utc(), iso_z(), format_span(), DIAS_SEMANA.
 No hace: red ni acceso a la base de datos.
 """
 
@@ -214,6 +214,13 @@ def render_day_block(date_obj, rows):
         lines.append("⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)")
 
     return "\n".join(lines)
+
+
+def format_span(minutes):
+    """Minutos como `—`, `1h 05m` o `2.5 d` (desde un día)."""
+    if minutes is None:
+        return "—"
+    return f"{minutes / 1440:.1f} d" if minutes >= 1440 else format_minutes(int(round(minutes)))
 
 
 def age_text(seconds):

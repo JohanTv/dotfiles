@@ -6,7 +6,6 @@ No hace: crear tickets.
 """
 
 import argparse
-import json
 import mimetypes
 import os
 import sys
@@ -18,7 +17,11 @@ import session_clock
 
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
+from plane_cli.envelope import build
+from plane_cli.freshness import Env, fetch_attachments
+from plane_cli.output import emit
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
+from plane_cli.views import VIEWS
 
 
 ATTACH_MAX_BYTES = 50 * 1024 * 1024
@@ -125,20 +128,9 @@ def cmd_attachment_delete(args, conn, base_url, api_key, workspace, default_proj
 
 def cmd_attachment_list(args, conn, base_url, api_key, workspace, default_project_id):
     """Lista los adjuntos del work item."""
-    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/issue-attachments/"
-    data = api_request(url, api_key)
-    items = data if isinstance(data, list) else data.get("results", [])
-    rows = [{"id": a.get("id"), "name": (a.get("attributes") or {}).get("name"), "size": (a.get("attributes") or {}).get("size") or a.get("size"),
-             "created_at": a.get("created_at")} for a in items]
-    if getattr(args, "json", False):
-        print(json.dumps(rows, indent=2, ensure_ascii=False))
-        return
-    print(f"\n📎 Adjuntos de {issue_ref} ({len(rows)}):")
-    for r in rows:
-        print(f"   • {r['name']}  ({(r['size'] or 0) / 1024:.1f} KB)  {local_stamp(r['created_at'])}  {r['id']}")
-    print("")
+    view = VIEWS["attachment list"]
+    issue_ref, items, coverage = fetch_attachments(conn, Env(base_url, api_key, workspace, default_project_id), args.issue)
+    emit(view, build(view.name, None, view.query(issue_ref, items, coverage)), getattr(args, "json", False))
 
 
 def register_attachment_add(sub):

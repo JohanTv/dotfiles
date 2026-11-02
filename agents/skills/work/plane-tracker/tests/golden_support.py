@@ -316,6 +316,11 @@ class FakePlane:
             return self.reply(handler, 200, {"results": d["projects"]})
         if rest == ["members"]:
             return self.reply(handler, 200, d["members"])
+        if len(rest) == 2 and rest[0] == "issues":  # un ticket por su etiqueta PRJ-n (1 GET)
+            ident, _, seq = rest[1].rpartition("-")
+            pid = next((p["id"] for p in d["projects"] if p["identifier"] == ident), None)
+            issue = next((i for i in d["issues"].get(pid, []) if str(i["sequence_id"]) == seq), None)
+            return self.reply(handler, 200, issue) if issue else self.reply(handler, 404, {"detail": "not found"})
         if len(rest) < 2 or rest[0] != "projects":
             return self.reply(handler, 404, {"detail": "no"})
         pid, tail = rest[1], rest[2:]
@@ -554,7 +559,7 @@ def normalize(text, sandbox, scrub=()):
     text = re.sub(r"\b(group\W+|grupo |pendiente )[0-9a-f]{8}\b", r"\1<GRP>", text)
     if scrub:
         text = re.sub(r'(\d+) ms\b', "<N> ms", text)
-        text = re.sub(r'"(%s)": (?:"[^"]*"|[\d.]+)' % "|".join(scrub), r'"\1": "<VOLATIL>"', text)
+        text = re.sub(r'"(%s)":( ?)(?:"[^"]*"|[\d.]+)' % "|".join(scrub), r'"\1":\2"<VOLATIL>"', text)  # JSON indentado y compacto
     return text
 
 

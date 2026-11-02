@@ -36,7 +36,7 @@ DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
-    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil"), 1), "query_*": (("store_*", "scope", "coverage", "assignments"), 1),
+    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox"), 1),
     "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
     "cmd_read": (("views", "scope", "scope_flags", "freshness", "errors"), 3), "cmd_report": (("views", "scope", "scope_flags", "freshness", "errors"), 5),
     "cmd_sync": (("views", "scope", "scope_flags", "freshness", "errors"), 6),
@@ -113,16 +113,20 @@ def pending(fid, what):
     raise AssertionError(f"{fid} sin escribir: {what}. Esta función de aptitud está activa desde la fase {PHASES[fid]}: hay que implementarla.")
 
 
-VIEW_COMMANDS = {"list": ["list"]}  # vista -> argv de su comando (las vistas de caché que F5, F6 y F7 recorren)
-NON_DIMENSIONAL_FLAGS = {"-h", "--help", "--json", "--refresh-history", "--budget"}  # flags que no son dimensiones ni controles (lista blanca de F2)
+# vista -> argv de su comando (lo que F5, F6 y F7 recorren); `seed` prepara la caché de la vista y `attachment list` es una lectura de red (queda fuera de F5)
+VIEW_COMMANDS = {"list": ["list"], "get": ["get", "OMNIFY-1"], "labels": ["labels"], "projects": ["projects"], "whoami": ["whoami"],
+                 "attachment list": ["attachment", "list", "OMNIFY-1"], "outbox list": ["outbox", "list"]}
+CACHE_VIEWS = {"list", "get", "labels", "projects"}  # vistas de caché: sobre una caché vencida dan stale y complete null
+NON_DIMENSIONAL_FLAGS = {"-h", "--help", "--json"}  # flags que no son dimensiones ni controles (lista blanca de F2; cada vista declara además sus extra_flags)
 
 
-def age_issues(sandbox, seconds):
-    """Envejece la caché de tickets de un Sandbox (también su marca de sincronización por proyecto)."""
+def age_caches(sandbox, seconds):
+    """Envejece todas las cachés de un Sandbox (tickets y su marca por proyecto, catálogos, miembros e instantáneas de `get`)."""
     import sqlite3
     conn = sqlite3.connect(os.path.join(sandbox.home, ".cache", "plane", "worklogs.db"))
-    conn.execute("UPDATE issues_cache SET updated_at = updated_at - ?", (seconds,))
-    conn.execute("UPDATE issue_sync SET as_of = as_of - ?", (seconds,))
+    for table, column in (("issues_cache", "updated_at"), ("issue_sync", "as_of"), ("projects", "updated_at"), ("labels", "updated_at"), ("states", "updated_at"),
+                          ("members", "updated_at"), ("issue_snapshots", "fetched_at")):
+        conn.execute(f"UPDATE {table} SET {column} = {column} - ?", (seconds,))
     conn.commit()
     conn.close()
 
@@ -148,10 +152,13 @@ class Architecture(unittest.TestCase):
         for view in views.VIEWS.values():
             self.assertLessEqual(set(view.dims), voc.DIMENSIONS, view.name)
             self.assertLessEqual(set(view.controls), voc.CONTROLS, view.name)
-        commands = cli._subparsers_of(cli.build_parser()).choices
+        root = cli._subparsers_of(cli.build_parser()).choices
         for view in views.VIEWS.values():
-            declared = {opt for action in commands[view.name]._actions for opt in action.option_strings}
-            self.assertEqual(declared - NON_DIMENSIONAL_FLAGS, flags_for(view.dims, view.controls), f"flags de `{view.name}` frente a sus dims y controls")
+            parser = root[view.command[0]]
+            for verb in view.command[1:]:
+                parser = cli._subparsers_of(parser).choices[verb]
+            declared = {opt for action in parser._actions for opt in action.option_strings}
+            self.assertEqual(declared - NON_DIMENSIONAL_FLAGS, flags_for(view.dims, view.controls) | set(view.extra_flags), f"flags de `{view.name}` frente a sus dims, controls y extra_flags")
 
     # F3 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F3")
@@ -253,6 +260,9 @@ class Architecture(unittest.TestCase):
         for filename, command, doc in golden_json_outputs():
             words = [w for w in command.split() if not w.startswith("-")]
             where = f"{filename}::{command[:50]}"
+            if isinstance(doc, dict) and doc.get("schema") == voc.SCHEMA and doc.get("view") in voc.VIEWS:  # ya migrada al sobre: las filas son del vocabulario
+                check(doc["results"], voc.VIEWS[doc["view"]][0], where, unknown)
+                continue
             if words[0] == "list":
                 check(doc["results"] if isinstance(doc, dict) else doc, "ticket", where, unknown)
             elif words[0] == "search":
@@ -278,16 +288,20 @@ class Architecture(unittest.TestCase):
     @gate("F5")
     def test_f5_cache_views_answer_offline_over_a_cache_older_than_the_ttl(self):
         for view, argv in VIEW_COMMANDS.items():
+            if view == "attachment list":
+                continue  # excepción declarada: es una auditoría de red por diseño
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
             self.assertEqual(sandbox.run(argv)[0], 0, view)
-            age_issues(sandbox, 2 * 3600)  # más vieja que el TTL: si no, la prueba no probaría nada
+            age_caches(sandbox, 2 * 86400 + 3600)  # más vieja que cualquier TTL: si no, la prueba no probaría nada
             before = len(sandbox.fake.requests)
             code, out, err = sandbox.run(argv + ["--json"], env_set={"PLANE_OFFLINE": "1"})
             self.assertEqual(code, 0, f"{view}: {err}")
             doc = json.loads(out)
+            self.assertEqual(envelope.validate(doc), [], view)
             self.assertIn(doc["coverage"]["source"], ("cache", "local", "snapshot"), view)
-            self.assertTrue(doc["coverage"]["stale"] and doc["coverage"]["complete"] is None, f"{view}: una caché vencida no es completa")
+            if view in CACHE_VIEWS:
+                self.assertTrue(doc["coverage"]["stale"] and doc["coverage"]["complete"] is None, f"{view}: una caché vencida no es completa")
             self.assertEqual(len(sandbox.fake.requests), before, f"{view}: PLANE_OFFLINE=1 no puede tocar la red")
 
     @gate("F6")
@@ -301,10 +315,10 @@ class Architecture(unittest.TestCase):
         for view, argv in VIEW_COMMANDS.items():
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
-            for extra in ([], ["--refresh"], ["--all-projects", "--refresh"], ["--involved", "--refresh-history", "--budget", "2"]):
+            for extra in ([], ["--refresh"], ["--all-projects", "--refresh"], ["--involved", "--refresh-history", "--budget", "2"]) if view == "list" else [[]]:
                 self.assertEqual(sandbox.run(argv + extra)[0], 0, f"{view} {extra}")
             methods = {method for method, _path, _body in sandbox.fake.requests}
-            self.assertEqual(methods, {"GET"}, f"{view}: una lectura solo puede emitir GET")
+            self.assertLessEqual(methods, {"GET"}, f"{view}: una lectura solo puede emitir GET (`whoami` con PLANE_ACTOR_UUID no emite nada)")
         # `sync` y `attachment list` se suman a esta comprobación en las fases 6 y 3.
 
     @gate("F7")
@@ -313,7 +327,8 @@ class Architecture(unittest.TestCase):
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
             self.assertEqual(sandbox.run(argv)[0], 0)
-            outputs = {zone: sandbox.run(argv + ["--json", "--offline"], env_set={"TZ": zone})[1] for zone in ("UTC", "America/Lima", "Asia/Tokyo", "UTC")}
+            offline = {"PLANE_OFFLINE": "1"} if view != "attachment list" else {}
+            outputs = {zone: sandbox.run(argv + ["--json"], env_set={"TZ": zone, **offline})[1] for zone in ("UTC", "America/Lima", "Asia/Tokyo", "UTC")}
             self.assertEqual(len(set(outputs.values())), 1, f"{view}: la salida cambia con la zona horaria o entre ejecuciones")
 
     # F8 ------------------------------------------------------------------------------------------------------------------------------

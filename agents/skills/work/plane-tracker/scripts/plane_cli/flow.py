@@ -15,7 +15,7 @@ import session_clock
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.assignments import assignment_rows, record_assignments
 from plane_cli.resolve import get_states_map, resolve_issue, resolve_project_and_seq
-from plane_cli.timeutil import format_minutes, time_to_minutes
+from plane_cli.timeutil import format_minutes, format_span, time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
 from plane_cli import clock
 
@@ -36,12 +36,6 @@ def format_lifecycle(issue):
 
 FLOW_TTL_SECONDS = 3600
 FLOW_MAX_PAGES = 20
-
-
-def format_span(minutes):
-    if minutes is None:
-        return "—"
-    return f"{minutes / 1440:.1f} d" if minutes >= 1440 else format_minutes(int(round(minutes)))
 
 
 def load_states_by_id(conn, base_url, api_key, workspace, project_id):

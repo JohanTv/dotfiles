@@ -94,10 +94,14 @@ class Offline(unittest.TestCase):
             self.age(table, 3 * 86400)
         code, out, err = self.cli("projects", offline=True)
         self.assertIn("OMNIFY", out)
-        self.assertIn("hace 3 d", err)
+        self.assertIn("Datos locales de hace 3 d; Plane no respondió.", out)
+        self.assertEqual(err, "")
         code, out, err = self.cli("labels", "--refresh", offline=True)
         self.assertIn("backend", out)
-        self.assertIn("Datos locales de hace", err)
+        self.assertIn("Datos locales de hace 3 d", out)
+        code, out, err = self.cli("labels", "--json", offline=True)
+        doc = json.loads(out)
+        self.assertEqual((doc["coverage"]["source"], doc["coverage"]["stale"], doc["coverage"]["complete"]), ("cache", True, None))
 
     def test_catalog_without_cache_exits_3(self):
         code, out, err = self.cli("projects", offline=True, ok=False)
@@ -109,24 +113,22 @@ class Offline(unittest.TestCase):
         self.age("issue_snapshots", 125 * 60)
         before = self.mark()
         code, out, err = self.cli("get", "OMNIFY-1", offline=True)
-        self.assertIn("Datos locales de hace 2 h; Plane no responde.", out)
+        self.assertIn("Datos locales de hace 2 h; Plane no respondió.", out)
         self.assertIn("Avance del formulario", out)
         self.assertEqual(self.mark(), before)
         code, out, err = self.cli("get", "OMNIFY-1", "--json", offline=True)
         data = json.loads(out)
-        self.assertTrue(data["stale"])
-        self.assertIn("fetched_at", data)
+        self.assertEqual((data["coverage"]["source"], data["coverage"]["stale"], data["coverage"]["complete"], data["coverage"]["age_s"]), ("snapshot", True, None, 7500))
         fresh = json.loads(online)
-        for key in fresh:
-            self.assertEqual(data[key], fresh[key], key)
-        self.assertEqual(set(data) - set(fresh), {"stale", "fetched_at"})
+        self.assertEqual((fresh["coverage"]["source"], fresh["coverage"]["complete"], "scope" in fresh), ("api", True, False))
+        self.assertEqual(data["results"], fresh["results"], "la instantánea reproduce la fila de la lectura en línea")
 
     def test_get_snapshot_without_comments(self):
         self.cli("get", "OMNIFY-1", "--no-comments")
         code, out, err = self.cli("get", "OMNIFY-1", "--no-comments", offline=True)
         self.assertIn("Esta copia no incluye comentarios", out)
         code, out, err = self.cli("get", "OMNIFY-1", "--json", offline=True)
-        self.assertTrue(json.loads(out)["comments_skipped"])
+        self.assertNotIn("comments", json.loads(out)["results"][0])
 
     def test_no_comments_read_keeps_previous_comments(self):
         self.cli("get", "OMNIFY-1")
@@ -142,7 +144,8 @@ class Offline(unittest.TestCase):
         self.assertIn("Completado", out)
         code, out, err = self.cli("get", "OMNIFY-2", "--json", offline=True)
         data = json.loads(out)
-        self.assertTrue(data["stale"] and data["metadata_only"])
+        self.assertTrue(data["coverage"]["stale"] and data["coverage"]["detail"]["metadata_only"])
+        self.assertIs(data["coverage"]["complete"], None)
 
     def test_get_with_nothing_local_exits_3(self):
         self.cli("projects")

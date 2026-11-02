@@ -9,27 +9,19 @@ import json
 import sys
 
 from plane_cli.config import add_json_flag, positive_int
-from plane_cli.outbox import drop_item, list_items
+from plane_cli.envelope import build
+from plane_cli.output import emit
+from plane_cli.outbox import drop_item
+from plane_cli.views import VIEWS
 from plane_cli.outbox_flush import DEFAULT_LIMIT, OUTBOX_MAX_AGE_DAYS, flush_items
 
 HOW = {"exists": " (ya existía en Plane)", "found": " (ya estaba publicado; no se reenvió)"}
 
 
 def cmd_outbox_list(args, conn, base_url, api_key, workspace, default_project_id):
-    items = list_items(conn, include_all=args.all)
-    if getattr(args, "json", False):
-        print(json.dumps(items, indent=2, ensure_ascii=False))
-        return
-    if not items:
-        print("La cola está vacía." if not args.all else "No hay registros en la cola.")
-        return
-    for it in items:
-        flag = " · pudo enviarse" if it["maybe_delivered"] and it["state"] != "sent" else ""
-        print(f"#{it['id']} [{it['state']}] {it['ticket']} · {it['track']} · {it['date']} {it['start_time']} · {it['duration_minutes'] or '?'} min · "
-              f"{it['attempts']} intento(s){flag}")
-        print(f"   {it['preview']}")
-        if it["last_error"]:
-            print(f"   último error: {it['last_error']}")
+    view = VIEWS["outbox list"]
+    doc = build(view.name, {"state": "all" if args.all else "open", "order": "id"}, view.query(conn, include_all=args.all))
+    emit(view, doc, getattr(args, "json", False))
 
 
 def _print_flush(result):

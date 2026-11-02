@@ -69,6 +69,7 @@ class Golden(unittest.TestCase):
     def test_errors_http(self):
         def setup(sb):
             sb.fake.fail = [("GET", r"/projects/%s/issues/$" % gs.P1, 500, {"detail": "boom"}),
+                            ("GET", r"/workspaces/ws/issues/OMNIFY-1/$", 500, {"detail": "boom"}),
                             ("GET", r"/projects/%s/labels/$" % gs.P1, 404, {"detail": "nada"}),
                             ("POST", r"/comments/$", 400, {"detail": "malo"}),
                             ("GET", r"/projects/%s/states/$" % gs.P2, 403, {"detail": "prohibido"})]

@@ -210,8 +210,8 @@ class ListDropNotice(Base):
     def test_list_shows_a_preview_and_never_the_payload(self):
         self.queue("x" * 200)
         out, _ = self.cli("outbox", "list", "--json")
-        item = json.loads(out)[0]
-        self.assertEqual((item["state"], item["ticket"], item["duration_minutes"], len(item["preview"])), ("pending", "OMNIFY-1", 20, 80))
+        item = json.loads(out)["results"][0]
+        self.assertEqual((item["state"], item["ticket"], item["minutes"], len(item["preview"])), ("pending", "OMNIFY-1", 20, 80))
         self.assertNotIn("payload_json", item)
         self.assertNotIn("dummy", out)
         text, _ = self.cli("outbox", "list")
@@ -219,7 +219,7 @@ class ListDropNotice(Base):
         self.assertNotIn("PLANE_WORKLOG_METADATA", text)
         self.cli("outbox", "flush")
         self.assertEqual(self.cli("outbox", "list")[0].strip(), "La cola está vacía.")
-        self.assertEqual(json.loads(self.cli("outbox", "list", "--all", "--json")[0])[0]["state"], "sent")
+        self.assertEqual(json.loads(self.cli("outbox", "list", "--all", "--json")[0])["results"][0]["state"], "sent")
 
     def test_drop_removes_the_provisional_worklog_unless_kept(self):
         self.queue("uno", "08:00")

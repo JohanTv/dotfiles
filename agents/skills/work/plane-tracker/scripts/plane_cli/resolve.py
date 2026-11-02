@@ -1,6 +1,6 @@
 """Resolución de proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite.
 
-Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(),
+Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(), resolve_issue_by_label(),
 get_states_map(), get_labels_map(), get_actor_uuid(), known_actor(), require_actor(), get_members_map(), sync_issues(), detect_ticket_from_git().
 No hace: imprimir resultados ni escribir en Plane. Ante PlaneUnavailable, proyectos, estados y etiquetas se sirven de la
 caché local aunque haya vencido (con aviso), y sin caché lanzan PlaneUnavailable (código 3 en el CLI).
@@ -200,6 +200,19 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
         return None
     sys.stderr.write(f"Error: Ticket #{seq_id} no encontrado en el proyecto.\n")
     sys.exit(1)
+
+
+def resolve_issue_by_label(base_url, api_key, workspace, issue_ref, fallback):
+    """Un ticket por su etiqueta (`PRJ-12`) en 1 GET a `workspaces/{ws}/issues/{PRJ}-{n}/`; ante un 404 (Plane sin ese endpoint) usa `fallback()`, que recorre el listado."""
+    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/issues/{issue_ref}/"
+    try:
+        return api_request(url, api_key, raise_on_error=True)
+    except urllib.error.HTTPError as exc:
+        status, detail = exc.code, http_detail(exc)
+        exc.close()
+        if status == 404:
+            return fallback()
+        fail_http(url, status, detail)
 
 
 def _states_mapping(items):

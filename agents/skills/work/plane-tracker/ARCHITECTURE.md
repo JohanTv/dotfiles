@@ -42,14 +42,16 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`. |
 | `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
 | `plane_cli/cmd_delete.py` | Comando `delete`: decide con los comentarios del ticket (paginados) unidos a lo local, falla cerrado y limpia lo local; sin `--yes` solo informa. |
-| `plane_cli/cmd_read.py` | Comandos `get`, `list` (orquesta catálogos, alcance, frescura, consulta y sobre; absorbe al retirado `search`), `labels`, `projects` y `whoami`. |
+| `plane_cli/cmd_read.py` | Comandos `get`, `list` (absorbe al retirado `search`), `labels`, `projects` y `whoami`: orquestan catálogos, alcance, frescura, consulta, sobre y salida. |
 | `plane_cli/scope.py` | `Scope`, `ProjectRef` y `resolve_scope()`: alcance validado, **puro** (sin red ni SQLite), contra catálogos ya cargados; lanza `CliError` (`unknown_project`, `actor_unknown`) con pista. |
 | `plane_cli/scope_flags.py` | `add_scope_args()` y `flags_for()`: cada vista solo declara los flags de sus dimensiones y controles. |
-| `plane_cli/freshness.py` | `Env`, `catalogs()` y `ensure()`: única vía a la red de las vistas, solo GET; cada proyecto por separado (403 y caídos pasan a la cobertura). |
+| `plane_cli/freshness.py` | `Env`, `catalogs()`, `ensure()` (`list`), `ensure_get()` (1 GET por etiqueta, comentarios, instantánea y flujo), `ensure_catalog()`, `fetch_attachments()` y `resolve_identity()`: única vía a la red de las vistas, solo GET; cada proyecto por separado (403 y caídos pasan a la cobertura). |
 | `plane_cli/store_issues.py` | Lecturas de solo lectura de `issues_cache` (con FTS), `issue_sync` y datos de personas. |
 | `plane_cli/query_issues.py` | Consulta de `list`: selección por persona y estado, orden total, filas del vocabulario `ticket` y `Result` con cobertura y `complete`. |
-| `plane_cli/render_issues.py` | Texto de `list` a partir del sobre (nunca de la base de datos). |
-| `plane_cli/views.py` | `View` y `VIEWS`: registro de vistas de lectura (hoy solo `list`). |
+| `plane_cli/query_get.py`, `query_catalogs.py`, `query_misc.py` | Consultas de `get` (fila `ticket_detail` con nombres locales; `complete` solo con API y comentarios completos), `labels`/`projects`, y `whoami`/`attachment list`/`outbox list`. |
+| `plane_cli/render_issues.py`, `render_get.py`, `render_catalogs.py`, `render_misc.py` | Texto de cada vista a partir del sobre (nunca de la base de datos). |
+| `plane_cli/output.py` | `emit()`: el sobre en `--json` o su render en texto. |
+| `plane_cli/views.py` | `View` y `VIEWS`: registro de las siete vistas de lectura (`list`, `get`, `labels`, `projects`, `whoami`, `attachment list`, `outbox list`) con su comando y flags extra (F2). |
 | `plane_cli/history_sweep.py` | Barrido de `list --refresh-history` (se retira en la fase 6). |
 | `plane_cli/assignments.py` | Historial de asignación medido (`assignment_events`), su cobertura y el barrido con presupuesto (`--refresh-history`). |
 | `plane_cli/cmd_report.py` | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
