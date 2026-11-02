@@ -84,16 +84,18 @@ def _day(text, flag):
 
 
 def _period(args, catalogs):
-    """{from, to, tz} (fechas inclusivas del calendario local): `--week` es la semana ISO en curso; `--from` solo es ese día; sin nada, hoy."""
+    """{from, to, tz} (fechas inclusivas del calendario local): `--week` es la semana ISO en curso; `--from` solo es ese día; `--to` sin `--from` es un error; sin nada, hoy."""
     first, last, week = getattr(args, "date_from", None), getattr(args, "date_to", None), getattr(args, "week", False)
     today = date.fromisoformat(catalogs.today)
     if week and (first or last):
         raise CliError("bad_period", "--week no se combina con --from ni --to.", "Usa --week o un rango con --from/--to.")
+    if last and not first and not week:
+        raise CliError("bad_period", "--to necesita --from.", "Usa --from <fecha> --to <fecha>, o --from <fecha> solo para un día.")
     if week:
         start = today - timedelta(days=today.weekday())
         end = start + timedelta(days=6)
     else:
-        start = _day(first, "--from") if first else (_day(last, "--to") if last else today)
+        start = _day(first, "--from") if first else today
         end = _day(last, "--to") if last else start
     if end < start:
         raise CliError("bad_period", f"El periodo está invertido: {start} es posterior a {end}.", "Usa --from <fecha anterior> --to <fecha posterior>.")

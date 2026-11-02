@@ -85,6 +85,14 @@ $ plane.py report time --from 2026-10-21 --to 2026-10-20
 Error: El periodo está invertido: 2026-10-21 es posterior a 2026-10-20.
 Usa --from <fecha anterior> --to <fecha posterior>.
 
+$ plane.py report time --to 2026-10-20
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: --to necesita --from.
+Usa --from <fecha> --to <fecha>, o --from <fecha> solo para un día.
+
 $ plane.py get X1
 [exit 1]
 --- stdout ---

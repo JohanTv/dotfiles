@@ -46,7 +46,7 @@ class Golden(unittest.TestCase):
             {"args": ["get", "--last", "0", "OMNIFY-1"]},
             {"args": ["health", "--hours", "x"]},
             {"args": ["comment", "add", "OMNIFY-1", "--capacity", "nada"]},
-            {"args": ["report", "time", "--week", "--from", "2026-10-20"]}, {"args": ["report", "time", "--from", "2026-10-21", "--to", "2026-10-20"]},
+            {"args": ["report", "time", "--week", "--from", "2026-10-20"]}, {"args": ["report", "time", "--from", "2026-10-21", "--to", "2026-10-20"]}, {"args": ["report", "time", "--to", "2026-10-20"]},
             {"args": ["get", "X1"]},
             {"args": ["get", "OTRO-5"]},
             {"args": ["list"], "env_set": {"PLANE_BASE_URL": "{DEAD}"}},

@@ -27,7 +27,7 @@ def add_scope_args(parser, dims, controls, default_limit=None):
         who.add_argument("--involved", action="store_true", help="Asignados, creados, con horas tuyas o asignados alguna vez, con la razón de cada uno")
     if "period" in dims:
         parser.add_argument("--from", dest="date_from", metavar="FECHA", help="Primer día del periodo (YYYY-MM-DD); solo, es ese día")
-        parser.add_argument("--to", dest="date_to", metavar="FECHA", help="Último día del periodo (YYYY-MM-DD)")
+        parser.add_argument("--to", dest="date_to", metavar="FECHA", help="Último día del periodo (YYYY-MM-DD); requiere --from")
         parser.add_argument("--week", action="store_true", help="Semana en curso (lunes a domingo)")
     if "state" in dims:
         parser.add_argument("--open", action="store_true", help="Sin completados, cancelados ni archivados")

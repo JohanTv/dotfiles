@@ -716,7 +716,7 @@ options:
                         Identificador del proyecto (ej: OMNIFY, OPS)
   --all-projects        Todos los proyectos accesibles del workspace
   --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
-  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --to FECHA            Último día del periodo (YYYY-MM-DD); requiere --from
   --week                Semana en curso (lunes a domingo)
   --json                Salida en JSON
 --- stderr ---
@@ -741,7 +741,7 @@ options:
                         Identificador del proyecto (ej: OMNIFY, OPS)
   --all-projects        Todos los proyectos accesibles del workspace
   --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
-  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --to FECHA            Último día del periodo (YYYY-MM-DD); requiere --from
   --week                Semana en curso (lunes a domingo)
   --refresh             Forzar la sincronización con Plane
   --offline             No consultar Plane: solo lo local
@@ -770,7 +770,7 @@ options:
                         Identificador del proyecto (ej: OMNIFY, OPS)
   --all-projects        Todos los proyectos accesibles del workspace
   --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
-  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --to FECHA            Último día del periodo (YYYY-MM-DD); requiere --from
   --week                Semana en curso (lunes a domingo)
   --refresh             Forzar la sincronización con Plane
   --offline             No consultar Plane: solo lo local

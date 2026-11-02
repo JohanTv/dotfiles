@@ -55,7 +55,7 @@ Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara 
 - Valores de `get --include`: `attachments`, `links`, `relations`, `children`
 - Incluibles cubiertos por `get`: `attachments`, `links`
 
-`person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas; en `report time` es siempre quien lo pide, sin flag para ver a otros). `period` es `{from, to, tz}`: fechas inclusivas del calendario local con `tz` el desplazamiento con que se interpretaron (`--from` solo es ese día, `--week` la semana ISO en curso, sin nada hoy); el cierre de un ticket (instante UTC) se compara en esa zona. Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
+`person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas; en `report time` es siempre quien lo pide, sin flag para ver a otros). `period` es `{from, to, tz}`: fechas inclusivas del calendario local con `tz` el desplazamiento con que se interpretaron (`--from` solo es ese día, `--to` sin `--from` es un error `bad_period`, `--week` la semana ISO en curso, sin nada hoy); el cierre de un ticket (instante UTC) se compara en esa zona. Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
 
 Serialización: `ensure_ascii=False`, claves ordenadas, separadores compactos. Mismo estado, reloj y zona horaria dan bytes idénticos.
 

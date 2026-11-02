@@ -86,10 +86,11 @@ class Time(Base):
         self.assertIn("[Martes 20/10/2026]", out)
 
     def test_bad_periods_are_errors_with_a_hint(self):
-        for args, code in ((["--from", "bad"], "bad_date"), (["--to", "2026-13-01"], "bad_date"), (["--week", "--from", DAY], "bad_period"),
-                           (["--from", "2026-10-21", "--to", "2026-10-20"], "bad_period")):
+        for args, code in ((["--from", "bad"], "bad_date"), (["--from", DAY, "--to", "2026-13-01"], "bad_date"), (["--week", "--from", DAY], "bad_period"),
+                           (["--from", "2026-10-21", "--to", "2026-10-20"], "bad_period"), (["--to", DAY], "bad_period")):
             doc = self.doc("report", "time", *args, code=1)
             self.assertEqual((doc["code"], bool(doc["hint"])), (code, True), args)
+        self.assertIn("--to necesita --from", self.doc("report", "time", "--to", DAY, code=1)["message"])
 
     def test_a_report_without_a_view_or_with_retired_period_flags_exits_2_with_the_command_to_use(self):
         for argv, hint in ((["report"], "report time --week"), (["report", "--date", DAY], "report time --from " + DAY), (["report", "time", "--date", DAY], "report time --from " + DAY),
