@@ -1,7 +1,7 @@
 ---
 id: "0021"
 title: Arquitectura de lectura - modelo de consulta, vistas y contrato de salida
-status: borrador
+status: propuesto
 created: 2026-11-02
 summary: Un modelo común (alcance, cobertura, almacenes, consultas, vistas y sobre JSON versionado) para listar, buscar y reportar, con los principios convertidos en pruebas de arquitectura; funde `search` en `list`. Versión 2, tras la revisión adversarial.
 ---
@@ -59,17 +59,17 @@ Construir **desde ya** un modelo robusto, no tres funciones sueltas, porque la d
 | :--- | :--- | :--- | :--- |
 | 1 | `--text` como flag | **Cerrada** (dueño) | Flag; el ID va en `get`. |
 | 2 | Versión completa del modelo | **Cerrada** (dueño) | Completa, con los cambios de la revisión. |
-| 3 | Cambiar la regla externa y dejarlo mapeado | **Cerrada** (dueño) | Mapeado; se ejecuta en la fase 2 con la redacción confirmada. |
-| 4 | Modelo de adquisición | Propuesta | Tabla "vista → qué refresca"; `resolve_scope` puro; `report flow` declara `source: mixed`. |
-| 5 | Regla de `complete` | Propuesta | Tabla por vista; notas derivadas; `complete=true` imposible con una nota `warn`. |
-| 6 | Horas de otras personas | Propuesta | **No existe** un flag `--all-authors` en el código ni se crea (no hay datos de otros y chocaría con P2/P3). Horas con autor nulo, excluidas de "mías" y contadas aparte; `sync` sin identidad deja de mezclar horas ajenas (error `actor_unknown`, hoy solo un aviso). |
-| 7 | Valores por defecto inventados por `sync` | Propuesta | Registrado como defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md); prerrequisito de `report time`. |
-| 8 | `report agenda` | Propuesta | Fuera de este RFC: la define 0005 sobre este modelo. |
-| 9 | Local-first | Propuesta | Enmienda "TTL con degradación" y `--offline`; `principles.md` no se modifica hasta confirmarlo. |
-| 10 | Regla de Momento Cero | Propuesta | `--limit 5`, leer `coverage` antes de concluir "no hay duplicado"; **depende de la fase 1** (hoy `--all-projects` falla con 403). Evaluar `create --check`. |
-| 11 | JSON compacto o indentado; límite por defecto (20); filas breves | Abierta, con medición | Medido: `search --json` actual 314 tokens; sobre completo compacto **726** (2,3x); sobre indentado 989 (+36 %); filas breves compactas **336** (1,07x). Recomendación: compacto, sin UUID en filas breves y vista breve para el Momento Cero. |
+| 3 | Cambiar la regla externa y dejarlo mapeado | **Cerrada** (dueño) | Mapeado; se ejecuta en la fase 2 con la redacción confirmada (decisión 10). |
+| 4 | Modelo de adquisición | **Cerrada** (dueño, 2026-11-02) | Tabla "vista → qué refresca"; `resolve_scope` puro; `report flow` declara `source: mixed`. |
+| 5 | Regla de `complete` | **Cerrada** (dueño, 2026-11-02) | Tabla por vista; notas derivadas; `complete=true` imposible con una nota `warn`. |
+| 6 | Horas de otras personas | **Cerrada** (dueño, 2026-11-02) | **No existe** un flag `--all-authors` en el código ni se crea (no hay datos de otros y chocaría con P2/P3). Horas con autor nulo, excluidas de "mías" y contadas aparte; `sync` sin identidad deja de mezclar horas ajenas (error `actor_unknown`, hoy solo un aviso). |
+| 7 | Valores por defecto inventados por `sync` | **Cerrada** (dueño, 2026-11-02) | Registrado como defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md); prerrequisito de `report time`. |
+| 8 | `report agenda` | **Cerrada** (dueño, 2026-11-02) | Fuera de este RFC: la define 0005 sobre este modelo. |
+| 9 | Local-first | **Cerrada** (dueño, 2026-11-02) | Enmienda "TTL con degradación" y `--offline`; `principles.md` no se modifica hasta confirmarlo. |
+| 10 | Regla de Momento Cero | **Cerrada** (dueño, 2026-11-02) | `--limit 5`, leer `coverage` antes de concluir "no hay duplicado"; **depende de la fase 1** (hoy `--all-projects` falla con 403). Evaluar `create --check`. |
+| 11 | JSON compacto; límite por defecto; filas breves | **Cerrada** (dueño, 2026-11-02) | **JSON compacto**; límite por defecto **20** (la regla de Momento Cero usa 5); flag fijo **`--brief`** (control de `list`: solo `ticket`, `title`, `state`, `state_group`, `project`, sin UUID). Medido: `search --json` actual 314 tokens; sobre completo compacto 726 (2,3x); indentado 989 (+36 %); filas breves 336 (1,07x). |
 
-Las propuestas (4 a 10) fueron contrastadas con el código y la API real: **confirmadas con cambios** (los cambios están aplicados en esta versión). Siguen pendientes de la confirmación del dueño.
+Las decisiones 4 a 10 se contrastaron con el código y la API real (**confirmadas con cambios**, aplicados en esta versión) y el dueño las **cerró el 2026-11-02**, junto con la 11. No queda ninguna decisión abierta: el RFC pasa a `propuesto` y se implementa fase a fase.
 
 ## Criterios de aceptación globales
 

@@ -37,11 +37,11 @@ La raíz conserva **18 entradas**: sale `search`, entra `sync`. El presupuesto d
 
 ## Matriz de dimensiones y controles por vista
 
-Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el contenido; los **controles** (`limit`, `refresh`, `offline`) no. `verbose` aplica a **todas** las vistas de lectura y no se repite en la matriz; `track` y `worker_type` son filtros de horas de `report time`. `●` acepta, `○` fijada por la vista, `—` sin flag (argparse la rechaza).
+Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el contenido; los **controles** (`limit`, `refresh`, `offline`, `brief`) no. `verbose` aplica a **todas** las vistas de lectura y no se repite en la matriz; `track` y `worker_type` son filtros de horas de `report time`. `●` acepta, `○` fijada por la vista, `—` sin flag (argparse la rechaza).
 
 | Vista | projects | person | period | state | text | limit | refresh | offline |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `list` | ● | ● ticket: `--mine`, `--created`, `--involved` | — | ● `--open` | ● `--text` | ● | ● | ● |
+| `list` | ● | ● ticket: `--mine`, `--created`, `--involved` | — | ● `--open` | ● `--text` | ● (por defecto 20) | ● | ● |
 | `report time` | ● | ○ autor = yo | ● | — | — | — (sin límite) | ● | ● |
 | `report flow` | ● | — | ● | ○ cerrados en el periodo | — | — (sin límite) | ● | ● |
 | `worklog check` | ● | — | ● | — | — | — | — (siempre red) | — |
@@ -56,6 +56,7 @@ Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el 
 - `list --text "<texto>"` busca en título y etiquetas (FTS con la tokenización y palabras vacías actuales) y ordena por relevancia; sin texto, por recencia. Se combina con cualquier otro flag.
 - **Estado por defecto `all`** en todos los modos (la búsqueda anti-duplicados debe ver cerrados y cancelados); `--open` es explícito.
 - **Orden total**: con texto, relevancia y desempate `-sequence`; sin texto, `plane_updated_at` descendente con NULL al final, desempate por proyecto y secuencia. Este RFC **sustituye** lo dicho en la decisión [0019](../../decisions/0019-filtros-de-persona-y-historial-de-asignacion.md) sobre dónde viven los filtros y el orden por `sequence_id`, y fusiona `search` en `list`; el resto de 0019 (definiciones de "involucrado", cobertura de historial, autoría) se mantiene.
+- **`--brief`** (control exclusivo de `list`): filas con solo `ticket`, `title`, `state`, `state_group` y `project`, sin UUID. Está pensado para el Momento Cero (336 tokens frente a 726 con filas completas, medido).
 - Sin consejo de rama ni prosa imperativa: con `total: 0` el agente decide. La política vive en `SKILL.md` y en la regla externa.
 - `list "texto"` posicional no existe: error de uso con pista a `--text`.
 

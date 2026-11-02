@@ -58,10 +58,11 @@ class Scope:
     limit: int | None                     # None en vistas de reporte
     offline: bool
     refresh: bool
+    brief: bool                           # filas breves (solo `list`)
     track: str | None                     # filtro de horas (solo `report time`)
     worker_type: str | None               # filtro de horas (solo `report time`)
 ```
-- **Dimensiones** del alcance: `projects`, `person`, `period`, `state`, `text`. **Controles**: `limit`, `refresh`, `offline`, `verbose`. La matriz de [`arbol-de-comandos.md`](./arbol-de-comandos.md) usa estos dos grupos.
+- **Dimensiones** del alcance: `projects`, `person`, `period`, `state`, `text`. **Controles**: `limit`, `refresh`, `offline`, `verbose`, `brief`. La matriz de [`arbol-de-comandos.md`](./arbol-de-comandos.md) usa estos dos grupos.
 - `person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas): `agenda` necesita ambos a la vez.
 - `resolve_scope(args, catalogs, view)` es **puro**: valida contra `Catalogs` ya cargados y no toca red ni base. Proyecto desconocido → `unknown_project` con la lista de opciones; persona sin identidad → `actor_unknown`; periodo mal formado → `bad_period`. Ningún comando valida por su cuenta.
 - `scope_flags.add_scope_args(parser, dims, controls)` declara **solo** los flags de lo que la vista acepta; lo no soportado no tiene flag y argparse lo rechaza (código 2). Hoy ya hay declaraciones de flags en librerías (`config.add_json_flag`, `list_filtered`, `attachments`); `scope_flags` las **centraliza** y se enmienda la regla de capas para permitir exactamente ese tipo de módulo.

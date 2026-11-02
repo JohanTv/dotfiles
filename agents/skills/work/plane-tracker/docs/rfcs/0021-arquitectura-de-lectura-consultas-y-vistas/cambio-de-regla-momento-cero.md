@@ -2,7 +2,7 @@
 
 Parte de [0021](./README.md) (versión 2). La regla que indica a los agentes cuándo comprobar si un ticket ya existe cita el comando que este RFC retira. Este documento deja **mapeado** el cambio; no se ejecuta hasta la fase 2 ([`plan-de-migracion.md`](./plan-de-migracion.md)).
 
-**Autorización:** el dueño pidió el 2026-11-02 cambiar la regla y dejarlo mapeado. La ejecución (editar la fuente y regenerar) ocurre en la fase 2, en la misma entrega que retira `search`. La **redacción exacta** del texto objetivo es una propuesta que el dueño confirma antes de ejecutarla.
+**Autorización:** el dueño pidió el 2026-11-02 cambiar la regla y dejarlo mapeado. La ejecución (editar la fuente y regenerar) ocurre en la fase 2, en la misma entrega que retira `search`. La **redacción del texto objetivo fue confirmada por el dueño el 2026-11-02**; solo falta ejecutarla en la fase 2.
 
 ## Dónde vive la regla
 
@@ -21,9 +21,9 @@ No se edita `dist/` ni el archivo global a mano: se perdería en la siguiente re
 
 > El agente debe ejecutar `plane-tracker search "<intención>"` para comprobar en < 2ms si ya existe un ticket abierto en Plane o si se debe proponer uno nuevo.
 
-**Objetivo (propuesta):**
+**Objetivo (confirmado):**
 
-> El agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --json` para comprobar si ya existe un ticket (también cerrado o cancelado) en cualquier proyecto. Antes de concluir que no hay duplicado debe leer `coverage`: si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado **no prueba ausencia** y debe decirlo. Con coincidencias, leer `state` y `state_group` antes de decidir. La búsqueda cubre título y etiquetas (`coverage.detail.text_fields`), no la descripción.
+> El agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` para comprobar si ya existe un ticket (también cerrado o cancelado) en cualquier proyecto. Antes de concluir que no hay duplicado debe leer `coverage`: si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado **no prueba ausencia** y debe decirlo. Con coincidencias, leer `state` y `state_group` antes de decidir. La búsqueda cubre título y etiquetas (`coverage.detail.text_fields`), no la descripción.
 
 Cambios de fondo respecto al texto vigente:
 1. **El comando**: `list --text`, con `--all-projects` (un duplicado puede estar en otro proyecto) y `--limit 5` (el coste en tokens de una respuesta con filas completas es mayor que el de `search`; el límite lo acota. Medido: ver abajo).
@@ -47,7 +47,7 @@ El bullet siguiente ("Acción Rápida": confirmar con el usuario y crear la rama
 ## Orden de ejecución (en la fase 2)
 
 1. Implementar `list --text` y sus pruebas (fase 1, suite verde).
-2. En la **misma entrega** que borra `search`: confirmar con el dueño la redacción objetivo, editar `agents/rules/src/work.md`, ejecutar `make work` y comprobar que `~/.claude/CLAUDE.md` (enlace) muestra el texto nuevo. Repetirlo en cada máquina.
+2. En la **misma entrega** que borra `search`: editar `agents/rules/src/work.md`, ejecutar `make work` y comprobar que `~/.claude/CLAUDE.md` (enlace) muestra el texto nuevo. Repetirlo en cada máquina.
 3. Actualizar `SKILL.md`, las referencias y `ARCHITECTURE.md` (incluidas las menciones sin prefijo).
 4. Verificar con el criterio de abajo.
 
@@ -61,5 +61,5 @@ rg -F "plane-tracker search" agents --glob '!**/.worktrees/**' --glob '!**/docs/
 debe devolver **solo** la pista de `renamed.py` y las pruebas de esa pista. Los documentos de este RFC y el artefacto regenerado quedan excluidos porque **citan el comando retirado a propósito**. Además:
 
 - La regla nueva llega a los tres asistentes (los enlaces apuntan a `dist/active-rules.md` regenerado, en cada máquina).
-- Una **sesión limpia** recibe una intención de trabajo y ejecuta `plane-tracker list --text ... --all-projects --limit 5 --json` y lee `coverage`.
+- Una **sesión limpia** recibe una intención de trabajo y ejecuta `plane-tracker list --text ... --all-projects --limit 5 --brief --json` y lee `coverage`.
 - `test_every_route_is_cited` sigue verde (cada ruta de comando se cita en `SKILL.md`).

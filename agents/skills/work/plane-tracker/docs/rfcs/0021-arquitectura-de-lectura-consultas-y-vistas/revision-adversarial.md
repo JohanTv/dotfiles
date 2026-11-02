@@ -43,7 +43,7 @@ La versión elegida por el dueño es la **completa** (modelo con registro de vis
 | `--text` como flag | **Cerrada** (el dueño). |
 | Versión completa del modelo | **Cerrada** (el dueño). |
 | Cambiar la regla externa "Momento Cero" y dejarlo mapeado | **Cerrada**; se ejecuta en la fase 2. |
-| Decisiones 4 a 11 del README (H01-H05, H12, `agenda`, Momento Cero, tokens) | **Propuesta** de esta versión; pendientes de la validación contra el código y la API real y de la confirmación del dueño. |
+| Decisiones 4 a 11 del README (adquisición, `complete`, horas de otros, defecto 0022, `agenda`, local-first, Momento Cero, tokens) | **Cerradas** por el dueño el 2026-11-02, tras la validación contra el código y la API real. |
 
 ## Alternativas que el revisor añadió
 

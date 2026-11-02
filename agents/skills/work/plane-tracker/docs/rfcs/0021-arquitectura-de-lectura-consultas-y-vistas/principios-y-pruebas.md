@@ -15,9 +15,9 @@ Parte de [0021](./README.md) (versión 2). Un principio que solo vive en un docu
 | **Una sola fuente de verdad** | Vocabulario único; el texto es un render del sobre; las notas se derivan de la cobertura. | F1, F9, F13 |
 | **No afirmar lo que no se midió** | `complete: null` se renderiza como "no verificado"; `hours_local_only`, `history_partial` y `hours_defaulted` son notas registradas. | F8, F14 |
 
-### Enmienda propuesta al principio local-first (pendiente de confirmación del dueño)
+### Enmienda al principio local-first (confirmada por el dueño el 2026-11-02 y aplicada en `principles.md`)
 
-Redacción vigente: "las lecturas responden con lo local y avisan su antigüedad; la red es para publicar". El modelo la **precisa**, no la contradice: *"las lecturas responden con lo local; pueden refrescarlo por TTL con un GET y degradan a lo almacenado, avisando su antigüedad, si la red falla; `--offline` las limita a lo local; la red de escritura es para publicar"*. Hasta que el dueño la confirme, `principles.md` **no se modifica**.
+Redacción vigente: "las lecturas responden con lo local y avisan su antigüedad; la red es para publicar". El modelo la **precisa**, no la contradice: *"las lecturas responden con lo local; pueden refrescarlo por TTL con un GET y degradan a lo almacenado, avisando su antigüedad, si la red falla; `--offline` las limita a lo local; la red de escritura es para publicar"*. Aplicada en [`principles.md`](../../principles.md).
 
 ## Funciones de aptitud
 

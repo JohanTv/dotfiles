@@ -71,7 +71,7 @@ Un nombre por concepto, en inglés y minúsculas, igual en todas las vistas. La 
 | `reasons` | lista | por qué entra en una selección de persona | |
 | `assignment_events` | lista | `{at, kind, user_id, user_name}` medidos | |
 
-**Filas breves** (propuesta, README decisión 11): `ticket`, `title`, `state`, `state_group`, `project`, sin UUID (`created_by`, `assignees[].id`) ni etiquetas ni fechas. Medidas: 336 tokens frente a 726 del sobre completo para 5 resultados; pensadas para el Momento Cero.
+**Filas breves** (`list --brief`, README decisión 11, cerrada): `ticket`, `title`, `state`, `state_group`, `project`, sin UUID (`created_by`, `assignees[].id`) ni etiquetas ni fechas. Medidas: 336 tokens frente a 726 del sobre completo para 5 resultados; pensadas para el Momento Cero.
 
 `get` añade `description`, `comments` (`{id, author, created_at, text}`), `links` y `attachments`; no lleva `scope`.
 
