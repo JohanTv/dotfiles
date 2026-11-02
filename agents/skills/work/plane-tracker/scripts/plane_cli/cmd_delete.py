@@ -13,6 +13,7 @@ import sys
 import urllib.error
 import urllib.parse
 
+from plane_cli import envelope, vocabulary
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
 from plane_cli.errors import CliError
@@ -142,7 +143,9 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
 
     if not args.yes:
         if getattr(args, "json", False):
-            print(json.dumps({"status": "needs_confirmation", "action": "delete", **summary}))
+            doc = {"schema": vocabulary.SCHEMA, "status": "needs_confirmation", "action": "delete",
+                   "ticket": summary.get("ticket") or label, "uuid": issue_id, **summary}
+            print(envelope.dumps(doc))
         else:
             what = (f"se pierden sus {len(comments)} comentario(s) en Plane y {plan['hours_own']} registro(s) de horas tuyas ({plan['own_minutes']} min)"
                     if issue else "ya no existe en Plane: solo se limpiaría lo local")
@@ -156,7 +159,9 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
         api_request(base, api_key, method="DELETE")
     _forget_locally(conn, issue_id, label)
     if getattr(args, "json", False):
-        print(json.dumps({"status": "ok", "action": "delete", **summary}))
+        doc = {"schema": vocabulary.SCHEMA, "status": "ok", "action": "delete",
+               "ticket": summary.get("ticket") or label, "uuid": issue_id, **summary}
+        print(envelope.dumps(doc))
     else:
         print(f"✔ Ticket {label} " + ("eliminado de Plane" if issue else "ya no existía en Plane; lo local se limpió")
               + f" ({plan['hours_own']} registro(s) de horas descartado(s))")

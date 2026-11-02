@@ -17,8 +17,8 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/__init__.py` | Docstring con el mapa de capas y módulos. |
 | `plane_cli/config.py` | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
 | `plane_cli/clock.py` | Reloj central, única fuente de la hora real: `timestamp()` (la primitiva) y, derivadas de ella, `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. |
-| `plane_cli/vocabulary.py` | Contrato `plane-tracker/1` como datos puros ([decisión 0025](docs/decisions/0025-contrato-json-de-lectura.md)): familias de campos, resúmenes, registro de notas, errores y códigos de comprobación; `field_spec()`. |
-| `plane_cli/errors.py` | `CliError(code, message, hint, exit_code, detail)`: error de comando con código registrado (`to_dict()`, `render()`); todavía no sustituye a los `sys.exit`. |
+| `plane_cli/vocabulary.py` | Contrato `plane-tracker/1` como datos puros ([decisión 0025](docs/decisions/0025-contrato-json-de-lectura.md)): familias de campos, resúmenes, registro de notas, errores y códigos de comprobación, estados y acciones de escritura; `field_spec()`. |
+| `plane_cli/errors.py` | `CliError(code, message, hint, exit_code, detail)`: error de comando con código registrado (`to_dict()`, `render()`); único mecanismo de error; capturado exclusivamente por `cli.main()`. |
 | `plane_cli/db.py` | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, esquema por partes (`init_core_tables()`, `init_catalog_tables()`, `init_issue_tables()`, `init_search_index()`, `init_outbox_tables()`...) y `init_db()` que las orquesta. |
 | `plane_cli/circuit.py` | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
 | `plane_cli/api.py` | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`), `log_request()` (JSONL de latencias) y `rate_limit()` (cabeceras `X-RateLimit-*` de la última respuesta, solo observadas). |
@@ -26,8 +26,8 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cache.py` | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
 | `plane_cli/resolve.py` | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
 | `plane_cli/timeutil.py` | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs, `render_day_block()`, `age_text()` e `iso_utc()`. |
-| `plane_cli/coverage.py` | `Coverage`, `Result` (no existe sin cobertura), regla de `complete` por vista (`complete_list()`...) y notas derivadas (`notes_from()`, `build_notes()`); aún sin consumidores. |
-| `plane_cli/envelope.py` | Sobre `plane-tracker/1`: `build()`, `validate()`, `validate_error()` y `dumps()`; en producción una deriva degrada con la nota `internal`; aún sin consumidores. |
+| `plane_cli/coverage.py` | `Coverage`, `Result` (no existe sin cobertura), regla de `complete` por vista (`complete_list()`...) y notas derivadas (`notes_from()`, `build_notes()`). |
+| `plane_cli/envelope.py` | Sobre `plane-tracker/1`: `build()`, `validate()`, `validate_error()`, `validate_write()` y `dumps()`; en producción una deriva degrada con la nota `internal`. |
 | `plane_cli/worklog.py` | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
 | `plane_cli/outbox.py` | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
 | `plane_cli/outbox_flush.py` | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
@@ -38,11 +38,11 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/proposals.py` | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
 | `plane_cli/flow.py` | Lead/cycle time y esfuerzo de un ticket (`get --history`) y la lectura incremental de sus transiciones (`fetch_transitions()`, `transitions_fresh()`). |
 | `plane_cli/renamed.py` | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
-| `plane_cli/attachments.py` | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
-| `plane_cli/cmd_comment.py` | Comando `comment add`. |
-| `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`. |
-| `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
-| `plane_cli/cmd_delete.py` | Comando `delete`: decide con los comentarios del ticket (paginados) unidos a lo local, falla cerrado y limpia lo local; sin `--yes` solo informa. |
+| `plane_cli/attachments.py` | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`); sobre de escritura y salida `--json`. |
+| `plane_cli/cmd_comment.py` | Comando `comment add` con soporte `--json` y sobre de escritura `plane-tracker/1`. |
+| `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`, con sobre de escritura en `--json`. |
+| `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add` con sobre de escritura `plane-tracker/1` y soporte `--json`. |
+| `plane_cli/cmd_delete.py` | Comando `delete`: decide con los comentarios del ticket (paginados) unidos a lo local, falla cerrado y limpia lo local; sin `--yes` solo informa (`status: needs_confirmation`); sobre de escritura en `--json`. |
 | `plane_cli/cmd_read.py` | Comandos `get`, `list` (absorbe al retirado `search`), `labels`, `projects` y `whoami`: orquestan catálogos, alcance, frescura, consulta, sobre y salida. |
 | `plane_cli/scope.py` | `Scope`, `ProjectRef` y `resolve_scope()`: alcance validado, **puro** (sin red ni SQLite), contra catálogos ya cargados; lanza `CliError` (`unknown_project`, `actor_unknown`) con pista. |
 | `plane_cli/scope_flags.py` | `add_scope_args()` y `flags_for()`: cada vista solo declara los flags de sus dimensiones y controles. |

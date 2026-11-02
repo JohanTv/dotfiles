@@ -21,7 +21,7 @@ from plane_cli.proposal_store import consume_proposal, load_recent_proposal, sav
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, known_actor, local_ticket_label, resolve_issue, resolve_project_and_seq
 from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders, strip_metadata_block
-from plane_cli import clock
+from plane_cli import clock, envelope, vocabulary
 
 
 def _resolve_duration(args, conn, meta, issue_ref):
@@ -105,12 +105,31 @@ def _print_result(args, result, issue, ticket_label, duration):
         sys.stderr.write(f"ℹ {result.note}\n")
     if result.state == "sent":
         if as_json:
-            print(json.dumps({"status": "ok", "action": "comment", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "comment_id": result.comment_id}))
+            doc = {
+                "schema": vocabulary.SCHEMA,
+                "status": "ok",
+                "action": "comment",
+                "ticket": ticket_label,
+                "uuid": issue["id"] if issue else None,
+                "comment_id": result.comment_id,
+            }
+            print(envelope.dumps(doc))
         else:
             print(f"✔ Comentario publicado exitosamente en {args.issue} (ID Comentario: {result.comment_id})")
     elif as_json:
-        print(json.dumps({"status": "queued", "action": "comment", "outbox_id": result.outbox_id, "client_id": result.client_id, "issue": ticket_label,
-                          "duration_minutes": duration, "reason": result.reason}))
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "queued",
+            "action": "comment",
+            "ticket": ticket_label,
+            "uuid": issue.get("id") if issue else None,
+            "outbox_id": result.outbox_id,
+            "client_id": result.client_id,
+            "issue": ticket_label,
+            "duration_minutes": duration,
+            "reason": result.reason,
+        }
+        print(envelope.dumps(doc))
     else:
         print(f"⏳ En cola (#{result.outbox_id}): comentario para {ticket_label}, {duration} min. Plane no responde; el tiempo ya cuenta como registrado. "
               "Publícalo con: plane-tracker outbox flush")

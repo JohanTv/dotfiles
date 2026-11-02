@@ -1,6 +1,6 @@
 """Sobre JSON versionado `plane-tracker/1` de las lecturas: construcción, validación contra el vocabulario y serialización.
 
-Expone: build(), validate(), validate_error(), dumps().
+Expone: build(), validate(), validate_error(), validate_write(), dumps().
 No hace: consultar, renderizar ni imprimir. Valida en las pruebas (F3) y, en producción, una deriva (campo fuera del vocabulario, cobertura
 incoherente) NO tumba el comando: el sobre sale igual con la nota `internal` y `complete` degradado a None, para que un agente reciba datos y un
 humano vea el defecto. En la fase 0 el alcance es un dict ya resuelto (el dataclass Scope llega con la fase 1).
@@ -139,6 +139,29 @@ def validate_error(doc):
     elif doc.get("exit") != vocabulary.ERRORS[doc["code"]]:
         problems.append("error: la salida no coincide con la del registro")
     return problems
+
+
+def validate_write(doc):
+    """Lista de problemas del sobre de escritura frente al vocabulario (vacía si es válido)."""
+    if not isinstance(doc, dict):
+        return ["el sobre de escritura debe ser un objeto"]
+    if doc.get("schema") != vocabulary.SCHEMA:
+        return [f"schema: se esperaba {vocabulary.SCHEMA}"]
+    status = doc.get("status")
+    if status not in vocabulary.WRITE_STATUSES:
+        return [f"status: estado de escritura no válido: {status}"]
+    action = doc.get("action")
+    if action not in vocabulary.WRITE_ACTIONS:
+        return [f"action: acción de escritura no registrada: {action}"]
+    if action not in ("sync", "outbox drop"):
+        ticket = doc.get("ticket")
+        if not ticket or not isinstance(ticket, str):
+            return ["falta la clave obligatoria ticket (str)"]
+        if "uuid" not in doc:
+            return ["falta la clave obligatoria uuid"]
+        if doc["uuid"] is not None and not isinstance(doc["uuid"], str):
+            return ["uuid debe ser str o null"]
+    return []
 
 
 def build(view, scope, result, verbose=False):

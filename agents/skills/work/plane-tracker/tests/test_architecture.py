@@ -27,7 +27,7 @@ DECISION = os.path.join(SKILL, "docs", "decisions", "0025-contrato-json-de-lectu
 PLAN = os.path.join(SKILL, "docs", "rfcs", "0021-arquitectura-de-lectura-consultas-y-vistas", "plan-de-migracion.md")
 GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
-CURRENT_PHASE = 7
+CURRENT_PHASE = 8
 # Fase del plan en que cada función de aptitud pasa a estar activa. F3-golden es la mitad de F3 que necesita sobres reales (fase 1).
 PHASES = {"F1": 0, "F2": 1, "F3": 0, "F3-golden": 1, "F4": 0, "F5": 1, "F6": 1, "F7": 1, "F8": 0, "F9": 1, "F10": 5, "F11": 5, "F12": 1, "F13": 0,
           "F14": 0, "F15": 0}
@@ -187,10 +187,24 @@ class Architecture(unittest.TestCase):
         self.assertNotEqual(envelope.validate(get_doc), [], "get no lleva scope")
         self.assertEqual(envelope.validate_error(errors.CliError("not_found", "x", "y").to_dict()), [])
         self.assertNotEqual(envelope.validate_error({**errors.CliError("not_found", "x").to_dict(), "exit": 2}), [])
+        good_write = {"schema": voc.SCHEMA, "status": "ok", "action": "create", "ticket": "OMNIFY-1", "uuid": "u1"}
+        self.assertEqual(envelope.validate_write(good_write), [])
+        bad_write_cases = {
+            "no es objeto": lambda: "texto",
+            "falta schema": lambda: {"status": "ok", "action": "create", "ticket": "OMNIFY-1", "uuid": "u1"},
+            "status no valido": lambda: {"schema": voc.SCHEMA, "status": "inventado", "action": "create", "ticket": "OMNIFY-1", "uuid": "u1"},
+            "action no valida": lambda: {"schema": voc.SCHEMA, "status": "ok", "action": "inventada", "ticket": "OMNIFY-1", "uuid": "u1"},
+            "falta ticket": lambda: {"schema": voc.SCHEMA, "status": "ok", "action": "create", "uuid": "u1"},
+            "ticket no str": lambda: {"schema": voc.SCHEMA, "status": "ok", "action": "create", "ticket": 123, "uuid": "u1"},
+            "falta uuid": lambda: {"schema": voc.SCHEMA, "status": "ok", "action": "create", "ticket": "OMNIFY-1"},
+            "uuid no str ni null": lambda: {"schema": voc.SCHEMA, "status": "ok", "action": "create", "ticket": "OMNIFY-1", "uuid": 123},
+        }
+        for label, fn in bad_write_cases.items():
+            self.assertNotEqual(envelope.validate_write(fn()), [], label)
 
     @gate("F3-golden")
     def test_f3_every_golden_envelope_validates(self):
-        envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA and "view" in d]  # los de escritura (`status`/`action`) son de la fase 8
+        envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA and "view" in d]
         self.assertTrue(envelopes, "ningún golden emite el sobre plane-tracker/1")
         for filename, command, doc in envelopes:
             self.assertEqual(envelope.validate(doc), [], f"{filename}: {command}")
@@ -198,6 +212,10 @@ class Architecture(unittest.TestCase):
         self.assertTrue(error_envelopes, "ningún golden emite el sobre de error plane-tracker/1")
         for filename, command, doc in error_envelopes:
             self.assertEqual(envelope.validate_error(doc), [], f"{filename}: {command}")
+        write_envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA and d.get("status") in voc.WRITE_STATUSES and "action" in d]
+        self.assertTrue(write_envelopes, "ningún golden emite el sobre de escritura plane-tracker/1")
+        for filename, command, doc in write_envelopes:
+            self.assertEqual(envelope.validate_write(doc), [], f"{filename}: {command}")
 
     # F4 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F4")
@@ -267,6 +285,8 @@ class Architecture(unittest.TestCase):
         unknown = set()
         for filename, command, doc in golden_json_outputs():
             if isinstance(doc, dict) and doc.get("status") == "error":
+                continue
+            if isinstance(doc, dict) and doc.get("status") in voc.WRITE_STATUSES and "action" in doc and "view" not in doc:
                 continue
             words = [w for w in command.split() if not w.startswith("-")]
             where = f"{filename}::{command[:50]}"

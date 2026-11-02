@@ -22,7 +22,7 @@ Error: El título no puede estar vacío.
 $ plane.py update OMNIFY-1 --state completado --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "update", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "patched": {"state": "11005808-0000-4000-8000-11111111-111"}}
+{"action":"update","patched":{"state":"11005808-0000-4000-8000-11111111-111"},"schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-1","uuid":"10000000-0000-4000-8000-000000000001"}
 --- stderr ---
 
 
@@ -82,7 +82,7 @@ $ plane.py update OMNIFY-1 --description-file desc.md --priority high
 $ plane.py update OMNIFY-1 -d <p>ya html</p> --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "update", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "patched": {"description_html": "<p>ya html</p>"}}
+{"action":"update","patched":{"description_html":"<p>ya html</p>"},"schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-1","uuid":"10000000-0000-4000-8000-000000000001"}
 --- stderr ---
 
 
@@ -125,26 +125,7 @@ Advertencia: Etiqueta 'zzz' no encontrada en el proyecto. Se omitirá.
 $ plane.py create [QA] Probar flujo --json --attach adj.txt
 [exit 0]
 --- stdout ---
-{
-  "status": "ok",
-  "action": "create",
-  "ticket": "OMNIFY-102",
-  "id": "99000000-0000-4000-8000-000000000002",
-  "sequence_id": 102,
-  "name": "[QA] Probar flujo",
-  "branch_suggestion": "test/OMNIFY-102-probar-flujo",
-  "url": "http://127.0.0.1:PORT/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002",
-  "attachments": [
-    "adj.txt"
-  ],
-  "attachment_errors": [],
-  "raw": {
-    "id": "99000000-0000-4000-8000-000000000002",
-    "sequence_id": 102,
-    "name": "[QA] Probar flujo",
-    "priority": "none"
-  }
-}
+{"action":"create","attachment_errors":[],"attachments":["adj.txt"],"branch_suggestion":"test/OMNIFY-102-probar-flujo","name":"[QA] Probar flujo","schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-102","url":"http://127.0.0.1:PORT/ws/projects/11111111-1111-4111-8111-111111111111/issues/99000000-0000-4000-8000-000000000002","uuid":"99000000-0000-4000-8000-000000000002"}
 --- stderr ---
 
 

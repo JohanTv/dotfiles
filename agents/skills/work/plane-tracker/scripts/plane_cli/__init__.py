@@ -22,8 +22,8 @@ Módulos:
   cache           stale-while-error: aviso de antigüedad, sync de tickets, snapshots de `get` y lecturas locales
   resolve         proyectos, tickets, estados, etiquetas y usuario activo (con caché)
   timeutil        horarios y fusión de intervalos (Klee) para los reportes; age_text() e iso_utc()
-  coverage        Coverage, Result y la regla de `complete` por vista; las notas se derivan de la cobertura (aún sin consumidores)
-  envelope        sobre `plane-tracker/1`: build(), validate(), dumps() (aún sin consumidores)
+  coverage        Coverage, Result y la regla de `complete` por vista; las notas se derivan de la cobertura
+  envelope        sobre `plane-tracker/1`: build(), validate(), validate_error(), validate_write(), dumps()
   worklog         metadata oculta de los comentarios, upsert local y check_worklogs()
   outbox          cola de salida de `comment add`: guardado previo, reclamo atómico, entrega idempotente, list y drop
   outbox_flush    publicación de la cola (`outbox flush`)

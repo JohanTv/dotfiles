@@ -155,7 +155,7 @@ Tabla fija de salida: **0** éxito (o comentario encolado); **1** error definiti
 ```json
 {"schema": "plane-tracker/1", "status": "ok", "action": "update", "ticket": "PRJ-12", "uuid": "<uuid>"}
 ```
-Los mismos nombres que las lecturas; `status` es `ok`, `queued` (comentario encolado) o `error`.
+Los mismos nombres que las lecturas. `status` es `ok`, `queued` (comentario encolado en outbox) o `needs_confirmation` (ej. `delete` sin `--yes`). Si hay un error, se emite el sobre de error estándar (`status: error`, exit 1, 2 o 3). Acciones registradas: `create`, `update`, `delete`, `link`, `link add`, `comment`, `comment add`, `comment edit`, `comment delete`, `attachment add`, `attachment replace`, `attachment delete`, `sync`, `outbox drop`. Claves obligatorias para operaciones sobre un ticket: `schema`, `status`, `action`, `ticket`, `uuid`.
 
 ## Evolución
 

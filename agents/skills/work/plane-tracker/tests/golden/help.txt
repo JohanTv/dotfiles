@@ -464,6 +464,7 @@ usage: plane.py comment edit [-h] [--comment-id COMMENT_ID] [-m MESSAGE]
                              [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                              [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
                              [--duration MIN] [--embed-metadata] [--force]
+                             [--json]
                              [issue]
 
 Edita un comentario y/o le vincula su worklog local sin publicar otro.
@@ -487,13 +488,14 @@ options:
                         su worklog local (sin cambiar el texto visible)
   --force               Con --duration: descartar los tramos medidos del
                         worklog cuando la nueva duración no coincide
+  --json                Salida en JSON
 --- stderr ---
 
 
 $ plane.py comment delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py comment delete [-h] [--comment-id COMMENT_ID] [issue]
+usage: plane.py comment delete [-h] [--comment-id COMMENT_ID] [--json] [issue]
 
 Elimina un comentario (por defecto el último propio) y su worklog local.
 
@@ -505,13 +507,14 @@ options:
   --comment-id COMMENT_ID
                         UUID del comentario (por defecto: último comentario
                         propio)
+  --json                Salida en JSON
 --- stderr ---
 
 
 $ plane.py attachment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py attachment add [-h] issue files [files ...]
+usage: plane.py attachment add [-h] [--json] issue files [files ...]
 
 positional arguments:
   issue       Ticket (ej: OMNIFY-205)
@@ -519,6 +522,7 @@ positional arguments:
 
 options:
   -h, --help  show this help message and exit
+  --json      Salida en JSON
 --- stderr ---
 
 
@@ -539,7 +543,7 @@ options:
 $ plane.py attachment delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py attachment delete [-h] issue id
+usage: plane.py attachment delete [-h] [--json] issue id
 
 positional arguments:
   issue       Ticket (ej: OMNIFY-205)
@@ -547,13 +551,14 @@ positional arguments:
 
 options:
   -h, --help  show this help message and exit
+  --json      Salida en JSON
 --- stderr ---
 
 
 $ plane.py attachment replace --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py attachment replace [-h] issue id file
+usage: plane.py attachment replace [-h] [--json] issue id file
 
 Sube el archivo nuevo y, si salió bien, borra el adjunto anterior.
 
@@ -564,13 +569,14 @@ positional arguments:
 
 options:
   -h, --help  show this help message and exit
+  --json      Salida en JSON
 --- stderr ---
 
 
 $ plane.py link add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py link add [-h] [--title TITLE] [issue] url
+usage: plane.py link add [-h] [--title TITLE] [--json] [issue] url
 
 Adjunta un enlace (PR, documento) al work item.
 
@@ -581,6 +587,7 @@ positional arguments:
 options:
   -h, --help     show this help message and exit
   --title TITLE  Texto visible del enlace (por defecto: la URL)
+  --json         Salida en JSON
 --- stderr ---
 
 

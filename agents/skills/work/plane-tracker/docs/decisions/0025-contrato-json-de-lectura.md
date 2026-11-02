@@ -10,7 +10,7 @@ summary: Sobre, vocabulario por familia, registros de notas, errores y códigos 
 
 Promueve [`contrato-json.md`](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/contrato-json.md) del RFC [0021](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) a una decisión estable, para que las pruebas de arquitectura no dependan de un documento cuyo estado cambia. Es la especificación de lo que un agente puede asumir de cualquier salida `--json`. Los nombres viven en `scripts/plane_cli/vocabulary.py` y la prueba F4 (`tests/test_architecture.py`) comprueba que los dos no se desincronizan: **cambiar uno exige cambiar el otro**.
 
-**Estado del contrato.** Aceptado como diseño. Se declara **estable** (y la evolución pasa a ser solo aditiva) al cerrar la fase 8 del plan de migración del RFC 0021; hasta entonces el RFC sigue siendo `propuesto` y ningún documento cita el modelo como existente en el código.
+**Estado del contrato.** Declarado **estable** al cerrar la fase 8 del plan de migración del RFC 0021. La evolución pasa a ser solo aditiva.
 
 ## Sobre de lectura
 
@@ -352,7 +352,11 @@ Tabla fija de salida: **0** éxito (o comentario encolado); **1** error definiti
 {"schema": "plane-tracker/1", "status": "ok", "action": "update", "ticket": "PRJ-12", "uuid": "<uuid>"}
 ```
 
-Los mismos nombres que las lecturas; `status` es `ok`, `queued` (comentario encolado) o `error`. Se implementa en la fase 8 del plan.
+Los mismos nombres que las lecturas. `status` es `ok`, `queued` (comentario encolado en outbox) o `needs_confirmation` (ej. `delete` sin `--yes`). Si hay un error, se emite el sobre de error estándar (`status: error`, exit 1, 2 o 3).
+
+Acciones registradas (`action`): `create`, `update`, `delete`, `link`, `link add`, `comment`, `comment add`, `comment edit`, `comment delete`, `attachment add`, `attachment replace`, `attachment delete`, `sync`, `outbox drop`.
+
+Claves obligatorias para operaciones sobre un ticket: `schema`, `status`, `action`, `ticket` (referencia ej. `OMNIFY-1`), `uuid` (identificador en Plane o null). En `sync` y `outbox drop` las claves `ticket` y `uuid` son opcionales. Todo sobre de escritura se valida con `envelope.validate_write(doc)`.
 
 ## Evolución
 

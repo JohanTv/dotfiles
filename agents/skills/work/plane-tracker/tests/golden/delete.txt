@@ -11,7 +11,7 @@ $ plane.py delete OMNIFY-3
 $ plane.py delete OMNIFY-3 --json
 [exit 1]
 --- stdout ---
-{"status": "needs_confirmation", "action": "delete", "ticket": "OMNIFY-3", "title": "Webhook SMS duplicado", "comments": 0, "already_gone": false, "hours_own": 0, "hours_foreign": 0, "hours_local_only": 0, "own_minutes": 0}
+{"action":"delete","already_gone":false,"comments":0,"hours_foreign":0,"hours_local_only":0,"hours_own":0,"own_minutes":0,"schema":"plane-tracker/1","status":"needs_confirmation","ticket":"OMNIFY-3","title":"Webhook SMS duplicado","uuid":"10000000-0000-4000-8000-000000000003"}
 --- stderr ---
 
 

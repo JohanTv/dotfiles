@@ -84,8 +84,8 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | 4 | cerrada | Commit `7504b9b` «feat(plane-tracker): fix the worklog sync defects 0017, 0010 and 0022 (phase 4)» y `1682efb` (convergencia incremental); 0017, 0010 y 0022 `corregidos`; validado por el dueño (2026-11-02). Hallazgos V39-V43 y V45 |
 | 5 | cerrada | Commits `57089e2` «feat(plane-tracker)!: make report a group with time and flow views (phase 5)», `f00ad1b` y `c3a7c21`; validado por el dueño (2026-11-02). Hallazgos V46-V55 |
 | 6 | cerrada | Commit `276d0e9` «feat(plane-tracker): add the sync command and retire the list history flags (phase 6)»; validado por el dueño (2026-11-02). Hallazgos V56-V61 |
-| 7 | cerrada | CliError en capas bajas, `cli.main()` único captor, sobre de error en `--json` y código 2 en JSON con `PlaneParser` |
-| 8 | pendiente | |
+| 7 | cerrada | Commit `aeae56c` «feat(plane-tracker): implement the error contract and parser usage errors (phase 7)»; CliError en capas bajas, `cli.main()` único captor, sobre de error en `--json` y código 2 en JSON con `PlaneParser` |
+| 8 | cerrada | Sobre de escritura con `{schema, status, action, ticket, uuid}`, flags `--json` en todas las escrituras, contrato declarado estable y evolución aditiva |
 
 Estados válidos: `pendiente`, `en curso`, `cerrada` (F15 los lee: `CURRENT_PHASE` debe ser la última fase `cerrada`). Al cerrar una fase se avanza esa constante en `tests/test_architecture.py`.
 

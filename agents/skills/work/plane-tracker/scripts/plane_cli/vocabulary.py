@@ -1,7 +1,7 @@
 """Vocabulario cerrado del contrato de lectura `plane-tracker/1` (decisión 0025): una sola fuente de nombres.
 
 Expone: SCHEMA, DIMENSIONS, CONTROLS, PERSON_RELATIONS, SCOPE_KEYS, ENVELOPE_KEYS, COVERAGE_SOURCES, COVERAGE_KEYS, DETAIL_KEYS,
-VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, CHECK_ERROR_CODES, ALWAYS_SHOWN, GET_INCLUDES, GET_INCLUDES_COVERED, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
+VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, CHECK_ERROR_CODES, ALWAYS_SHOWN, GET_INCLUDES, GET_INCLUDES_COVERED, DERIVED_ORIGINS, ERRORS, CHECK_CODES, WRITE_STATUSES, WRITE_ACTIONS, field_spec().
 No hace: importar nada del paquete, validar sobres (eso es envelope) ni calcular cobertura (coverage). Son datos puros.
 Un campo se declara como "tipo" con sufijos: `?` admite null y `!` es obligatorio (ej. "str?!"); tipos: str, int, num, bool, list, dict.
 La especificación legible es docs/decisions/0025-contrato-json-de-lectura; una prueba (F4) comprueba que no se desincronizan.
@@ -128,6 +128,16 @@ EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_UNAVAILABLE = 0, 1, 2, 3
 # Espacio propio de `worklog check` (no se confunde con códigos de nota ni de error).
 CHECK_CODES = ("duplicate", "orphan", "mismatch", "missing_local", "pending", "unlinked", "no_block", "unreachable")
 CHECK_ERROR_CODES = ("duplicate", "orphan", "mismatch", "missing_local")  # inconsistencias (`summary.ok` falso y salida 1); el resto son avisos o falta de comprobación
+
+
+# --- Escrituras --------------------------------------------------------------------------------------------------------------------------
+WRITE_STATUSES = frozenset({"ok", "queued", "needs_confirmation"})
+WRITE_ACTIONS = frozenset({
+    "create", "update", "delete", "link", "link add",
+    "comment", "comment add", "comment edit", "comment delete",
+    "attachment add", "attachment replace", "attachment delete",
+    "sync", "outbox drop",
+})
 
 
 def field_spec(spec):

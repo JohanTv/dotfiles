@@ -36,12 +36,20 @@ ON = [
     ["attachment", "list", "--json"],
     ["focus", "status", "--json"],
     ["--json", "focus", "status"],
+    ["link", "add", "OMNIFY-1", "https://x.example", "--json"],
+    ["comment", "edit", "OMNIFY-1", "--json"],
+    ["comment", "delete", "--json"],
+    ["attachment", "add", "OMNIFY-1", "f.txt", "--json"],
+    ["attachment", "replace", "OMNIFY-1", "d0000000-0000-4000-8000-000000000001", "f.txt", "--json"],
+    ["attachment", "delete", "OMNIFY-1", "d0000000-0000-4000-8000-000000000001", "--json"],
 ]
 # Hojas que no declaran --json: solo vale el de la raíz o el del grupo, y se ignora.
-ROOT_ONLY = [["--json", "whoami"], ["--json", "handoff"], ["--json", "link", "add", "OMNIFY-1", "https://x.example"],
-             ["link", "--json", "add", "OMNIFY-1", "https://x.example"], ["--json", "focus", "clear"],
-             ["--json", "comment", "edit", "OMNIFY-1"], ["comment", "--json", "delete"], ["--json", "attachment", "delete", "OMNIFY-1",
-                                                                                           "d0000000-0000-4000-8000-000000000001"]]
+ROOT_ONLY = [
+    ["--json", "whoami"],
+    ["--json", "handoff"],
+    ["--json", "focus", "clear"],
+    ["focus", "--json", "clear"],
+]
 
 
 class JsonFlag(unittest.TestCase):

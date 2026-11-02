@@ -20,7 +20,7 @@ $ plane.py comment add OMNIFY-1 -m <p>Primero</p><!-- PLANE_WORKLOG_METADATA {"d
 $ plane.py comment add OMNIFY-1 -m <p>Segundo</p><!-- PLANE_WORKLOG_METADATA {"date": "2026-10-21", "start_time": "08:30", "duration_minutes": 20, "notes": "n", "track": "mm"} --> --json
 [exit 0]
 --- stdout ---
-{"status": "queued", "action": "comment", "outbox_id": 2, "client_id": "<VOLATIL>", "issue": "OMNIFY-1", "duration_minutes": 20, "reason": "offline"}
+{"action":"comment","client_id":"<VOLATIL>","duration_minutes":20,"issue":"OMNIFY-1","outbox_id":2,"reason":"offline","schema":"plane-tracker/1","status":"queued","ticket":"OMNIFY-1","uuid":null}
 --- stderr ---
 ⏳ Outbox: 2 pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush
 
@@ -135,7 +135,7 @@ $ plane.py comment add OMNIFY-1 -m <p>Tercero</p><!-- PLANE_WORKLOG_METADATA {"d
 $ plane.py outbox drop 3 --keep-worklog --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "outbox drop", "outbox_id": 3, "client_id": "<VOLATIL>", "kept_worklog": true}
+{"action":"outbox drop","client_id":"<VOLATIL>","kept_worklog":true,"outbox_id":3,"schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-1","uuid":null}
 --- stderr ---
 
 

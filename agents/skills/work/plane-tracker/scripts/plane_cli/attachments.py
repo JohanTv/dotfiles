@@ -15,9 +15,10 @@ import uuid
 
 import session_clock
 
+from plane_cli import vocabulary
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
-from plane_cli.envelope import build
+from plane_cli.envelope import build, dumps
 from plane_cli.errors import CliError
 from plane_cli.freshness import Env, fetch_attachments
 from plane_cli.output import emit
@@ -91,29 +92,56 @@ def attachment_id(value):
 
 
 def _upload_files(args, conn, base_url, api_key, workspace, default_project_id, files):
-    """Resuelve el ticket, valida los archivos y los sube; devuelve (project_id, issue)."""
+    """Resuelve el ticket, valida los archivos y los sube; devuelve (project_id, issue, issue_ref, uploaded)."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     validate_attachment_paths(files)
+    uploaded = []
+    as_json = getattr(args, "json", False)
     for path in files:
         try:
             name, size = upload_attachment(base_url, api_key, workspace, project_id, issue["id"], path)
         except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError) as exc:
             raise CliError("http_error", f"Error subiendo '{path}': {exc}")
-        print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
-    return project_id, issue
+        uploaded.append({"name": name, "size": size})
+        if not as_json:
+            print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
+    return project_id, issue, issue_ref, uploaded
 
 
 def cmd_attachment_add(args, conn, base_url, api_key, workspace, default_project_id):
     """Sube archivos al work item."""
-    _upload_files(args, conn, base_url, api_key, workspace, default_project_id, args.files)
+    project_id, issue, issue_ref, uploaded = _upload_files(args, conn, base_url, api_key, workspace, default_project_id, args.files)
+    if getattr(args, "json", False):
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "attachment add",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "attachments": uploaded,
+        }
+        print(dumps(doc))
 
 
 def cmd_attachment_replace(args, conn, base_url, api_key, workspace, default_project_id):
     """Sustituye un adjunto: sube el nuevo y, si salió bien, borra el anterior."""
-    project_id, issue = _upload_files(args, conn, base_url, api_key, workspace, default_project_id, [args.file])
+    project_id, issue, issue_ref, uploaded = _upload_files(args, conn, base_url, api_key, workspace, default_project_id, [args.file])
     delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.id)
-    print(f"✔ Adjunto anterior {args.id} eliminado (reemplazado)")
+    if getattr(args, "json", False):
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "attachment replace",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "attachment_id": args.id,
+            "name": uploaded[0]["name"] if uploaded else None,
+            "size": uploaded[0]["size"] if uploaded else None,
+        }
+        print(dumps(doc))
+    else:
+        print(f"✔ Adjunto anterior {args.id} eliminado (reemplazado)")
 
 
 def cmd_attachment_delete(args, conn, base_url, api_key, workspace, default_project_id):
@@ -121,7 +149,18 @@ def cmd_attachment_delete(args, conn, base_url, api_key, workspace, default_proj
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.id)
-    print(f"✔ Adjunto {args.id} eliminado de {issue_ref}")
+    if getattr(args, "json", False):
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "attachment delete",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "attachment_id": args.id,
+        }
+        print(dumps(doc))
+    else:
+        print(f"✔ Adjunto {args.id} eliminado de {issue_ref}")
 
 
 def cmd_attachment_list(args, conn, base_url, api_key, workspace, default_project_id):
@@ -135,6 +174,7 @@ def register_attachment_add(sub):
     p_add = sub.add_parser("add", help="Subir archivos al ticket")
     p_add.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_add.add_argument("files", nargs="+", help="Archivo(s) a adjuntar (máx. 50 MB cada uno)")
+    add_json_flag(p_add)
     p_add.set_defaults(handler=cmd_attachment_add)
 
 
@@ -149,6 +189,7 @@ def register_attachment_delete(sub):
     p_delete = sub.add_parser("delete", help="Eliminar un adjunto del ticket")
     p_delete.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_delete.add_argument("id", type=attachment_id, help="UUID del adjunto (ver `attachment list`)")
+    add_json_flag(p_delete)
     p_delete.set_defaults(handler=cmd_attachment_delete)
 
 
@@ -158,4 +199,5 @@ def register_attachment_replace(sub):
     p_replace.add_argument("issue", help="Ticket (ej: OMNIFY-205)")
     p_replace.add_argument("id", type=attachment_id, help="UUID del adjunto a sustituir (ver `attachment list`)")
     p_replace.add_argument("file", help="Archivo nuevo (máx. 50 MB)")
+    add_json_flag(p_replace)
     p_replace.set_defaults(handler=cmd_attachment_replace)

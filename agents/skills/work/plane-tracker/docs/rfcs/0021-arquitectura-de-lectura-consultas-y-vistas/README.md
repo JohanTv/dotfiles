@@ -1,7 +1,7 @@
 ---
 id: "0021"
 title: Arquitectura de lectura - modelo de consulta, vistas y contrato de salida
-status: propuesto
+status: implementado
 created: 2026-11-02
 summary: Un modelo común (alcance, cobertura, almacenes, consultas, vistas y sobre JSON versionado) para listar, buscar y reportar, con los principios convertidos en pruebas de arquitectura; funde `search` en `list`. Versión 2, tras la revisión adversarial.
 ---

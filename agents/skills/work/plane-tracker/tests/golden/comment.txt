@@ -11,14 +11,14 @@ $ plane.py comment add OMNIFY-1 -m **Hola** mundo
 $ plane.py comment add OMNIFY-1 -m mismo minuto --duration 15 --track t1 --capacity tooling_dx --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "comment", "issue_id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "comment_id": "c9000000-0000-4000-8000-000000000002"}
+{"action":"comment","comment_id":"c9000000-0000-4000-8000-000000000002","schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-1","uuid":"10000000-0000-4000-8000-000000000001"}
 --- stderr ---
 ⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).
 
 $ plane.py comment add OPS-13 -f cuerpo.md --duration 5 --worker-type agent:claude --session sess-golden-0001 --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "comment", "issue_id": "20000000-0000-4000-8000-000000000013", "sequence_id": 13, "comment_id": "c9000000-0000-4000-8000-000000000003"}
+{"action":"comment","comment_id":"c9000000-0000-4000-8000-000000000003","schema":"plane-tracker/1","status":"ok","ticket":"OPS-13","uuid":"20000000-0000-4000-8000-000000000013"}
 --- stderr ---
 
 

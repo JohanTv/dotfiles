@@ -32,7 +32,7 @@ $ plane.py delete OMNIFY-2 --discard-worklogs
 $ plane.py delete OMNIFY-2 --yes --discard-worklogs --json
 [exit 0]
 --- stdout ---
-{"status": "ok", "action": "delete", "ticket": "OMNIFY-2", "title": "Acortador de enlaces", "comments": 1, "already_gone": false, "hours_own": 1, "hours_foreign": 0, "hours_local_only": 0, "own_minutes": 60}
+{"action":"delete","already_gone":false,"comments":1,"hours_foreign":0,"hours_local_only":0,"hours_own":1,"own_minutes":60,"schema":"plane-tracker/1","status":"ok","ticket":"OMNIFY-2","title":"Acortador de enlaces","uuid":"10000000-0000-4000-8000-000000000002"}
 --- stderr ---
 
 

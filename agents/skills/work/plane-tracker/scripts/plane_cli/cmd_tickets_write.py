@@ -10,7 +10,7 @@ import sys
 import urllib.error
 from datetime import datetime
 
-from plane_cli import create_guard
+from plane_cli import create_guard, envelope, vocabulary
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag
 from plane_cli.attachments import upload_attachment, validate_attachment_paths
@@ -27,11 +27,26 @@ def cmd_link(args, conn, base_url, api_key, workspace, default_project_id):
         raise CliError("invalid_input", "la URL debe empezar por http:// o https://")
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/links/"
     existing = api_request(url, api_key).get("results", [])
-    if any(l.get("url") == args.url for l in existing):
-        print(f"✔ {issue_ref} ya tiene ese enlace")
-        return
-    api_request(url, api_key, method="POST", data={"url": args.url, "title": args.title or args.url})
-    print(f"✔ Enlace añadido a {issue_ref}: {args.title or args.url}")
+    already = any(l.get("url") == args.url for l in existing)
+    if not already:
+        api_request(url, api_key, method="POST", data={"url": args.url, "title": args.title or args.url})
+    if getattr(args, "json", False):
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "link add",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "title": args.title or args.url,
+            "url": args.url,
+            "already_exists": already,
+        }
+        print(envelope.dumps(doc))
+    else:
+        if already:
+            print(f"✔ {issue_ref} ya tiene ese enlace")
+        else:
+            print(f"✔ Enlace añadido a {issue_ref}: {args.title or args.url}")
 
 
 def _description_html(text):
@@ -121,7 +136,15 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     res = api_request(url, api_key, method="PATCH", data=patch_data)
     
     if getattr(args, "json", False):
-        print(json.dumps({"status": "ok", "action": "update", "issue_id": issue["id"], "sequence_id": issue.get("sequence_id"), "patched": patch_data}))
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "update",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "patched": patch_data,
+        }
+        print(envelope.dumps(doc))
     else:
         changes = []
         if "name" in patch_data: changes.append(f"Título ➔ {patch_data['name']}")
@@ -264,19 +287,19 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     branch_sugg = f"{branch_type}/{ticket_ref}-{clean_desc}"
 
     if getattr(args, "json", False):
-        print(json.dumps({
+        doc = {
+            "schema": vocabulary.SCHEMA,
             "status": "ok",
             "action": "create",
             "ticket": ticket_ref,
-            "id": res.get("id"),
-            "sequence_id": seq_id,
+            "uuid": res.get("id"),
             "name": res.get("name"),
             "branch_suggestion": branch_sugg,
             "url": web_url,
             "attachments": attached,
             "attachment_errors": attach_errors,
-            "raw": res
-        }, indent=2))
+        }
+        print(envelope.dumps(doc))
     else:
         print(f"\n🎉 Ticket creado exitosamente: {ticket_ref}")
         print(f"   • Título: {res.get('name')}")
@@ -296,6 +319,7 @@ def register_link_add(sub):
     p_link.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-205)")
     p_link.add_argument("url", help="URL del enlace (https://...)")
     p_link.add_argument("--title", help="Texto visible del enlace (por defecto: la URL)")
+    add_json_flag(p_link)
     p_link.set_defaults(handler=cmd_link)
 
 

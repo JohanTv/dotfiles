@@ -33,7 +33,7 @@ $ plane.py attachment replace OMNIFY-1 x adj.txt
 --- stdout ---
 
 --- stderr ---
-usage: plane.py attachment replace [-h] issue id file
+usage: plane.py attachment replace [-h] [--json] issue id file
 plane.py attachment replace: error: argument id: 'x' no es un UUID de adjunto (ver `attachment list`)
 
 $ plane.py attachment replace OMNIFY-1 d0000000-0000-4000-8000-000000000001 no-existe.bin
@@ -78,7 +78,7 @@ $ plane.py attachment delete OMNIFY-1 no-es-uuid
 --- stdout ---
 
 --- stderr ---
-usage: plane.py attachment delete [-h] issue id
+usage: plane.py attachment delete [-h] [--json] issue id
 plane.py attachment delete: error: argument id: 'no-es-uuid' no es un UUID de adjunto (ver `attachment list`)
 
 $ plane.py attachment delete OMNIFY-1
@@ -86,7 +86,7 @@ $ plane.py attachment delete OMNIFY-1
 --- stdout ---
 
 --- stderr ---
-usage: plane.py attachment delete [-h] issue id
+usage: plane.py attachment delete [-h] [--json] issue id
 plane.py attachment delete: error: the following arguments are required: id
 
 $ plane.py attachment

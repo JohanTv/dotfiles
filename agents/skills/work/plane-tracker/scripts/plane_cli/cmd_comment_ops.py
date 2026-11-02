@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 import session_clock
 
+from plane_cli import envelope, vocabulary
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
 from plane_cli.errors import CliError
@@ -90,11 +91,24 @@ def cmd_comment_delete(args, conn, base_url, api_key, workspace, default_project
     api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/", api_key, method="DELETE")
     with conn:
         n = conn.execute("DELETE FROM worklogs WHERE plane_comment_id = ?", (cid,)).rowcount
-    print(f"✔ Comentario {cid} eliminado de {issue_ref} ({n} worklog local(es) borrado(s))")
+    if getattr(args, "json", False):
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "comment delete",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "comment_id": cid,
+            "deleted_worklogs": n,
+        }
+        print(envelope.dumps(doc))
+    else:
+        print(f"✔ Comentario {cid} eliminado de {issue_ref} ({n} worklog local(es) borrado(s))")
 
 
 def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_id):
     """Edita el texto de un comentario y/o registra su worklog local, sin publicar otro comentario."""
+    as_json = getattr(args, "json", False)
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     cid = _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue)
@@ -121,16 +135,19 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
             elif local_meta:
                 html += "\n" + worklog_metadata_block(local_meta)
         api_request(url, api_key, method="PATCH", data={"comment_html": html})
-        print(f"✔ Comentario {cid} actualizado en {issue_ref}")
+        if not as_json:
+            print(f"✔ Comentario {cid} actualizado en {issue_ref}")
     elif getattr(args, "embed_metadata", False):
         if not local_meta:
             raise CliError("not_found", "no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.")
         current = api_request(url, api_key).get("comment_html") or ""
         if "PLANE_WORKLOG_METADATA" in current:
-            print(f"✔ El comentario {cid} ya lleva su metadata")
+            if not as_json:
+                print(f"✔ El comentario {cid} ya lleva su metadata")
         else:
             api_request(url, api_key, method="PATCH", data={"comment_html": current + "\n" + worklog_metadata_block(local_meta)})
-            print(f"✔ Metadata del worklog añadida al comentario {cid} (sin cambiar su texto visible)")
+            if not as_json:
+                print(f"✔ Metadata del worklog añadida al comentario {cid} (sin cambiar su texto visible)")
 
     if args.duration:
         c = api_request(url, api_key)
@@ -159,9 +176,21 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
         upsert_worklog(conn, {**meta, "ticket_id": f"{proj_ident}-{issue.get('sequence_id') or seq_id}",
                               "issue_name": issue.get("name", ""), "plane_comment_id": cid, "author_id": author, "raw_payload": meta})
         api_request(url, api_key, method="PATCH", data={"comment_html": replace_metadata_block(current_html, meta)})
-        print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {meta['track']}, {meta['capacity_bucket']})")
+        if not as_json:
+            print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {meta['track']}, {meta['capacity_bucket']})")
     elif content is None and not getattr(args, "embed_metadata", False):
         sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
+
+    if as_json:
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "comment edit",
+            "ticket": issue_ref,
+            "uuid": issue["id"],
+            "comment_id": cid,
+        }
+        print(envelope.dumps(doc))
 
 
 def register_worklog_propose(sub):
@@ -187,6 +216,7 @@ def register_comment_delete(sub):
                               description="Elimina un comentario (por defecto el último propio) y su worklog local.")
     p_cdel.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OPS-13)")
     p_cdel.add_argument("--comment-id", help="UUID del comentario (por defecto: último comentario propio)")
+    add_json_flag(p_cdel)
     p_cdel.set_defaults(handler=cmd_comment_delete)
 
 
@@ -203,4 +233,5 @@ def register_comment_edit(sub):
     p_cedit.add_argument("--duration", type=int, metavar="MIN", help="Duración en minutos: registra el worklog usando la hora de publicación como fin")
     p_cedit.add_argument("--embed-metadata", action="store_true", help="Añadir al comentario el bloque oculto de metadata de su worklog local (sin cambiar el texto visible)")
     p_cedit.add_argument("--force", action="store_true", help="Con --duration: descartar los tramos medidos del worklog cuando la nueva duración no coincide")
+    add_json_flag(p_cedit)
     p_cedit.set_defaults(handler=cmd_comment_edit)

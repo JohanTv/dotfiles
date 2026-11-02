@@ -8,6 +8,7 @@ Códigos de `flush`: 0 sin nada fallido ni cortado, 1 si hay registros fallidos 
 import json
 import sys
 
+from plane_cli import envelope, vocabulary
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.envelope import build
 from plane_cli.output import emit
@@ -58,7 +59,17 @@ def cmd_outbox_flush(args, conn, base_url, api_key, workspace, default_project_i
 def cmd_outbox_drop(args, conn, base_url, api_key, workspace, default_project_id):
     item = drop_item(conn, args.id, force=args.force, keep_worklog=args.keep_worklog)
     if getattr(args, "json", False):
-        print(json.dumps({"status": "ok", "action": "outbox drop", "outbox_id": item["id"], "client_id": item["client_id"], "kept_worklog": args.keep_worklog}))
+        doc = {
+            "schema": vocabulary.SCHEMA,
+            "status": "ok",
+            "action": "outbox drop",
+            "ticket": item["ticket_ref"],
+            "uuid": None,
+            "outbox_id": item["id"],
+            "client_id": item["client_id"],
+            "kept_worklog": args.keep_worklog,
+        }
+        print(envelope.dumps(doc))
     else:
         print(f"✔ Registro #{item['id']} descartado" + (" (se conservó el worklog local)." if args.keep_worklog else " y su worklog provisional eliminado."))
 
