@@ -130,6 +130,48 @@ $ plane.py comment add OMNIFY-1 -m ### Bitácora
 --- stderr ---
 ⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).
 
+$ plane.py comment add OMNIFY-1 -m Reunión con preventas --since 09:00 --until 10:00 --capacity coordination --track preventas
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000009)
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m Reunión fechada del viernes --date 2026-10-30 --since 14:40 --until 18:20 --capacity coordination
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000010)
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m Solo con inicio --since 10:30 --duration 45
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-1 (ID Comentario: c9000000-0000-4000-8000-000000000011)
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-1 -m Conflicto de intervalo --since 09:00 --until 10:00 --duration 90
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: --duration 90 no coincide con el intervalo 09:00-10:00 (60 min).
+
+$ plane.py comment add OMNIFY-1 -m Sin duración --since 09:00
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: con --since solo hace falta la duración: añade --duration o también el otro extremo.
+
+$ plane.py comment add OMNIFY-1 -m Ventana futura --until 18:00 --duration 30
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: la ventana termina en el futuro (2026-11-02 18:00): el tiempo se registra después de trabajarlo.
+
 $ plane.py comment add OMNIFY-999 -m x --duration 5
 [exit 1]
 --- stdout ---
@@ -162,11 +204,23 @@ POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<h3>Bitácora</h3>\n<ul><li><strong>Hecho:</strong> nota limpia</li></ul>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"<VOLATIL>\", \"date\": \"2026-11-02\", \"duration_minutes\": 4, \"end_time\": \"12:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Hecho: nota limpia\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"11:56\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Reunión con preventas</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"coordination\", \"client_id\": \"<VOLATIL>\", \"date\": \"2026-11-02\", \"duration_minutes\": 60, \"end_time\": \"10:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Reunión con preventas\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:00\", \"stoppers\": [], \"track\": \"preventas\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Reunión fechada del viernes</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"coordination\", \"client_id\": \"<VOLATIL>\", \"date\": \"2026-10-30\", \"duration_minutes\": 220, \"end_time\": \"18:20\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Reunión fechada del viernes\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"14:40\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/ {"comment_html": "<p>Solo con inicio</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"<VOLATIL>\", \"date\": \"2026-11-02\", \"duration_minutes\": 45, \"end_time\": \"11:15\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Solo con inicio\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 
 === worklogs ===
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 3, "end_time": "12:00", "issue_name": "Validaciones de formulario SMS", "notes": "Ya es HTML", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000005", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 3, "end_time": "12:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Ya es HTML", "phase": "dev", "schema_version": "2.2", "start_time": "11:57", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "11:57", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 4, "end_time": "12:00", "issue_name": "Validaciones de formulario SMS", "notes": "Hecho: nota limpia", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000008", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 4, "end_time": "12:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Hecho: nota limpia", "phase": "dev", "schema_version": "2.2", "start_time": "11:56", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "11:56", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
+{"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 45, "end_time": "11:15", "issue_name": "Validaciones de formulario SMS", "notes": "Solo con inicio", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000011", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 45, "end_time": "11:15", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Solo con inicio", "phase": "dev", "schema_version": "2.2", "start_time": "10:30", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "10:30", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
+{"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "coordination", "created_at": "2026-11-02T12:00:00", "date": "2026-10-30", "duration_minutes": 220, "end_time": "18:20", "issue_name": "Validaciones de formulario SMS", "notes": "Reunión fechada del viernes", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000010", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "coordination", "client_id": "<VOLATIL>", "date": "2026-10-30", "duration_minutes": 220, "end_time": "18:20", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Reunión fechada del viernes", "phase": "dev", "schema_version": "2.2", "start_time": "14:40", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "14:40", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-10-21", "duration_minutes": 20, "end_time": "12:00", "issue_name": "Validaciones de formulario SMS", "notes": "meta", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000006", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-10-21", "duration_minutes": 20, "end_time": "12:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "meta", "start_time": "08:00", "track": "mm", "worker_type": "human"}, "role": "backend_engineer", "start_time": "08:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "mm", "worker_type": "human"}
+{"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "coordination", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 60, "end_time": "10:00", "issue_name": "Validaciones de formulario SMS", "notes": "Reunión con preventas", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000009", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "coordination", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 60, "end_time": "10:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Reunión con preventas", "phase": "dev", "schema_version": "2.2", "start_time": "09:00", "stoppers": [], "track": "preventas", "worker_type": "human"}, "role": "backend_engineer", "start_time": "09:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "preventas", "worker_type": "human"}
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "tooling_dx", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 15, "end_time": "12:00", "issue_name": "Validaciones de formulario SMS", "notes": "mismo minuto", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000002", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "tooling_dx", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 15, "end_time": "12:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "mismo minuto", "phase": "dev", "schema_version": "2.2", "start_time": "11:45", "stoppers": [], "track": "t1", "worker_type": "human"}, "role": "backend_engineer", "start_time": "11:45", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "t1", "worker_type": "human"}
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 7, "end_time": "12:00", "issue_name": "Acortador de enlaces", "notes": "Desde stdin", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000004", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 7, "end_time": "12:00", "measured_by": {"kind": "declared", "worker_type": "human"}, "notes": "Desde stdin", "phase": "dev", "schema_version": "2.2", "start_time": "11:53", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "11:53", "stoppers_json": "[]", "ticket_id": "OMNIFY-2", "track": "main", "worker_type": "human"}
 {"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-11-02", "duration_minutes": 5, "end_time": "12:00", "issue_name": "Tareas Rápidas y Soporte - W43", "notes": "Texto con `código` y [enlace](https://x.example)", "phase": "dev", "plane_comment_id": "c9000000-0000-4000-8000-000000000003", "project_id": "OPS", "raw_payload": {"capacity_bucket": "deep_work", "client_id": "<VOLATIL>", "date": "2026-11-02", "duration_minutes": 5, "end_time": "12:00", "measured_by": {"kind": "declared", "session": "sess-golden-0001", "worker_type": "agent:claude"}, "notes": "Texto con `código` y [enlace](https://x.example)", "phase": "dev", "schema_version": "2.2", "start_time": "11:55", "stoppers": [], "track": "main", "worker_type": "agent:claude"}, "role": "backend_engineer", "start_time": "11:55", "stoppers_json": "[]", "ticket_id": "OPS-13", "track": "main", "worker_type": "agent:claude"}

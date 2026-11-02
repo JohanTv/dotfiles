@@ -146,6 +146,15 @@ class Golden(unittest.TestCase):
                  ["comment", "add", "OMNIFY-1", "-m", "L" * 701, "--duration", "4"],
                  ["comment", "add", "OMNIFY-1", "-m", "L" * 701, "--duration", "4", "--long"],
                  ["comment", "add", "OMNIFY-1", "-m", "### Bitácora\n\n- **Hecho:** nota limpia", "--duration", "4"],
+                 # Ventana real del trabajo (defecto 0001): la duración sale del intervalo, no de la publicación
+                 ["comment", "add", "OMNIFY-1", "-m", "Reunión con preventas", "--since", "09:00", "--until", "10:00",
+                  "--capacity", "coordination", "--track", "preventas"],
+                 ["comment", "add", "OMNIFY-1", "-m", "Reunión fechada del viernes", "--date", "2026-10-30", "--since", "14:40",
+                  "--until", "18:20", "--capacity", "coordination"],
+                 ["comment", "add", "OMNIFY-1", "-m", "Solo con inicio", "--since", "10:30", "--duration", "45"],
+                 ["comment", "add", "OMNIFY-1", "-m", "Conflicto de intervalo", "--since", "09:00", "--until", "10:00", "--duration", "90"],
+                 ["comment", "add", "OMNIFY-1", "-m", "Sin duración", "--since", "09:00"],
+                 ["comment", "add", "OMNIFY-1", "-m", "Ventana futura", "--until", "18:00", "--duration", "30"],
                  ["comment", "add", "OMNIFY-999", "-m", "x", "--duration", "5"]]
         self.golden("comment", steps, files={"cuerpo.md": "# Título\n\nTexto con `código` y [enlace](https://x.example)\n"},
                     scrub=RANDOM_FIELDS, db_queries=[WORKLOGS], sandbox_kwargs={"with_session": True})
@@ -209,6 +218,12 @@ class Golden(unittest.TestCase):
                  ["comment", "edit", "OMNIFY-1", "--comment-id", "c1000000-0000-4000-8000-0000000000ff", "--embed-metadata"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4],
                  ["comment", "edit", "OMNIFY-1", "--duration", "10"],
+                 # Corrección de la ventana real sin publicar otro comentario (defecto 0001)
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID1, "--since", "09:00", "--until", "10:00"],
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "--since", "11:00", "--duration", "20"],
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "--date", "2026-10-30", "--until", "10:00", "--duration", "45"],
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID1, "--since", "10:00", "--until", "09:00"],
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID1, "--date", "2026-11-02", "--until", "18:00", "--duration", "60"],
                  ["comment", "delete", "OMNIFY-1", "--comment-id", CID4]]
         self.golden("comment_edit_delete", steps, db_queries=[WORKLOGS])
 

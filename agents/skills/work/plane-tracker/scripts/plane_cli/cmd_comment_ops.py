@@ -24,8 +24,11 @@ from plane_cli.worklog import (
     extract_metadata_from_comment,
     find_metadata_block,
     note_from,
+    parse_date,
     reject_placeholders,
     replace_metadata_block,
+    requested_date,
+    resolve_window,
     strip_metadata_block,
     upsert_worklog,
     worklog_metadata_block,
@@ -149,24 +152,36 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
             if not as_json:
                 print(f"✔ Metadata del worklog añadida al comentario {cid} (sin cambiar su texto visible)")
 
-    if args.duration:
+    if args.duration or args.since or args.until or args.date:
         c = api_request(url, api_key)
         current_html = c.get("comment_html") or ""
         proj_ident = get_project_identifier(conn, base_url, api_key, workspace, project_id)
         old_meta = extract_metadata_from_comment(current_html) if find_metadata_block(current_html) else None
+        stamp = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
+        day = requested_date(args.date) if args.date else ((parse_date((old_meta or {}).get("date")) if old_meta else None) or stamp.date())
+        # La ventana real manda (defecto 0001): con los dos extremos la duración es su delta; con uno
+        # solo se completa con --duration o con la duración ya registrada.
+        win_dur = args.duration if (args.since and args.until) else (args.duration or (old_meta or {}).get("duration_minutes"))
+        win = resolve_window(args.since, args.until, win_dur, day)
+        duration = win[2] if win else args.duration or (old_meta or {}).get("duration_minutes")
+        if duration is None:
+            raise CliError("invalid_input", "falta la duración: usa --duration o el intervalo --since/--until.")
         if old_meta:
             # Corrección: se parte del bloque existente (sesión, tramos, fechas) y se cambia solo lo pedido.
             try:
-                meta = corrected_metadata(old_meta, args.duration, args.track, args.capacity_bucket, args.worker_type, getattr(args, "force", False))
+                meta = corrected_metadata(old_meta, duration, args.track, args.capacity_bucket, args.worker_type, getattr(args, "force", False))
             except ValueError as exc:
                 raise CliError("invalid_input", str(exc))
+            if win:
+                meta["start_time"], meta["end_time"], meta["duration_minutes"] = win[0], win[1], win[2]
+            if args.date:
+                meta["date"] = args.date
         else:
-            # Comentario sin telemetría: su hora de publicación (local) es el fin; inicio = fin - duración
-            end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()
-            start = end - timedelta(minutes=args.duration)
+            # Comentario sin telemetría: la ventana declarada manda; sin ella, la publicación es el fin.
+            start_s, end_s = (win[0], win[1]) if win else ((stamp - timedelta(minutes=duration)).strftime("%H:%M"), stamp.strftime("%H:%M"))
             notes = note_from(current_html, issue.get("name", ""))
-            meta = {"schema_version": "2.2", "date": start.strftime("%Y-%m-%d"), "start_time": start.strftime("%H:%M"),
-                    "end_time": end.strftime("%H:%M"), "duration_minutes": args.duration, "track": args.track or "main",
+            meta = {"schema_version": "2.2", "date": args.date or day.strftime("%Y-%m-%d"), "start_time": start_s,
+                    "end_time": end_s, "duration_minutes": duration, "track": args.track or "main",
                     "worker_type": args.worker_type or "human", "capacity_bucket": args.capacity_bucket or "deep_work",
                     "notes": notes, "stoppers": [], "phase": "dev", "measured_by": {"kind": "declared", "worker_type": args.worker_type or "human"}}
         previous = conn.execute("SELECT author_id FROM worklogs WHERE plane_comment_id = ?", (cid,)).fetchone()
@@ -177,9 +192,10 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
                               "issue_name": issue.get("name", ""), "plane_comment_id": cid, "author_id": author, "raw_payload": meta})
         api_request(url, api_key, method="PATCH", data={"comment_html": replace_metadata_block(current_html, meta)})
         if not as_json:
-            print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} ({args.duration} min, {meta['track']}, {meta['capacity_bucket']})")
+            print(f"✔ Worklog {'corregido' if old_meta else 'vinculado'} en {cid}: {meta['date']} {meta['start_time']}-{meta['end_time']} "
+                  f"({meta['duration_minutes']} min, {meta['track']}, {meta['capacity_bucket']})")
     elif content is None and not getattr(args, "embed_metadata", False):
-        sys.stderr.write("Advertencia: nada que hacer (usa -m y/o --duration).\n")
+        sys.stderr.write("Advertencia: nada que hacer (usa -m, --duration o el intervalo --since/--until).\n")
 
     if as_json:
         doc = {
@@ -230,7 +246,11 @@ def register_comment_edit(sub):
     p_cedit.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
                          choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"])
     p_cedit.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"])
-    p_cedit.add_argument("--duration", type=int, metavar="MIN", help="Duración en minutos: registra el worklog usando la hora de publicación como fin")
+    p_cedit.add_argument("--duration", type=int, metavar="MIN",
+                         help="Duración en minutos: sin --since/--until, la publicación es el fin")
+    p_cedit.add_argument("--date", metavar="YYYY-MM-DD", help="Fecha del trabajo registrada (nunca futura)")
+    p_cedit.add_argument("--since", metavar="HH:MM", help="Inicio real del trabajo; con --until fija el intervalo")
+    p_cedit.add_argument("--until", metavar="HH:MM", help="Fin real del trabajo; con --since fija el intervalo")
     p_cedit.add_argument("--embed-metadata", action="store_true", help="Añadir al comentario el bloque oculto de metadata de su worklog local (sin cambiar el texto visible)")
     p_cedit.add_argument("--force", action="store_true", help="Con --duration: descartar los tramos medidos del worklog cuando la nueva duración no coincide")
     add_json_flag(p_cedit)

@@ -20,19 +20,20 @@ from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, known_actor, local_ticket_label, resolve_issue, resolve_project_and_seq
-from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders, strip_metadata_block
+from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, parse_date, reject_long_comment, reject_placeholders, requested_date, resolve_window, strip_metadata_block
 from plane_cli import clock, envelope, vocabulary
 
 
-def _resolve_duration(args, conn, meta, issue_ref):
+def _resolve_duration(args, conn, meta, issue_ref, implied=None):
     """Duración en minutos y propuesta aceptada (si la hay); termina el proceso si falta o es inválida."""
     # --- Duración explícita (NUNCA estimar por defecto) ---------------------------------
     # Se valida ANTES de publicar: no puede quedar un comentario en Plane sin su worklog.
-    # Fuentes válidas: metadata dual-layer (duration_minutes / duration_net_minutes) o --duration N.
+    # Fuentes válidas: el intervalo --since/--until (implícito), la bandera --duration N o la
+    # metadata dual-layer (duration_minutes / duration_net_minutes); el intervalo manda.
     meta_duration = None
     if meta:
         meta_duration = meta.get("duration_minutes") or meta.get("duration_net_minutes")
-    duration = getattr(args, "duration", None) or meta_duration
+    duration = implied or getattr(args, "duration", None) or meta_duration
 
     proposal = None
     if not duration:
@@ -166,7 +167,15 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         issue = issue_stub(conn, project_id, seq_id, uuid_ref, issue_ref)
 
     meta = extract_metadata_from_comment(content)
-    duration, proposal = _resolve_duration(args, conn, meta, issue_ref)
+    # Ventana real del trabajo: --date/--since/--until mandan sobre la hora de publicación (defecto 0001).
+    if getattr(args, "date", None):
+        day = requested_date(args.date)
+    else:
+        day = (parse_date(meta.get("date")) if meta else None) or clock.local_today()
+    since, until = getattr(args, "since", None), getattr(args, "until", None)
+    declared = getattr(args, "duration", None) or (meta.get("duration_minutes") or meta.get("duration_net_minutes") if meta else None)
+    win = resolve_window(since, until, declared, day)
+    duration, proposal = _resolve_duration(args, conn, meta, issue_ref, win[2] if win else None)
     if duration is None:
         return 1
 
@@ -220,6 +229,12 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
             meta["start_time"] = derived_start(end_t, duration)
 
     _record_measurement(meta, args, proposal, worker_type)
+    # La ventana declarada manda sobre la hora de publicación y sobre la del bloque de metadata.
+    if win:
+        meta["start_time"], meta["end_time"], meta["duration_minutes"] = win[0], win[1], win[2]
+        duration = win[2]
+    if getattr(args, "date", None):
+        meta["date"] = args.date
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
     # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report time --refresh`.
@@ -263,6 +278,9 @@ def register_comment_add(sub):
     p_comment.add_argument("--worker-type", choices=["human", "subagent", "agent:agy", "agent:claude", "agent:opencode"], help="Tipo de ejecutor")
     p_comment.add_argument("--duration", type=int, metavar="MIN",
                            help="Duración neta de la sesión en minutos (requerido si el contenido no lleva metadata telemétrica). Ej: --duration 5")
+    p_comment.add_argument("--date", metavar="YYYY-MM-DD", help="Fecha del trabajo registrada (por defecto: hoy, nunca futura)")
+    p_comment.add_argument("--since", metavar="HH:MM", help="Inicio real del trabajo; con --until fija el intervalo")
+    p_comment.add_argument("--until", metavar="HH:MM", help="Fin real del trabajo; con --since fija el intervalo")
     p_comment.add_argument("--accept-proposal", action="store_true",
                            help="Registrar la duración propuesta (solo vale si se mostró hace menos de 30 min para este ticket)")
     p_comment.add_argument("--long", action="store_true",

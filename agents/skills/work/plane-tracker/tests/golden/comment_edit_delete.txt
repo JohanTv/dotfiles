@@ -89,7 +89,7 @@ $ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-0000000000
 --- stdout ---
 
 --- stderr ---
-Advertencia: nada que hacer (usa -m y/o --duration).
+Advertencia: nada que hacer (usa -m, --duration o el intervalo --since/--until).
 
 $ plane.py comment edit OMNIFY-1 --duration 10
 [exit 0]
@@ -97,6 +97,41 @@ $ plane.py comment edit OMNIFY-1 --duration 10
 ✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 13:50-14:00 (10 min, main, deep_work)
 --- stderr ---
 
+
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --since 09:00 --until 10:00
+[exit 0]
+--- stdout ---
+✔ Worklog corregido en c1000000-0000-4000-8000-000000000001: 2026-10-20 09:00-10:00 (60 min, main, deep_work)
+--- stderr ---
+
+
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --since 11:00 --duration 20
+[exit 0]
+--- stdout ---
+✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-20 11:00-11:20 (20 min, main, deep_work)
+--- stderr ---
+
+
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 --date 2026-10-30 --until 10:00 --duration 45
+[exit 0]
+--- stdout ---
+✔ Worklog vinculado en c1000000-0000-4000-8000-000000000004: 2026-10-30 09:15-10:00 (45 min, main, deep_work)
+--- stderr ---
+
+
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --since 10:00 --until 09:00
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: --until debe ser posterior a --since: la ventana no cruza la medianoche.
+
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 --date 2026-11-02 --until 18:00 --duration 60
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: la ventana termina en el futuro (2026-11-02 18:00): el tiempo se registra después de trabajarlo.
 
 $ plane.py comment delete OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004
 [exit 0]
@@ -140,7 +175,20 @@ GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/1
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 10, \"end_time\": \"14:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"13:50\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/ {"comment_html": "<p>Avance del formulario.</p><!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"edited_at\": \"2026-11-02T12:00:00+00:00\", \"end_time\": \"10:00\", \"measured_by\": {\"kind\": \"corrected\", \"was\": null}, \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"previous_duration_minutes\": 60, \"schema_version\": \"2.2\", \"start_time\": \"09:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 20, \"end_time\": \"11:20\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"11:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>Solo texto, sin telemetría.</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-30\", \"duration_minutes\": 45, \"end_time\": \"10:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"Solo texto, sin telemetría.\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:15\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"} -->"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
 
 === worklogs ===
-{"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-10-20", "duration_minutes": 45, "end_time": "11:00", "issue_name": "Validaciones de formulario SMS", "notes": "Avance del formulario", "phase": "dev", "plane_comment_id": "c1000000-0000-4000-8000-000000000001", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "2026-10-20", "duration_minutes": 45, "edited_at": "2026-11-02T12:00:00+00:00", "end_time": "11:00", "measured_by": {"kind": "corrected", "was": null}, "notes": "Avance del formulario", "phase": "dev", "previous_duration_minutes": 60, "schema_version": "2.2", "start_time": "10:00", "stoppers": [], "track": "otro", "worker_type": "human"}, "role": "backend_engineer", "start_time": "10:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "otro", "worker_type": "human"}
+{"author_id": "aaaaaaaa-0000-4000-8000-000000000001", "capacity_bucket": "deep_work", "created_at": "2026-11-02T12:00:00", "date": "2026-10-20", "duration_minutes": 60, "end_time": "10:00", "issue_name": "Validaciones de formulario SMS", "notes": "Avance del formulario", "phase": "dev", "plane_comment_id": "c1000000-0000-4000-8000-000000000001", "project_id": "OMNIFY", "raw_payload": {"capacity_bucket": "deep_work", "date": "2026-10-20", "duration_minutes": 60, "edited_at": "2026-11-02T12:00:00+00:00", "end_time": "10:00", "measured_by": {"kind": "corrected", "was": null}, "notes": "Avance del formulario", "phase": "dev", "previous_duration_minutes": 60, "schema_version": "2.2", "start_time": "09:00", "stoppers": [], "track": "main", "worker_type": "human"}, "role": "backend_engineer", "start_time": "09:00", "stoppers_json": "[]", "ticket_id": "OMNIFY-1", "track": "main", "worker_type": "human"}

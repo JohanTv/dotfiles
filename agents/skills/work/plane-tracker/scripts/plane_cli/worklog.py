@@ -1,8 +1,8 @@
 """Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación.
 
 Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), strip_metadata_block(), replace_metadata_block(),
-corrected_metadata(), derived_start(), upsert_worklog(), check_worklogs(), reject_placeholders(), reject_long_comment(),
-note_from(), PLACEHOLDER, MAX_COMMENT_CHARS.
+corrected_metadata(), derived_start(), resolve_window(), requested_date(), parse_date(), upsert_worklog(), check_worklogs(),
+reject_placeholders(), reject_long_comment(), note_from(), PLACEHOLDER, MAX_COMMENT_CHARS.
 No hace: llamadas a Plane.
 """
 
@@ -172,6 +172,81 @@ def derived_start(end_dt, duration):
         sys.stderr.write("⚠ La duración cruza la medianoche: el inicio se limita a 00:00 del día del registro.\n")
         return "00:00"
     return start.strftime("%H:%M")
+
+
+def parse_date(value):
+    """'YYYY-MM-DD' → date; devuelve None si el valor no lo es."""
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def requested_date(value=None):
+    """Fecha del registro: la de `--date` (YYYY-MM-DD, nunca futura) o la de hoy."""
+    if value is None:
+        return clock.local_today()
+    day = parse_date(value)
+    if day is None:
+        raise CliError("invalid_input", "--date debe ir en formato YYYY-MM-DD (ej: --date 2026-11-02).")
+    if day > clock.local_today():
+        raise CliError("invalid_input", "--date no puede ser futuro: solo se registra trabajo ya hecho.")
+    return day
+
+
+def _minutes(value):
+    """Duración declarada en minutos, con error claro si no lo es."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise CliError("invalid_input", f"la duración debe ser un entero de minutos, no {value!r}.")
+
+
+def resolve_window(since, until, duration=None, date=None):
+    """Ventana explícita de `--since`/`--until`: (inicio, fin, duración) o None si no se pidió.
+
+    Con los dos extremos la ventana manda y la duración es su delta; `duration` (la bandera
+    `--duration` o la del bloque de metadata) solo se comprueba y debe coincidir. Con un extremo
+    solo, `duration` es obligatoria para completar el otro. La ventana no cruza la medianoche ni
+    termina en el futuro: el tiempo se registra después de trabajarlo.
+    """
+    if not since and not until:
+        return None
+    day = date or clock.local_today()
+    start = datetime.combine(day, _hhmm(since, "--since")) if since else None
+    end = datetime.combine(day, _hhmm(until, "--until")) if until else None
+    if start and end:
+        delta = int((end - start).total_seconds() // 60)
+        if delta <= 0:
+            raise CliError("invalid_input", "--until debe ser posterior a --since: la ventana no cruza la medianoche.")
+        if duration is not None and _minutes(duration) != delta:
+            raise CliError("invalid_input", f"--duration {_minutes(duration)} no coincide con el intervalo {since}-{until} ({delta} min).")
+    else:
+        if duration is None:
+            raise CliError("invalid_input", f"con {'--since' if start else '--until'} solo hace falta la duración: "
+                                             "añade --duration o también el otro extremo.")
+        delta = _minutes(duration)
+        if delta < 1:
+            raise CliError("invalid_input", "la duración debe ser al menos 1 minuto.")
+        if start:
+            end = start + timedelta(minutes=delta)
+            if end.date() != day:
+                raise CliError("invalid_input", f"--since {since} con {delta} min cruza la medianoche.")
+        else:
+            start = end - timedelta(minutes=delta)
+            if start.date() != day:
+                raise CliError("invalid_input", f"--until {until} con {delta} min cruza la medianoche.")
+    if end > clock.local_now():
+        raise CliError("invalid_input", f"la ventana termina en el futuro ({day} {end.strftime('%H:%M')}): el tiempo se registra después de trabajarlo.")
+    return start.strftime("%H:%M"), end.strftime("%H:%M"), delta
+
+
+def _hhmm(value, flag):
+    """Extremo de ventana en HH:MM estricto."""
+    try:
+        return datetime.strptime(str(value), "%H:%M").time()
+    except (TypeError, ValueError):
+        raise CliError("invalid_input", f"{flag} debe ir en formato HH:MM (ej: {flag} 09:00).")
 
 
 PLACEHOLDER = "[COMPLETAR]"

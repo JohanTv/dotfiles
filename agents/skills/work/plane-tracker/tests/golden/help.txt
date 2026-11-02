@@ -420,7 +420,9 @@ $ plane.py comment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPAC
 usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                            [--duration MIN] [--accept-proposal] [--long]
+                            [--duration MIN] [--date YYYY-MM-DD]
+                            [--since HH:MM] [--until HH:MM]
+                            [--accept-proposal] [--long]
                             [--agent {claude,opencode,agy}] [--session ID]
                             [--json]
                             [issue]
@@ -443,6 +445,10 @@ options:
   --duration MIN        Duración neta de la sesión en minutos (requerido si el
                         contenido no lleva metadata telemétrica). Ej:
                         --duration 5
+  --date YYYY-MM-DD     Fecha del trabajo registrada (por defecto: hoy, nunca
+                        futura)
+  --since HH:MM         Inicio real del trabajo; con --until fija el intervalo
+  --until HH:MM         Fin real del trabajo; con --since fija el intervalo
   --accept-proposal     Registrar la duración propuesta (solo vale si se
                         mostró hace menos de 30 min para este ticket)
   --long                Permite más de 700 caracteres visibles (solo relevos o
@@ -463,8 +469,9 @@ usage: plane.py comment edit [-h] [--comment-id COMMENT_ID] [-m MESSAGE]
                              [--track TRACK]
                              [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                              [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
-                             [--duration MIN] [--embed-metadata] [--force]
-                             [--json]
+                             [--duration MIN] [--date YYYY-MM-DD]
+                             [--since HH:MM] [--until HH:MM]
+                             [--embed-metadata] [--force] [--json]
                              [issue]
 
 Edita un comentario y/o le vincula su worklog local sin publicar otro.
@@ -482,8 +489,11 @@ options:
   --track TRACK         Frente de trabajo
   --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}
   --worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}
-  --duration MIN        Duración en minutos: registra el worklog usando la
-                        hora de publicación como fin
+  --duration MIN        Duración en minutos: sin --since/--until, la
+                        publicación es el fin
+  --date YYYY-MM-DD     Fecha del trabajo registrada (nunca futura)
+  --since HH:MM         Inicio real del trabajo; con --until fija el intervalo
+  --until HH:MM         Fin real del trabajo; con --since fija el intervalo
   --embed-metadata      Añadir al comentario el bloque oculto de metadata de
                         su worklog local (sin cambiar el texto visible)
   --force               Con --duration: descartar los tramos medidos del
