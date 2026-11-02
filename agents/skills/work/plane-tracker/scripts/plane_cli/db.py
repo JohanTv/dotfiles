@@ -114,151 +114,167 @@ def init_people_tables(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_assignment_user ON assignment_events(user_id, kind);")
 
 
+def init_core_tables(conn):
+    """Proyectos, metadatos de sincronización y registros de trabajo (worklogs v2.2) con sus índices."""
+    # 1. Tabla de Proyectos
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS projects (
+            identifier TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            workspace TEXT NOT NULL DEFAULT 'teamprogra',
+            updated_at REAL NOT NULL
+        );
+    """)
+
+    # 2. Tabla de Metadatos de Sincronización
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sync_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at REAL NOT NULL
+        );
+    """)
+
+    # 3. Tabla Principal de Registros de Trabajo (Worklogs v2.2)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS worklogs (
+            ticket_id TEXT NOT NULL,
+            track TEXT NOT NULL DEFAULT 'main',
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+            plane_comment_id TEXT,
+            project_id TEXT NOT NULL,
+            issue_name TEXT NOT NULL DEFAULT '',
+            worker_type TEXT NOT NULL DEFAULT 'human',
+            capacity_bucket TEXT NOT NULL DEFAULT 'deep_work',
+            phase TEXT NOT NULL DEFAULT 'construction_dev',
+            role TEXT NOT NULL DEFAULT 'backend_engineer',
+            notes TEXT NOT NULL DEFAULT '',
+            stoppers_json TEXT NOT NULL DEFAULT '[]',
+            raw_payload TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at REAL NOT NULL,
+            PRIMARY KEY (ticket_id, track, date, start_time)
+        );
+    """)
+
+    # Índices
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_date_start ON worklogs(date, start_time);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_ticket_track ON worklogs(ticket_id, track);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_project_date ON worklogs(project_id, date);")
+
+
+def init_catalog_tables(conn):
+    """Etiquetas y estados por proyecto, con TTL."""
+    # 4. Tabla de Etiquetas (Labels) con TTL
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS labels (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL DEFAULT '',
+            updated_at REAL NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_labels_project ON labels(project_id);")
+
+    # 5. Tabla de Estados (States) con TTL
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS states (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            group_name TEXT NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            updated_at REAL NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_states_project ON states(project_id);")
+
+
+def init_issue_tables(conn):
+    """Caché de tickets para búsqueda local, historial de transiciones, marcas de foco y las fechas del ciclo de vida."""
+    # 6. Tabla de Issues Cache para búsqueda FTS5 en Momento Cero (< 2ms)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issues_cache (
+            id TEXT PRIMARY KEY,
+            sequence_id INTEGER NOT NULL,
+            ticket_id TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            state_name TEXT NOT NULL,
+            state_group TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            labels_csv TEXT NOT NULL DEFAULT '',
+            updated_at REAL NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues_cache(project_id, state_group);")
+    # Historial de transiciones de estado (independiente de issues_cache: sobrevive a su resync)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS state_transitions (
+            activity_id TEXT PRIMARY KEY,
+            issue_id TEXT NOT NULL,
+            ticket_id TEXT NOT NULL,
+            at_utc TEXT NOT NULL,
+            from_id TEXT,
+            to_id TEXT NOT NULL,
+            from_name TEXT,
+            to_name TEXT
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_transitions_issue ON state_transitions(issue_id, at_utc);")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS flow_fetch (
+            issue_id TEXT PRIMARY KEY,
+            fetched_at REAL NOT NULL,
+            issue_updated_at TEXT
+        );
+    """)
+    # Marcas de foco: en qué ticket trabaja cada sesión de agente (solo local)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS session_marks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            agent TEXT NOT NULL,
+            ticket TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_marks_session ON session_marks(session_id, started_at);")
+    # Fechas del ciclo de vida (cachés previas no las tienen): ALTER idempotente y tolerante a concurrencia.
+    ensure_columns(conn, "issues_cache", {
+        "created_at": "TEXT", "completed_at": "TEXT", "start_date": "TEXT",
+        "target_date": "TEXT", "archived_at": "TEXT",
+        # Quién tiene el ticket y quién lo creó (lista JSON de UUID y UUID) y cuándo lo tocó Plane (updated_at de Plane, no de la sincronización).
+        "assignees_json": "TEXT", "created_by": "TEXT", "plane_updated_at": "TEXT",
+    })
+
+
+def init_search_index(conn):
+    """Índice FTS5 de los tickets en caché."""
+    conn.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
+            ticket_id UNINDEXED,
+            title,
+            labels_csv,
+            tokenize = 'unicode61 remove_diacritics 2'
+        );
+    """)
+
+
 def init_db(conn):
     """Inicializa el esquema relacional e índices si no existen."""
     with conn:
-        # 1. Tabla de Proyectos
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS projects (
-                identifier TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                workspace TEXT NOT NULL DEFAULT 'teamprogra',
-                updated_at REAL NOT NULL
-            );
-        """)
-
-        # 2. Tabla de Metadatos de Sincronización
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sync_metadata (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at REAL NOT NULL
-            );
-        """)
-
-        # 3. Tabla Principal de Registros de Trabajo (Worklogs v2.2)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS worklogs (
-                ticket_id TEXT NOT NULL,
-                track TEXT NOT NULL DEFAULT 'main',
-                date TEXT NOT NULL,
-                start_time TEXT NOT NULL,
-                end_time TEXT NOT NULL,
-                duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
-                plane_comment_id TEXT,
-                project_id TEXT NOT NULL,
-                issue_name TEXT NOT NULL DEFAULT '',
-                worker_type TEXT NOT NULL DEFAULT 'human',
-                capacity_bucket TEXT NOT NULL DEFAULT 'deep_work',
-                phase TEXT NOT NULL DEFAULT 'construction_dev',
-                role TEXT NOT NULL DEFAULT 'backend_engineer',
-                notes TEXT NOT NULL DEFAULT '',
-                stoppers_json TEXT NOT NULL DEFAULT '[]',
-                raw_payload TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL,
-                updated_at REAL NOT NULL,
-                PRIMARY KEY (ticket_id, track, date, start_time)
-            );
-        """)
-
-        # Índices
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_date_start ON worklogs(date, start_time);")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_ticket_track ON worklogs(ticket_id, track);")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_worklogs_project_date ON worklogs(project_id, date);")
-
-        # 4. Tabla de Etiquetas (Labels) con TTL
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS labels (
-                id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                color TEXT NOT NULL DEFAULT '',
-                updated_at REAL NOT NULL
-            );
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_labels_project ON labels(project_id);")
-
-        # 5. Tabla de Estados (States) con TTL
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS states (
-                id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                slug TEXT NOT NULL,
-                group_name TEXT NOT NULL,
-                is_default INTEGER NOT NULL DEFAULT 0,
-                updated_at REAL NOT NULL
-            );
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_states_project ON states(project_id);")
-
-        # 6. Tabla de Issues Cache para búsqueda FTS5 en Momento Cero (< 2ms)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS issues_cache (
-                id TEXT PRIMARY KEY,
-                sequence_id INTEGER NOT NULL,
-                ticket_id TEXT NOT NULL,
-                project_id TEXT NOT NULL,
-                title TEXT NOT NULL,
-                state_name TEXT NOT NULL,
-                state_group TEXT NOT NULL,
-                priority TEXT NOT NULL,
-                labels_csv TEXT NOT NULL DEFAULT '',
-                updated_at REAL NOT NULL
-            );
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues_cache(project_id, state_group);")
-        # Historial de transiciones de estado (independiente de issues_cache: sobrevive a su resync)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS state_transitions (
-                activity_id TEXT PRIMARY KEY,
-                issue_id TEXT NOT NULL,
-                ticket_id TEXT NOT NULL,
-                at_utc TEXT NOT NULL,
-                from_id TEXT,
-                to_id TEXT NOT NULL,
-                from_name TEXT,
-                to_name TEXT
-            );
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_transitions_issue ON state_transitions(issue_id, at_utc);")
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS flow_fetch (
-                issue_id TEXT PRIMARY KEY,
-                fetched_at REAL NOT NULL,
-                issue_updated_at TEXT
-            );
-        """)
-        # Marcas de foco: en qué ticket trabaja cada sesión de agente (solo local)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS session_marks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                agent TEXT NOT NULL,
-                ticket TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                ended_at TEXT
-            );
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_marks_session ON session_marks(session_id, started_at);")
-        # Fechas del ciclo de vida (cachés previas no las tienen): ALTER idempotente y tolerante a concurrencia.
-        ensure_columns(conn, "issues_cache", {
-            "created_at": "TEXT", "completed_at": "TEXT", "start_date": "TEXT",
-            "target_date": "TEXT", "archived_at": "TEXT",
-            # Quién tiene el ticket y quién lo creó (lista JSON de UUID y UUID) y cuándo lo tocó Plane (updated_at de Plane, no de la sincronización).
-            "assignees_json": "TEXT", "created_by": "TEXT", "plane_updated_at": "TEXT",
-        })
-
+        init_core_tables(conn)
+        init_catalog_tables(conn)
+        init_issue_tables(conn)
         init_snapshot_table(conn)
         init_outbox_tables(conn)
         init_people_tables(conn)
-
-        conn.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
-                ticket_id UNINDEXED,
-                title,
-                labels_csv,
-                tokenize = 'unicode61 remove_diacritics 2'
-            );
-        """)
+        init_search_index(conn)
