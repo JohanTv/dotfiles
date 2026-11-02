@@ -36,7 +36,10 @@ $ plane.py get OMNIFY-1 --json
   "start_date": "2026-10-01",
   "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-  "labels": [],
+  "labels": [
+    "1b000000-0000-4000-8000-11111111-111",
+    "1b200000-0000-4000-8000-11111111-111"
+  ],
   "assignees": [
     "bbbbbbbb-0000-4000-8000-000000000002"
   ],
@@ -94,7 +97,10 @@ $ plane.py --json get OMNIFY-1
   "start_date": "2026-10-01",
   "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-  "labels": [],
+  "labels": [
+    "1b000000-0000-4000-8000-11111111-111",
+    "1b200000-0000-4000-8000-11111111-111"
+  ],
   "assignees": [
     "bbbbbbbb-0000-4000-8000-000000000002"
   ],
@@ -216,7 +222,9 @@ $ plane.py get OMNIFY-3 --history --json
   "start_date": null,
   "target_date": null,
   "description_html": "<p>Sin alcance.</p>",
-  "labels": [],
+  "labels": [
+    "1b200000-0000-4000-8000-11111111-111"
+  ],
   "assignees": [],
   "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
   "updated_by": null,
@@ -310,7 +318,9 @@ $ plane.py get 10000000-0000-4000-8000-000000000002 --json
   "start_date": null,
   "target_date": null,
   "description_html": "",
-  "labels": [],
+  "labels": [
+    "1b100000-0000-4000-8000-11111111-111"
+  ],
   "assignees": [
     "aaaaaaaa-0000-4000-8000-000000000001"
   ],

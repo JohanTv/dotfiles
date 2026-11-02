@@ -78,6 +78,11 @@ def assignee_ids(issue):
     return [i for i in (_ref_id(a) for a in (issue.get("assignees") or [])) if i]
 
 
+def _label_names_by_id(conn, project_id):
+    """{UUID: nombre} de las etiquetas del proyecto que hay en la tabla `labels` (la puebla resolve.sync_issues antes de sincronizar)."""
+    return {r["id"]: r["name"].lower().strip() for r in conn.execute("SELECT id, name FROM labels WHERE project_id = ?", (project_id,))}
+
+
 def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
     """Sincroniza los issues del proyecto en SQLite (búsqueda FTS5 instantánea). Sin Plane sirve la caché existente."""
     now = clock.timestamp()
@@ -97,6 +102,7 @@ def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_id
             return
         fail_no_cache(f"los tickets de {project_ident}")
 
+    label_names = _label_names_by_id(conn, project_id)
     with conn:
         conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
         for iss in results:
@@ -108,7 +114,8 @@ def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_id
                 INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at,
                                           created_at, completed_at, start_date, target_date, archived_at, assignees_json, created_by, plane_updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (iss["id"], seq, f"{project_ident}-{seq}", project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"), "", now,
+            """, (iss["id"], seq, f"{project_ident}-{seq}", project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"),
+                  ",".join(sorted({label_names[i] for i in (_ref_id(l) for l in iss.get("labels") or []) if i in label_names})), now,
                   iss.get("created_at"), iss.get("completed_at"), iss.get("start_date"), iss.get("target_date"), iss.get("archived_at"),
                   json.dumps(assignee_ids(iss)), _ref_id(iss.get("created_by")), iss.get("updated_at")))
         conn.execute("DELETE FROM issues_fts;")

@@ -11,7 +11,7 @@ import re
 import sys
 
 from plane_cli.api import PlaneUnavailable, api_request
-from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, sync_issues_cache, warn_stale
+from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, warn_stale
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
 from plane_cli.list_filtered import add_list_filter_flags, cmd_list_filtered, wants_filtered
@@ -22,6 +22,7 @@ from plane_cli.resolve import (
     get_states_map,
     resolve_issue,
     resolve_project_and_seq,
+    sync_issues,
 )
 from plane_cli import clock
 
@@ -236,7 +237,7 @@ def cmd_search(args, conn, base_url, api_key, workspace, default_project_id):
                 project_ident = k
                 break
 
-    sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=getattr(args, "refresh", False))
+    sync_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=getattr(args, "refresh", False))
 
     raw_query = args.query.strip()
     matches = []

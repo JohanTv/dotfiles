@@ -11,7 +11,8 @@ import re
 
 import session_clock
 from plane_cli.api import PlaneUnavailable
-from plane_cli.cache import age_text, sync_issues_cache
+from plane_cli.cache import age_text
+from plane_cli.resolve import sync_issues
 from plane_cli import clock
 
 DUPLICATE_WINDOW_HOURS = 24
@@ -48,7 +49,7 @@ def recent_duplicates(conn, base_url, api_key, workspace, project_id, project_id
     refreshed = False
     if unconfirmed:
         try:
-            sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=True)
+            sync_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=True)
             refreshed = True
         except PlaneUnavailable:
             pass

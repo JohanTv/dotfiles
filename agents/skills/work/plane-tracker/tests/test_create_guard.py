@@ -35,11 +35,11 @@ class Base(unittest.TestCase):
         db.init_db(self.conn)
         self.refreshes = 0
         self.refresh_effect = lambda: None
-        self._sync = cg.sync_issues_cache
-        cg.sync_issues_cache = self._fake_sync
+        self._sync = cg.sync_issues
+        cg.sync_issues = self._fake_sync
 
     def tearDown(self):
-        cg.sync_issues_cache = self._sync
+        cg.sync_issues = self._sync
         self.conn.close()
 
     def _fake_sync(self, *args, **kwargs):

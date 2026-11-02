@@ -77,17 +77,18 @@ def build_data():
     states = {pid: [{"id": state_id(pid, n), "name": n, "slug": n.lower(), "group": g, "default": d} for n, g, d in STATE_DEFS]
               for pid in (P1, P2)}
     s = lambda pid, name: state_id(pid, name)
+    lid = lambda pid, i: f"1b{i}00000-0000-4000-8000-{pid[:12]}"  # id de la etiqueta i del proyecto (ver `labels` más abajo)
     issues = {
         P1: [
             {"id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "name": "Validaciones de formulario SMS", "priority": "high",
              "state": s(P1, "Progreso"), "created_at": "2026-10-01T10:00:00Z", "updated_at": "2026-10-20T15:00:00Z", "completed_at": None,
-             "start_date": "2026-10-01", "target_date": "2026-10-27", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": [], "assignees": [OTHER], "created_by": OTHER, "updated_by": None},
+             "start_date": "2026-10-01", "target_date": "2026-10-27", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": [lid(P1, 0), lid(P1, 2)], "assignees": [OTHER], "created_by": OTHER, "updated_by": None},
             {"id": "10000000-0000-4000-8000-000000000002", "sequence_id": 2, "name": "Acortador de enlaces", "priority": "medium",
              "state": s(P1, "Completado"), "created_at": "2026-10-10T09:00:00Z", "updated_at": "2026-10-15T12:00:00Z",
-             "completed_at": "2026-10-15T12:00:00Z", "start_date": None, "target_date": None, "description_html": "", "labels": [], "assignees": [ME], "created_by": ME, "updated_by": None},
+             "completed_at": "2026-10-15T12:00:00Z", "start_date": None, "target_date": None, "description_html": "", "labels": [lid(P1, 1)], "assignees": [ME], "created_by": ME, "updated_by": None},
             {"id": "10000000-0000-4000-8000-000000000003", "sequence_id": 3, "name": "Webhook SMS duplicado", "priority": "low",
              "state": s(P1, "Cancelado"), "created_at": "2026-10-05T09:00:00Z", "updated_at": "2026-10-06T12:00:00Z",
-             "completed_at": None, "start_date": None, "target_date": None, "description_html": "<p>Sin alcance.</p>", "labels": [], "assignees": [], "created_by": OTHER, "updated_by": None},
+             "completed_at": None, "start_date": None, "target_date": None, "description_html": "<p>Sin alcance.</p>", "labels": [lid(P1, 2)], "assignees": [], "created_by": OTHER, "updated_by": None},
         ],
         P2: [
             {"id": "20000000-0000-4000-8000-000000000013", "sequence_id": 13, "name": "Tareas Rápidas y Soporte - W43", "priority": "none",

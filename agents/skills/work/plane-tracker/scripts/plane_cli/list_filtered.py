@@ -16,10 +16,10 @@ import flow_metrics
 
 from plane_cli import clock
 from plane_cli.assignments import assignment_events_for, history_coverage, sweep_history
-from plane_cli.cache import age_text, fail_no_cache, iso_utc, sync_issues_cache
+from plane_cli.cache import age_text, fail_no_cache, iso_utc
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import fetch_transitions
-from plane_cli.resolve import get_members_map, get_projects_map, require_actor
+from plane_cli.resolve import get_members_map, get_projects_map, require_actor, sync_issues
 from plane_cli.api import PlaneUnavailable
 
 DEFAULT_LIMIT = 30
@@ -71,7 +71,7 @@ def _sync(conn, base_url, api_key, workspace, scope, refresh):
         # Una caché anterior a esta función no guarda asignados: se renueva aunque no haya vencido.
         outdated = conn.execute("SELECT 1 FROM issues_cache WHERE project_id = ? AND assignees_json IS NULL LIMIT 1", (project_id,)).fetchone()
         try:
-            sync_issues_cache(conn, base_url, api_key, workspace, project_id, ident, force_refresh=refresh or bool(outdated))
+            sync_issues(conn, base_url, api_key, workspace, project_id, ident, force_refresh=refresh or bool(outdated))
         except PlaneUnavailable:
             if len(scope) == 1:
                 raise

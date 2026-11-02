@@ -90,7 +90,7 @@ class Golden(unittest.TestCase):
     def test_list_search_labels_projects(self):
         steps = [["list"], ["list", "--json"], ["--json", "list"], ["list", "-p", "OPS"], ["list", "-p", "nope"],
                  ["search", "formulario"], ["search", "3"], ["search", "OMNIFY-2"], ["search", "zzz"], ["search", "validaciones", "--json", "-p", "OMNIFY"],
-                 ["search", "x", "-p", "NOPE"], ["search", "de la", "--refresh"], ["search", "soporte", "-p", "OPS"],
+                 ["search", "x", "-p", "NOPE"], ["search", "de la", "--refresh"], ["search", "soporte", "-p", "OPS"], ["search", "backend"], ["search", "bug"],
                  ["labels"], ["labels", "--json", "-p", "OPS", "--refresh"], ["labels", "-p", "NOPE"],
                  ["projects"], ["projects", "--json", "--refresh"]]
         self.golden("read_list_search_labels_projects", steps)

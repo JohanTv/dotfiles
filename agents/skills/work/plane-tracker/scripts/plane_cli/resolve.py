@@ -1,7 +1,7 @@
 """Resolución de proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite.
 
 Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(),
-get_states_map(), get_labels_map(), get_actor_uuid(), require_actor(), get_members_map(), detect_ticket_from_git().
+get_states_map(), get_labels_map(), get_actor_uuid(), require_actor(), get_members_map(), sync_issues(), detect_ticket_from_git().
 No hace: imprimir resultados ni escribir en Plane. Ante PlaneUnavailable, proyectos, estados y etiquetas se sirven de la
 caché local aunque haya vencido (con aviso), y sin caché lanzan PlaneUnavailable (código 3 en el CLI).
 """
@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 
 from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
-from plane_cli.cache import serve_stale
+from plane_cli.cache import serve_stale, sync_issues_cache
 from plane_cli import clock
 
 
@@ -238,8 +238,8 @@ def get_states_map(conn, base_url, api_key, workspace, project_id, force_refresh
     return _states_mapping(data.get("results", []))
 
 
-def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=False):
-    """Mapea nombres de etiquetas a su UUID con paginación y caché SQLite3 con TTL."""
+def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh=False, raise_http=False):
+    """Mapea nombres de etiquetas a su UUID con paginación y caché SQLite3 con TTL. Con `raise_http` un error HTTP se lanza como HTTPError en vez de terminar el programa."""
     now = clock.timestamp()
     rows = conn.execute("SELECT id, name, color, updated_at FROM labels WHERE project_id = ?", (project_id,)).fetchall() if conn else []
     if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
@@ -254,7 +254,7 @@ def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh
             url += f"?cursor={urllib.parse.quote(cursor)}"
 
         try:
-            data = api_request(url, api_key)
+            data = api_request(url, api_key, raise_on_error=raise_http)
         except PlaneUnavailable:
             return {r["name"].lower().strip(): r["id"] for r in serve_stale(rows, "etiquetas")}
         for lb in data.get("results", []):
@@ -352,3 +352,12 @@ def get_members_map(conn, base_url, api_key, workspace):
                 conn.execute("INSERT INTO members (user_id, name, updated_at) VALUES (?, ?, ?) "
                              "ON CONFLICT(user_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at", (m["id"], name, now))
     return {m["id"]: (m.get("display_name") or m.get("email") or m.get("first_name") or "") for m in items if m.get("id")}
+
+
+def sync_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
+    """cache.sync_issues_cache con las etiquetas del proyecto ya cacheadas, para que `labels_csv` lleve sus nombres. Sin etiquetas disponibles se sincroniza igual."""
+    try:
+        get_labels_map(conn, base_url, api_key, workspace, project_id, raise_http=True)
+    except (PlaneUnavailable, urllib.error.HTTPError):
+        pass
+    sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
