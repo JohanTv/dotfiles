@@ -206,6 +206,71 @@ $ plane.py get @
 --- stderr ---
 ℹ Ticket auto-detectado desde la rama actual de Git: OMNIFY-1
 
+$ plane.py get OMNIFY-1 --include attachments,links --no-comments
+[exit 0]
+--- stdout ---
+
+📌 OMNIFY-1: Validaciones de formulario SMS
+   • Estado    : Progreso
+   • Prioridad : HIGH
+   • Creado el : 2026-10-01
+   • Plan      : 2026-10-01 → 2026-10-27
+   • Ciclo     : abierto desde hace 32.1 días
+   • UUID      : 10000000-0000-4000-8000-000000000001
+
+📄 Descripción:
+   Validar formulario de campañas.
+
+📎 Adjuntos (1):
+   • informe.pdf  (2.0 KB)  d0000000-0000-4000-8000-000000000001
+
+🔗 Enlaces (0):
+--- stderr ---
+
+
+$ plane.py get OMNIFY-1 --include links --include attachments --json
+[exit 0]
+--- stdout ---
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"comments":{"shown":4,"total":4},"include":["attachments","links"]},"source":"api","stale":false,"unavailable":[]},"notes":[],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"attachments":[{"created_at":"2026-10-16T10:00:00Z","id":"d0000000-0000-4000-8000-000000000001","name":"informe.pdf","size":2048}],"comments":[{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T11:05:00Z","id":"c1000000-0000-4000-8000-000000000001","text":"Avance del formulario."},{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T11:35:00Z","id":"c1000000-0000-4000-8000-000000000002","text":"Revisión por subagente."},{"author":"bbbbbbbb-0000-4000-8000-000000000002","created_at":"2026-10-20T12:05:00Z","id":"c1000000-0000-4000-8000-000000000003","text":"Comentario ajeno."},{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T14:00:00Z","id":"c1000000-0000-4000-8000-000000000004","text":"Solo texto, sin telemetría."}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","description":"Validar formulario de campañas.","labels":["backend","sms"],"links":[],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","uuid":"10000000-0000-4000-8000-000000000001"}],"schema":"plane-tracker/1","summary":null,"total":1,"view":"get"}
+--- stderr ---
+
+
+$ plane.py get OMNIFY-1 --all --json
+[exit 0]
+--- stdout ---
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":null,"detail":{"comments":{"shown":4,"total":4},"include":["attachments","links"]},"source":"api","stale":false,"unavailable":[]},"notes":[{"code":"include_not_covered","hint":"Por ahora get solo incluye attachments y links.","text":"relations, children: aún no implementado en get (solo se incluyen attachments y links)."}],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"attachments":[{"created_at":"2026-10-16T10:00:00Z","id":"d0000000-0000-4000-8000-000000000001","name":"informe.pdf","size":2048}],"comments":[{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T11:05:00Z","id":"c1000000-0000-4000-8000-000000000001","text":"Avance del formulario."},{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T11:35:00Z","id":"c1000000-0000-4000-8000-000000000002","text":"Revisión por subagente."},{"author":"bbbbbbbb-0000-4000-8000-000000000002","created_at":"2026-10-20T12:05:00Z","id":"c1000000-0000-4000-8000-000000000003","text":"Comentario ajeno."},{"author":"aaaaaaaa-0000-4000-8000-000000000001","created_at":"2026-10-20T14:00:00Z","id":"c1000000-0000-4000-8000-000000000004","text":"Solo texto, sin telemetría."}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","description":"Validar formulario de campañas.","labels":["backend","sms"],"links":[],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","uuid":"10000000-0000-4000-8000-000000000001"}],"schema":"plane-tracker/1","summary":null,"total":1,"view":"get"}
+--- stderr ---
+
+
+$ plane.py get OMNIFY-1 --include relations --no-comments
+[exit 0]
+--- stdout ---
+
+⚠ relations: aún no implementado en get (solo se incluyen attachments y links). → Por ahora get solo incluye attachments y links.
+
+📌 OMNIFY-1: Validaciones de formulario SMS
+   • Estado    : Progreso
+   • Prioridad : HIGH
+   • Creado el : 2026-10-01
+   • Plan      : 2026-10-01 → 2026-10-27
+   • Ciclo     : abierto desde hace 32.1 días
+   • UUID      : 10000000-0000-4000-8000-000000000001
+
+📄 Descripción:
+   Validar formulario de campañas.
+--- stderr ---
+
+
+$ plane.py get OMNIFY-1 --include nope
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py get [-h] [--json] [--no-comments] [--last N] [--full]
+                    [--no-description] [--history] [--include LISTA] [--all]
+                    [issue]
+plane.py get: error: argument --include: valor no válido: 'nope' (opciones: attachments, links, relations, children)
+
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/
 GET /api/v1/workspaces/ws/issues/OMNIFY-1/
@@ -242,3 +307,15 @@ GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
 GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/issue-attachments/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/

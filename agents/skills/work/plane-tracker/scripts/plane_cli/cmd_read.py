@@ -5,6 +5,7 @@ y los cmd_* correspondientes.
 No hace: escribir en Plane.
 """
 
+import argparse
 import os
 import sys
 
@@ -16,12 +17,24 @@ from plane_cli.output import emit
 from plane_cli.scope import PERSON_FLAGS, resolve_scope, single_project
 from plane_cli.scope_flags import add_scope_args
 from plane_cli.views import LIST_LIMIT, VIEWS
+from plane_cli.vocabulary import GET_INCLUDES, GET_INCLUDES_COVERED
+
+
+def _include_list(value):
+    """`--include a,b`: valores separados por comas; uno desconocido es un error de uso con las opciones."""
+    items = [v.strip() for v in value.split(",") if v.strip()]
+    bad = [v for v in items if v not in GET_INCLUDES]
+    if bad or not items:
+        raise argparse.ArgumentTypeError(f"valor no válido: {', '.join(bad) or value!r} (opciones: {', '.join(GET_INCLUDES)})")
+    return items
 
 
 def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
     """`get`: el ticket (1 GET) y sus comentarios -> sobre sin `scope`; con red caída, la última lectura guardada. El texto es un render del mismo sobre."""
     view = VIEWS["get"]
-    source = ensure_get(conn, Env(base_url, api_key, workspace, default_project_id), args.issue, skip_comments=args.no_comments, history=args.history)
+    asked = [i for group in args.include for i in group] + (list(GET_INCLUDES) if args.all else [])
+    include = tuple(dict.fromkeys(asked))
+    source = ensure_get(conn, Env(base_url, api_key, workspace, default_project_id), args.issue, skip_comments=args.no_comments, history=args.history, include=include)
     doc = build(view.name, None, view.query(conn, source, last=args.last, no_description=args.no_description))
     emit(view, doc, getattr(args, "json", False), **({} if getattr(args, "json", False) else {"full": args.full}))
 
@@ -81,6 +94,9 @@ def register_get(sub):
     p_get.add_argument("--full", action="store_true", help="Sin truncar descripción ni comentarios en el texto (por defecto 300 caracteres)")
     p_get.add_argument("--no-description", action="store_true", help="Omitir la descripción")
     p_get.add_argument("--history", action="store_true", help="Añadir flujo: lead/cycle time, tiempo por estado, esfuerzo y transiciones")
+    p_get.add_argument("--include", type=_include_list, action="append", default=[], metavar="LISTA",
+                       help=f"Añadir {', '.join(GET_INCLUDES_COVERED)} (1 GET cada uno); también relations y children, que aún no se implementan")
+    p_get.add_argument("--all", action="store_true", help="Todo lo incluible (--include con todos los valores)")
     p_get.set_defaults(handler=cmd_get)
 
 

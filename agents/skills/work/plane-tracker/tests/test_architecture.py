@@ -36,7 +36,7 @@ DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
-    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox"), 1),
+    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox"), 1),
     "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
     "cmd_read": (("views", "scope", "scope_flags", "freshness", "errors"), 3), "cmd_report": (("views", "scope", "scope_flags", "freshness", "errors"), 5),
     "cmd_sync": (("views", "scope", "scope_flags", "freshness", "errors"), 6),

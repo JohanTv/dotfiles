@@ -1,7 +1,7 @@
 """Vocabulario cerrado del contrato de lectura `plane-tracker/1` (decisión 0025): una sola fuente de nombres.
 
 Expone: SCHEMA, DIMENSIONS, CONTROLS, PERSON_RELATIONS, SCOPE_KEYS, ENVELOPE_KEYS, COVERAGE_SOURCES, COVERAGE_KEYS, DETAIL_KEYS,
-VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, ALWAYS_SHOWN, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
+VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, ALWAYS_SHOWN, GET_INCLUDES, GET_INCLUDES_COVERED, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
 No hace: importar nada del paquete, validar sobres (eso es envelope) ni calcular cobertura (coverage). Son datos puros.
 Un campo se declara como "tipo" con sufijos: `?` admite null y `!` es obligatorio (ej. "str?!"); tipos: str, int, num, bool, list, dict.
 La especificación legible es docs/decisions/0025-contrato-json-de-lectura; una prueba (F4) comprueba que no se desincronizan.
@@ -24,7 +24,7 @@ COVERAGE_SOURCES = ("cache", "api", "snapshot", "local", "mixed")
 COVERAGE_KEYS = {"source": "str!", "as_of": "str?!", "age_s": "int?!", "stale": "bool!", "complete": "bool?!", "unavailable": "list!", "detail": "dict!"}
 # Claves conocidas de coverage.detail (por vista); las que alimentan notas derivadas están en coverage.py.
 DETAIL_KEYS = frozenset({"history", "text_fields", "hours_scope", "capped", "legacy", "forbidden", "rate_budget_exhausted", "assignment_snapshot",
-                         "count_mismatch", "hours_verified", "comments", "metadata_only"})
+                         "count_mismatch", "hours_verified", "comments", "metadata_only", "include"})
 NOTE_KEYS = {"code": "str!", "text": "str!", "hint": "str"}
 ERROR_KEYS = {"schema": "str!", "status": "str!", "code": "str!", "message": "str!", "hint": "str", "exit": "int!", "detail": "dict"}
 
@@ -55,7 +55,10 @@ FAMILIES = {
 }
 # Objetos anidados dentro de una fila: nombre del campo -> claves permitidas de cada elemento.
 NESTED = {"assignees": {"id", "name"}, "assignment_events": {"at", "kind", "user_id", "user_name"}, "comments": {"id", "author", "created_at", "text"},
-          "transitions": {"at", "from", "to"}}
+          "transitions": {"at", "from", "to"}, "attachments": {"id", "name", "size", "created_at"}, "links": {"id", "title", "url", "created_at"}}
+# `get --include`: qué se puede pedir y qué cubre hoy (cada cubierto cuesta 1 GET). Lo demás se acepta pero solo avisa (`include_not_covered`): V37.
+GET_INCLUDES = ("attachments", "links", "relations", "children")
+GET_INCLUDES_COVERED = ("attachments", "links")
 # Agregados (`summary`) por familia de resumen. `report time` lleva listas de {key, minutes}; `undeclared` va en by_capacity, nunca sumado a deep_work.
 SUMMARIES = {
     "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int"},
@@ -108,6 +111,7 @@ NOTES = {
     "cache_capped": ("warn", "cobertura", "El proyecto supera el máximo sincronizable: {projects}.", "Acota el alcance."),
     "pending_unpublished": ("warn", "vista", None, "plane-tracker outbox flush"),
     "text_looks_like_id": ("info", "vista", None, "plane-tracker get <ticket>"),
+    "include_not_covered": ("warn", "vista", None, "Por ahora get solo incluye attachments y links."),
     "internal": ("warn", "envelope", None, "Informa el defecto."),
 }
 SEVERITY_ORDER = ("warn", "info")  # al ordenar notas, los avisos van antes que las informativas

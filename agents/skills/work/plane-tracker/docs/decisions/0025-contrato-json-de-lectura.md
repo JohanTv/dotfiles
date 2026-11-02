@@ -51,7 +51,9 @@ Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara 
 - Claves de `coverage`: `source`, `as_of`, `age_s`, `stale`, `complete`, `unavailable`, `detail`
 - Valores de `coverage.source`: `cache`, `api`, `snapshot`, `local`, `mixed`
 - Notas siempre visibles: `truncated`, `text_looks_like_id`
-- Claves de `coverage.detail`: `history`, `text_fields`, `hours_scope`, `hours_verified`, `capped`, `legacy`, `forbidden`, `rate_budget_exhausted`, `assignment_snapshot`, `count_mismatch`, `comments`, `metadata_only`
+- Claves de `coverage.detail`: `history`, `text_fields`, `hours_scope`, `hours_verified`, `capped`, `legacy`, `forbidden`, `rate_budget_exhausted`, `assignment_snapshot`, `count_mismatch`, `comments`, `metadata_only`, `include`
+- Valores de `get --include`: `attachments`, `links`, `relations`, `children`
+- Incluibles cubiertos por `get`: `attachments`, `links`
 
 `person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas). Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
 
@@ -89,14 +91,14 @@ Vistas `list` y `get`. Las filas breves (`list --brief`) llevan solo `ticket`, `
 
 ### Familia `ticket_detail`
 
-Vista `get`: todos los campos de `ticket` más los siguientes.
+Vista `get`: todos los campos de `ticket` más los siguientes. `links` y `attachments` solo se leen si se piden (`--include attachments,links` o `--all`; cada uno cuesta 1 GET) y, si se piden, van aunque estén vacíos (vacío = medido). `relations` y `children` se aceptan en `--include` pero **aún no están implementados**: producen el aviso `include_not_covered` y dejan `complete` en `null` (su verificación contra la API real quedó pendiente).
 
 | Campo | Tipo | Significado |
 | :--- | :--- | :--- |
 | `description` | `str?` | descripción |
 | `comments` | `list` | `{id, author, created_at, text}` |
-| `links` | `list` | enlaces del ticket |
-| `attachments` | `list` | adjuntos del ticket |
+| `links` | `list` | solo con `get --include links` (o `--all`): `{id, title, url, created_at}` |
+| `attachments` | `list` | solo con `get --include attachments` (o `--all`): `{id, name, size, created_at}` |
 | `flow` | `dict` | con `get --history`: los campos de la familia `flow` sin `ticket` ni `title` |
 
 ### Familia `hours`
@@ -268,6 +270,8 @@ Claves permitidas de cada elemento de estas listas dentro de una fila.
 | `assignment_events` | `at`, `kind`, `user_id`, `user_name` |
 | `comments` | `id`, `author`, `created_at`, `text` |
 | `transitions` | `at`, `from`, `to` |
+| `attachments` | `id`, `name`, `size`, `created_at` |
+| `links` | `id`, `title`, `url`, `created_at` |
 
 ## Códigos de comprobación (`worklog check`)
 
@@ -305,6 +309,7 @@ Severidad (`info`, `warn`) y origen. Agregar uno exige añadirlo aquí y en `voc
 | `cache_capped` | warn | cobertura | el proyecto supera el máximo sincronizable | acotar el alcance |
 | `pending_unpublished` | warn | vista | comentarios en cola sin publicar que afectan el resultado | `outbox flush` |
 | `text_looks_like_id` | info | vista | el texto parece un ticket (`PRJ-12`); siempre visible | `get PRJ-12` |
+| `include_not_covered` | warn | vista | se pidió `relations` o `children` (o `--all`), que `get` aún no implementa | solo se incluyen `attachments` y `links` |
 | `internal` | warn | envelope | deriva del sobre detectada en producción | informar el defecto |
 
 ## Sobre de error

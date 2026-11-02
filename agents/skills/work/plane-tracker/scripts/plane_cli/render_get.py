@@ -68,6 +68,12 @@ def render(doc, full=False):
         lines += ["\n📄 Descripción:", f"   {_cut(row['description'], full)}"]
     if row.get("flow"):
         lines += _flow(row["flow"])
+    if "attachments" in row:
+        lines.append(f"\n📎 Adjuntos ({len(row['attachments'])}):")
+        lines += [f"   • {a['name']}  ({(a['size'] or 0) / 1024:.1f} KB)  {a['id']}" for a in row["attachments"]]
+    if "links" in row:
+        lines.append(f"\n🔗 Enlaces ({len(row['links'])}):")
+        lines += [f"   • {(k['title'] + ' → ') if k.get('title') else ''}{k['url']}" for k in row["links"]]
     comments = row.get("comments") or []
     if comments:
         total, shown = cov["detail"]["comments"]["total"], len(comments)

@@ -27,6 +27,7 @@ from plane_cli.resolve import (PROJECTS_TTL, get_actor_uuid, get_labels_map, get
                                resolve_issue, resolve_issue_by_label, resolve_project_and_seq)
 from plane_cli.scope import ProjectRef
 from plane_cli.timeutil import iso_z
+from plane_cli.vocabulary import GET_INCLUDES_COVERED
 
 Env = namedtuple("Env", "base_url api_key workspace default_project_id")
 
@@ -133,6 +134,10 @@ class TicketSource:
     metadata_only: bool = False   # solo había los metadatos del listado: sin descripción ni comentarios
     state_name: str | None = None
     flow: dict | None = None      # con --history: métricas de flujo y transiciones con nombres de estado
+    attachments: list | None = None  # con --include attachments: lo que devolvió la API (None: no se pidió o no se pudo leer)
+    links: list | None = None
+    include: tuple = ()           # incluibles pedidos que `get` cubre (attachments, links)
+    not_covered: tuple = ()       # incluibles pedidos que aún no se implementan (relations, children)
 
 
 def _fetch_comments(env, project_id, issue):
@@ -144,13 +149,22 @@ def _fetch_comments(env, project_id, issue):
         return None
 
 
-def _names_for(conn, env, project_id):
-    """Estados, miembros y etiquetas del proyecto en la caché local, para dar nombres; lo que no se pueda traer se omite sin aviso."""
-    for fetch in (lambda: get_states_map(conn, env.base_url, env.api_key, env.workspace, project_id),
-                  lambda: get_members_map(conn, env.base_url, env.api_key, env.workspace),
-                  lambda: get_labels_map(conn, env.base_url, env.api_key, env.workspace, project_id)):
+def _names_for(conn, env, project_id, issue):
+    """Estados, miembros y etiquetas del proyecto en la caché local (con su TTL), para dar nombres; si al ticket le falta alguna etiqueta en la caché, se refresca una vez."""
+    def fetch_all():
+        for fetch in (lambda: get_states_map(conn, env.base_url, env.api_key, env.workspace, project_id),
+                      lambda: get_members_map(conn, env.base_url, env.api_key, env.workspace),
+                      lambda: get_labels_map(conn, env.base_url, env.api_key, env.workspace, project_id)):
+            try:
+                _quiet(fetch)
+            except (PlaneUnavailable, urllib.error.URLError, OSError):
+                pass
+    fetch_all()
+    wanted = {i.get("id") if isinstance(i, dict) else i for i in issue.get("labels") or []}
+    known = {r["id"] for r in conn.execute("SELECT id FROM labels WHERE project_id = ?", (project_id,))}
+    if wanted - known:  # una etiqueta creada después de la última sincronización: 1 GET para ponerla al día
         try:
-            _quiet(fetch)
+            _quiet(get_labels_map, conn, env.base_url, env.api_key, env.workspace, project_id, force_refresh=True)
         except (PlaneUnavailable, urllib.error.URLError, OSError):
             pass
 
@@ -165,8 +179,37 @@ def _flow_json(conn, env, project_id, issue, issue_ref):
     return out
 
 
-def ensure_get(conn, env, issue_arg, skip_comments=False, history=False):
-    """Pide el ticket (1 GET por su etiqueta) y sus comentarios, guarda la instantánea y devuelve la fuente; sin red usa la última lectura guardada."""
+def _get_pages(url, api_key, limit_pages=10):
+    """Todos los elementos de una lectura que puede ser una lista plana (adjuntos) o paginada (enlaces); None si no se pudo leer."""
+    items, cursor = [], None
+    try:
+        for _ in range(limit_pages):
+            data = api_request(url + (f"?cursor={cursor}" if cursor else ""), api_key)
+            if isinstance(data, list):
+                return data
+            items += data.get("results", [])
+            cursor = data.get("next_cursor")
+            if not data.get("next_page_results") or not cursor:
+                return items
+    except (PlaneUnavailable, urllib.error.URLError, OSError):
+        return None
+    return None  # más páginas de las que se siguen: no se afirma que esté completo
+
+
+def _read_includes(env, project_id, issue, include):
+    """{incluible: elementos | None} de los incluibles cubiertos que se pidieron; cada uno cuesta 1 GET."""
+    root = f"{env.base_url.rstrip('/')}/api/v1/workspaces/{env.workspace}/projects/{project_id}/issues/{issue['id']}"
+    paths = {"attachments": "issue-attachments/", "links": "links/"}
+    return {name: _get_pages(f"{root}/{paths[name]}", env.api_key) for name in include}
+
+
+def ensure_get(conn, env, issue_arg, skip_comments=False, history=False, include=()):
+    """Pide el ticket (1 GET por su etiqueta) y sus comentarios, guarda la instantánea y devuelve la fuente; sin red usa la última lectura guardada.
+
+    `include` (de GET_INCLUDES) pide además adjuntos y/o enlaces (1 GET cada uno, solo en línea); `relations` y `children` no se implementan: se anotan en `not_covered`.
+    """
+    not_covered = tuple(i for i in include if i not in GET_INCLUDES_COVERED)
+    include = tuple(i for i in include if i in GET_INCLUDES_COVERED)
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, env.base_url, env.api_key, env.workspace, env.default_project_id, issue_arg)
     now = clock.timestamp()
     try:
@@ -177,13 +220,15 @@ def ensure_get(conn, env, issue_arg, skip_comments=False, history=False):
                                            lambda: resolve_issue(env.base_url, env.api_key, env.workspace, project_id, seq_id, None))
         comments = None if skip_comments else _fetch_comments(env, project_id, issue)
         save_snapshot(conn, issue, issue_ref, comments)
-        source = TicketSource(issue, comments, comments is not None, issue_ref, project_id, Coverage(source="api", as_of=iso_z(now), age_s=0))
-        _names_for(conn, env, project_id)
+        extra = _read_includes(env, project_id, issue, include)
+        source = TicketSource(issue, comments, comments is not None, issue_ref, project_id, Coverage(source="api", as_of=iso_z(now), age_s=0),
+                              attachments=extra.get("attachments"), links=extra.get("links"), include=include, not_covered=not_covered)
+        _names_for(conn, env, project_id, issue)
     except PlaneUnavailable:
         local = offline_issue(conn, project_id, seq_id, uuid_ref, issue_ref) or fail_no_cache(issue_ref)
         coverage = Coverage(source="snapshot", as_of=iso_z(local["fetched_at"]), age_s=int(now - local["fetched_at"]), stale=True)
         source = TicketSource(local["issue"], local["comments"] if not skip_comments else None, False, issue_ref, project_id, coverage,
-                              metadata_only=local["metadata_only"], state_name=local["state_name"])
+                              metadata_only=local["metadata_only"], state_name=local["state_name"], include=include, not_covered=not_covered)
     if history:
         source = replace(source, flow=_flow_json(conn, env, project_id, source.issue, issue_ref))
     return source

@@ -39,7 +39,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Tarea | Comando |
 | :--- | :--- |
 | Buscar antes de crear | `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` (lee `coverage`: si `complete` no es `true`, `stale` es `true` o `unavailable` no está vacío, no prueba que no exista) |
-| Ver ticket | `plane-tracker get T [--last N] [--history]` |
+| Ver ticket | `plane-tracker get T [--last N] [--history] [--include attachments,links \| --all]` (adjuntos y enlaces solo si se piden: +1 GET cada uno; `relations` y `children` aún no están implementados y avisan) |
 | Listar tickets | `plane-tracker list -p OMNIFY` (sin filtros, desde la API) |
 | Mis tickets | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` (caché local; necesita `PLANE_ACTOR_UUID` o `PLANE_USERNAME`) |
 | Cambiar título/descripción/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` (la descripción reemplaza la actual) |

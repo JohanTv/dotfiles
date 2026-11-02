@@ -69,6 +69,68 @@ class Views(unittest.TestCase):
         self.assertNotIn("labels", doc["results"][0])
         self.assertEqual((doc["coverage"]["source"], doc["coverage"]["stale"]), ("snapshot", True))
 
+    def test_include_reads_only_what_was_asked_and_costs_one_get_each(self):
+        self.sb.fake.data["links"] += [{"id": "l1", "title": "Doc", "url": "https://example.com/a", "created_at": "2026-10-01T10:00:00Z"}]
+        mark = len(self.sb.fake.requests)
+        doc, _ = self.run_json("get", "OMNIFY-1", "--include", "links")
+        row = doc["results"][0]
+        self.assertEqual(row["links"], [{"id": "l1", "title": "Doc", "url": "https://example.com/a", "created_at": "2026-10-01T10:00:00Z"}])
+        self.assertNotIn("attachments", row)
+        self.assertEqual(doc["coverage"]["detail"]["include"], ["links"])
+        self.assertEqual(len([p for p in self.requests(mark) if p.endswith("/links/")]), 1)
+        self.assertFalse([p for p in self.requests(mark) if "issue-attachments" in p])
+        self.assertIs(doc["coverage"]["complete"], True)
+        doc, _ = self.run_json("get", "OMNIFY-1", "--include", "attachments,links")
+        self.assertEqual((doc["results"][0]["attachments"][0]["name"], doc["coverage"]["detail"]["include"]), ("informe.pdf", ["attachments", "links"]))
+        doc, _ = self.run_json("get", "OMNIFY-1")
+        self.assertFalse({"attachments", "links"} & set(doc["results"][0]), "sin pedirlos no se emiten")
+
+    def test_an_empty_include_is_a_measured_empty_list(self):
+        self.sb.fake.data["links"] = []
+        doc, _ = self.run_json("get", "OMNIFY-1", "--include", "links")
+        self.assertEqual(doc["results"][0]["links"], [])
+        self.assertIs(doc["coverage"]["complete"], True)
+
+    def test_relations_and_children_only_warn_and_all_covers_what_exists(self):
+        mark = len(self.sb.fake.requests)
+        doc, _ = self.run_json("get", "OMNIFY-1", "--include", "relations,children")
+        warn = [n for n in doc["notes"] if n["code"] == "include_not_covered"]
+        self.assertEqual(len(warn), 1)
+        self.assertIn("relations, children", warn[0]["text"])
+        self.assertIs(doc["coverage"]["complete"], None, "se pidió algo que no se entrega: no es completo")
+        self.assertFalse([p for p in self.requests(mark) if p.endswith(("/links/", "/relations/")) or "issue-attachments" in p])
+        doc, _ = self.run_json("get", "OMNIFY-1", "--all")
+        row = doc["results"][0]
+        self.assertTrue({"attachments", "links"} <= set(row))
+        self.assertEqual(doc["coverage"]["detail"]["include"], ["attachments", "links"])
+        self.assertIn("relations, children", [n for n in doc["notes"] if n["code"] == "include_not_covered"][0]["text"])
+        self.assertEqual(envelope.validate(doc), [])
+
+    def test_unknown_include_is_a_usage_error_with_the_options(self):
+        code, out, err = self.sb.run(["get", "OMNIFY-1", "--include", "nope"])
+        self.assertEqual(code, 2)
+        self.assertIn("attachments, links, relations, children", err)
+
+    def test_includes_cannot_be_read_offline_and_are_left_out(self):
+        self.run_json("get", "OMNIFY-1")
+        doc, _ = self.run_json("get", "OMNIFY-1", "--include", "links", env_set=OFFLINE)
+        self.assertNotIn("links", doc["results"][0])
+        self.assertIs(doc["coverage"]["complete"], None)
+
+    # --- etiquetas ---
+    def test_a_label_missing_from_the_cache_is_refreshed_once_while_online(self):
+        self.run_json("get", "OMNIFY-1")  # llena la caché de etiquetas
+        new = {"id": "1bnew000-0000-4000-8000-%s" % gs.P1[:12], "name": "nueva", "color": "#abcdef"}
+        self.sb.fake.data["labels"][gs.P1].append(new)
+        self.sb.fake.data["issues"][gs.P1][0]["labels"].append(new["id"])
+        mark = len(self.sb.fake.requests)
+        doc, _ = self.run_json("get", "OMNIFY-1")
+        self.assertEqual(doc["results"][0]["labels"], ["backend", "sms", "nueva"])
+        self.assertEqual(len([p for p in self.requests(mark) if p.endswith(f"/projects/{gs.P1}/labels/")]), 1, "un GET para ponerlas al día")
+        mark = len(self.sb.fake.requests)
+        self.run_json("get", "OMNIFY-1")
+        self.assertFalse([p for p in self.requests(mark) if p.endswith("/labels/")], "con la caché al día no se vuelve a pedir")
+
     # --- catálogos ----------------------------------------------------------------------------------------------------------------------
     def test_catalogs_are_sorted_and_declare_their_project(self):
         doc, _ = self.run_json("labels", "-p", "OPS")

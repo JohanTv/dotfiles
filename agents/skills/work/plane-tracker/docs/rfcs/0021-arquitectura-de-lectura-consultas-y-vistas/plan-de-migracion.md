@@ -91,4 +91,7 @@ Estados válidos: `pendiente`, `en curso`, `cerrada` (F15 los lee: `CURRENT_PHAS
 
 **Fase 0, lo que queda para las siguientes:** F5, F7, F10, F11 y las mitades de F2 (parser por vista) y F6 (servidor falso) dependen de código que aún no existe: están escritas como `pending()` y **fallan** en cuanto `CURRENT_PHASE` alcanza su fase, para obligar a escribirlas entonces. F2 (vocabulario de las vistas), F3 con golden, F6 (AST), F9 y F12 ya tienen cuerpo real.
 
+**Pendientes declarados (no bloquean ninguna fase):**
+- `get --include relations` y `--include children`: hoy se aceptan pero solo avisan (`include_not_covered`). Falta verificar con tickets reales la forma de una relación (`work-items/{id}/relations/`) y de un hijo (resolverlos desde `parent` en la caché local, que además exige guardar `parent` al sincronizar) y entonces implementarlos. Hechos y huecos en [`hechos-de-la-api.md`](./hechos-de-la-api.md).
+
 Este RFC pasa a `implementado` solo cuando las nueve fases estén cerradas; hasta entonces ningún documento cita el modelo como existente.

@@ -82,7 +82,9 @@ class Golden(unittest.TestCase):
         steps = [["get", "OMNIFY-1"], ["get", "OMNIFY-1", "--json"], ["--json", "get", "OMNIFY-1"], ["get", "OMNIFY-1", "--no-comments", "--no-description"],
                  ["get", "OMNIFY-1", "--last", "2", "--full"], ["get", "OMNIFY-2", "--history"], ["get", "OMNIFY-3", "--history", "--json"],
                  ["get", "1"], ["get", "OPS-13"], ["get", "OMNIFY-999"], ["get", "10000000-0000-4000-8000-000000000002", "--json"],
-                 ["get"], ["get", "@"]]
+                 ["get"], ["get", "@"],
+                 ["get", "OMNIFY-1", "--include", "attachments,links", "--no-comments"], ["get", "OMNIFY-1", "--include", "links", "--include", "attachments", "--json"],
+                 ["get", "OMNIFY-1", "--all", "--json"], ["get", "OMNIFY-1", "--include", "relations", "--no-comments"], ["get", "OMNIFY-1", "--include", "nope"]]
         self.golden("get", steps, sandbox_kwargs={"with_repo": True})
 
     def test_get_outside_repo(self):

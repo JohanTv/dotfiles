@@ -53,10 +53,23 @@ Las respuestas 200 traen `X-RateLimit-Remaining` y `X-RateLimit-Reset` (época);
 
 **Consecuencia:** con 60 peticiones por ventana, una lectura en frío cuesta `3N + 1` GET para `N` proyectos accesibles (proyectos, y por cada uno estados, etiquetas y tickets); con `N ≥ 20` se agota la cuota. `report flow` con más de 15 tickets también.
 
+## Un ticket, enlaces, adjuntos, relaciones y sub work-items
+
+Verificado el 2026-11-02 con GET sobre un ticket real (formas; ningún dato de la instancia).
+
+| Hecho | Detalle |
+| :--- | :--- |
+| Ticket por etiqueta | `GET workspaces/{ws}/issues/{PRJ}-{n}/` (y `work-items/` con la misma respuesta): 1 GET. |
+| Contadores | El ticket **no** trae contadores de enlaces, adjuntos, relaciones ni hijos. Solo `parent` (id o null). Saber si hay algo exige pedirlo. |
+| Enlaces | `…/issues/{id}/links/`: sobre paginado (`results`, `total_count`, `next_cursor`, `next_page_results`). Cada elemento: `id`, `title`, `url`, `metadata`, fechas y autor. |
+| Adjuntos | `…/issues/{id}/issue-attachments/`: **lista plana**, sin paginación. Cada elemento: `id`, `size`, `created_at`, `attributes {name, size, type}` y otros. |
+| Relaciones | Solo con la ruta `…/work-items/{id}/relations/`: un objeto con `blocked_by`, `blocking`, `duplicate`, `finish_after`, `finish_before` y `relates_to`. Con `issues/` responde 404. **La forma de un elemento no se verificó** (no había ninguno). |
+| Sub work-items | No existe un endpoint dedicado (`sub-issues/` y `sub-work-items/` dan 404 con ambas rutas). El filtro `?parent=` lo ignora el servidor. El listado acepta `fields=parent`: los hijos solo se pueden resolver con `parent` en la caché local. **No verificado con un ticket que tenga hijos.** |
+
 ## Borrado
 
 La documentación pública indica que `DELETE .../work-items/{id}/` responde **204** sin cuerpo. No se probó (la validación era de solo lectura) **[S]**.
 
 ## Lo que sigue sin verificar
 
-Máximo real de `per_page`; paginación de más de una página en comentarios y actividades (solo `per_page=1`); un ticket con muchos comentarios (el máximo visto fue 4); comentarios con telemetría de otras personas o parcial en toda la instancia (la muestra fue de unos 41 tickets de unos 234: **0** casos); el 429 y `Retry-After`; `expand=assignees`; que reasignar actualice `updated_at`; que exista el grupo `triage`.
+Forma de un elemento de `relations/` y de un hijo real (pendiente: hace falta un ticket con relaciones y otro con sub work-items); máximo real de `per_page`; paginación de más de una página en comentarios y actividades (solo `per_page=1`); un ticket con muchos comentarios (el máximo visto fue 4); comentarios con telemetría de otras personas o parcial en toda la instancia (la muestra fue de unos 41 tickets de unos 234: **0** casos); el 429 y `Retry-After`; `expand=assignees`; que reasignar actualice `updated_at`; que exista el grupo `triage`.

@@ -2,8 +2,8 @@
 
 Expone: query().
 No hace: red ni escribir. La API se pidió en freshness.ensure_get; aquí solo se leen estados, miembros y etiquetas locales.
-`complete` es true solo si el ticket vino de la API y sus comentarios se leyeron completos (con instantánea o sin comentarios, None). Las etiquetas se
-omiten si alguna no se conoce y los enlaces y adjuntos no se leen en `get` (ausente = no leído): nunca se inventa un dato.
+`complete` es true solo si el ticket vino de la API y se leyó todo lo pedido: comentarios, `--include` cubiertos y ninguno sin implementar (con instantánea, sin comentarios
+o con un incluible sin leer, None). Las etiquetas se omiten si alguna no se conoce; adjuntos y enlaces solo se emiten si se pidieron (ausente = no leído): nunca se inventa un dato.
 """
 
 import re
@@ -66,5 +66,19 @@ def query(conn, source, last=None, no_description=False):
         detail["comments"] = {"shown": len(shown), "total": len(source.comments)}
     if source.metadata_only:
         detail["metadata_only"] = True
+    read = [name for name, items in (("attachments", source.attachments), ("links", source.links)) if items is not None]
+    if source.attachments is not None:
+        row["attachments"] = [{"id": a.get("id"), "name": (a.get("attributes") or {}).get("name"), "size": (a.get("attributes") or {}).get("size") or a.get("size"),
+                               "created_at": a.get("created_at")} for a in source.attachments]
+    if source.links is not None:
+        row["links"] = [{"id": k.get("id"), "title": k.get("title"), "url": k.get("url"), "created_at": k.get("created_at")} for k in source.links]
+    if read:
+        detail["include"] = read
     cov = replace(source.coverage, detail=detail)
-    return Result(rows=[row], total=1, coverage=replace(cov, complete=complete_get(cov, source.comments_read)))
+    # completo solo si se leyó todo lo pedido: comentarios, incluibles cubiertos y ninguno sin implementar
+    everything = source.comments_read and set(read) == set(source.include) and not source.not_covered
+    notes = ()
+    if source.not_covered:
+        names = ", ".join(source.not_covered)
+        notes = ({"code": "include_not_covered", "text": f"{names}: aún no implementado en get (solo se incluyen attachments y links)."},)
+    return Result(rows=[row], total=1, coverage=replace(cov, complete=complete_get(cov, everything)), extra_notes=notes)

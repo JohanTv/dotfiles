@@ -119,3 +119,10 @@ Cada uno se resolvió con el supuesto más conservador y espera confirmación; n
 | V36 | BAJO | Silenciar el stderr de las capas bajas (para no duplicar los avisos que ya van en la cobertura) también tragaba los mensajes de los errores que terminan el programa (`Error HTTP 404 ...`). | Corregido | `freshness._quiet` reemite lo capturado si hay `SystemExit`; las pruebas lo cubren. |
 
 Notas de alcance: el endpoint de 1 GET por etiqueta (`workspaces/{ws}/issues/{PRJ}-{n}/`) solo se usa en `get` (el plan solo lo pide ahí; `update`, `comment`, `delete` siguen recorriendo el listado: defecto 0024). `projects` ya no imprime el proyecto por defecto ni el workspace (datos de instancia que el sobre no lleva).
+
+## Hallazgos posteriores a la fase 3 (2026-11-02)
+
+| Id | Sev. | Hallazgo | Estado | Dónde se atiende |
+| :--- | :---: | :--- | :--- | :--- |
+| V37 | MEDIO | V32 dejó `links` y `attachments` fuera de `get` porque costarían 2 GET. Contra la API real: el ticket no trae contadores, así que saberlo exige pedirlos; además existen relaciones (solo bajo `work-items/…/relations/`) y sub work-items (sin endpoint; se resolverían desde `parent` en la caché). | Corregido en parte | `get --include attachments,links` o `--all` (1 GET cada uno; lo no pedido no se emite; lo pedido y vacío es una lista vacía medida). `relations` y `children` se aceptan pero avisan (`include_not_covered`, `complete: null`): **pendiente** hasta verificarlos con tickets reales. |
+| V38 | BAJO | Si una etiqueta del ticket no estaba en la caché (creada tras la última sincronización, TTL de un día), `get` en línea la omitía aun teniendo red. | Corregido | Con red, si falta alguna se refresca una vez (+1 GET, solo en ese caso); sin red sigue la regla de omitir `labels` entera. |

@@ -43,7 +43,7 @@ $ plane.py get --last 0 OMNIFY-1
 
 --- stderr ---
 usage: plane.py get [-h] [--json] [--no-comments] [--last N] [--full]
-                    [--no-description] [--history]
+                    [--no-description] [--history] [--include LISTA] [--all]
                     [issue]
 plane.py get: error: argument --last: debe ser un entero >= 1
 

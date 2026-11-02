@@ -201,6 +201,8 @@ plane-tracker comment add OMNIFY-197 -m "..." --accept-proposal                 
 ### C.2 Flujo del work item: tiempo abierto vs esfuerzo efectivo
 ```bash
 plane-tracker get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
+plane-tracker get OMNIFY-129 --include attachments,links   # adjuntos y enlaces (+1 GET cada uno; sin el flag no se leen)
+plane-tracker get OMNIFY-129 --all                # todo lo incluible hoy (attachments y links); relations y children avisan: aún no implementados
 plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas
 ```
 - **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.

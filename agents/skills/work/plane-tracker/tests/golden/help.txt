@@ -35,7 +35,7 @@ $ plane.py get --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,P
 [exit 0]
 --- stdout ---
 usage: plane.py get [-h] [--json] [--no-comments] [--last N] [--full]
-                    [--no-description] [--history]
+                    [--no-description] [--history] [--include LISTA] [--all]
                     [issue]
 
 positional arguments:
@@ -52,6 +52,9 @@ options:
   --no-description  Omitir la descripción
   --history         Añadir flujo: lead/cycle time, tiempo por estado, esfuerzo
                     y transiciones
+  --include LISTA   Añadir attachments, links (1 GET cada uno); también
+                    relations y children, que aún no se implementan
+  --all             Todo lo incluible (--include con todos los valores)
 --- stderr ---
 
 

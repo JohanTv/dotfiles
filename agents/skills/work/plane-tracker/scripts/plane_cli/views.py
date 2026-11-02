@@ -34,7 +34,7 @@ VIEWS = {
                  "tickets de los proyectos accesibles del alcance (TTL 30 min; --refresh fuerza; --offline no toca la red)", ("list",),
                  frozenset({"--refresh-history", "--budget"})),
     "get": View("get", NONE, NONE, query_get.query, render_get.render, {}, "el ticket por su etiqueta (1 GET) y sus comentarios; la instantánea guardada de respaldo",
-                ("get",), frozenset({"--no-comments", "--last", "--full", "--no-description", "--history"})),
+                ("get",), frozenset({"--no-comments", "--last", "--full", "--no-description", "--history", "--include", "--all"})),
     "labels": View("labels", NONE, frozenset({"refresh", "offline"}), query_catalogs.labels, render_catalogs.render_labels, {},
                    "etiquetas del proyecto (TTL 1 día)", ("labels",), frozenset({"-p", "--project"})),
     "projects": View("projects", NONE, frozenset({"refresh", "offline"}), query_catalogs.projects, render_catalogs.render_projects, {},
