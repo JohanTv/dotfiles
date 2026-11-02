@@ -255,8 +255,9 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         try:
             name, _ = upload_attachment(base_url, api_key, workspace, project_id, res["id"], path)
             attached.append(name)
-        except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, SystemExit) as exc:
-            attach_errors.append(f"{path}: {exc}")
+        except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, SystemExit, CliError) as exc:
+            err_msg = exc.render() if isinstance(exc, CliError) else str(exc)
+            attach_errors.append(f"{path}: {err_msg}")
 
     seq_id = res.get("sequence_id")
     ticket_ref = f"{project_ident}-{seq_id}" if seq_id else res.get("id")

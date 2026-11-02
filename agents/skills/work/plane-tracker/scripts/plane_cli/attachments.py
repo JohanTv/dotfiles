@@ -16,7 +16,7 @@ import uuid
 import session_clock
 
 from plane_cli import vocabulary
-from plane_cli.api import api_request
+from plane_cli.api import api_request, fail_http, http_detail
 from plane_cli.config import add_json_flag
 from plane_cli.envelope import build, dumps
 from plane_cli.errors import CliError
@@ -27,6 +27,7 @@ from plane_cli.views import VIEWS
 
 
 ATTACH_MAX_BYTES = 50 * 1024 * 1024
+UNSUPPORTED_ATTACH_EXTENSIONS = frozenset({".sql"})
 
 
 def build_multipart(fields, filename, content_type, data):
@@ -45,7 +46,24 @@ def upload_attachment(base_url, api_key, workspace, project_id, issue_id, path):
     content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
     with open(path, "rb") as handle:
         data = handle.read()
-    created = api_request(attachments_url, api_key, method="POST", data={"name": name, "type": content_type, "size": len(data)})
+    try:
+        created = api_request(
+            attachments_url,
+            api_key,
+            method="POST",
+            data={"name": name, "type": content_type, "size": len(data)},
+            raise_on_error=True,
+        )
+    except urllib.error.HTTPError as exc:
+        detail = http_detail(exc)
+        exc.close()
+        if exc.code == 400 and any(msg in detail.lower() for msg in ("invalid file type", "file type not allowed", "unsupported file type")):
+            raise CliError(
+                "invalid_input",
+                f"Plane rechazó '{name}': tipo de archivo no permitido.",
+                hint="Convierte o renombra el archivo a .txt o .md para subirlo como adjunto.",
+            ) from exc
+        fail_http(attachments_url, exc.code, detail)
     asset_id, upload = created["asset_id"], created["upload_data"]
     body, header = build_multipart(upload["fields"], name, content_type, data)
     try:
@@ -75,6 +93,13 @@ def validate_attachment_paths(paths):
             raise CliError("not_found", f"'{path}' no es un archivo.")
         if os.path.getsize(path) > ATTACH_MAX_BYTES:
             raise CliError("invalid_input", f"'{path}' supera {ATTACH_MAX_BYTES // (1024 * 1024)} MB.")
+        _, ext = os.path.splitext(path)
+        if ext.lower() in UNSUPPORTED_ATTACH_EXTENSIONS:
+            raise CliError(
+                "invalid_input",
+                f"'{path}' tiene una extensión no admitida por Plane ({ext.lower()}).",
+                hint="Plane no admite archivos de este tipo como adjuntos. Convierte o renombra el archivo a .txt o .md para subirlo.",
+            )
 
 
 def delete_attachment(base_url, api_key, workspace, project_id, issue_id, attachment_id):
