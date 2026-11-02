@@ -19,7 +19,7 @@ from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, local_ticket_label, resolve_issue, resolve_project_and_seq
-from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders
+from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, reject_long_comment, reject_placeholders, strip_metadata_block
 from plane_cli import clock
 
 
@@ -152,11 +152,12 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     meta = extract_metadata_from_comment(content)
     duration, proposal = _resolve_duration(args, conn, meta, issue_ref)
 
-    # Convertir Markdown → HTML si el contenido no viene ya como HTML
+    # Convertir Markdown → HTML si el contenido no viene ya como HTML. El bloque oculto se quita antes: el conversor
+    # lo escaparía y quedaría visible; publish_comment inserta el real.
     if content.strip().startswith("<") and ">" in content:
         comment_html = content
     else:
-        comment_html = markdown_to_html(content)
+        comment_html = markdown_to_html(strip_metadata_block(content))
 
     now = clock.local_now()
     if unavailable is None:

@@ -33,6 +33,14 @@ $ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-0000000000
 --- stderr ---
 
 
+$ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 -m Con bloque
+<!-- PLANE_WORKLOG_METADATA {"date": "2026-10-21", "duration_minutes": 20} -->
+[exit 0]
+--- stdout ---
+✔ Comentario c1000000-0000-4000-8000-000000000001 actualizado en OMNIFY-1
+--- stderr ---
+
+
 $ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000004 -m Pendiente [COMPLETAR]
 [exit 1]
 --- stdout ---
@@ -111,6 +119,8 @@ PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/ {"comment_html": "<p>HTML nuevo</p>"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000001/ {"comment_html": "<p>Con bloque</p>\n<!-- PLANE_WORKLOG_METADATA {\"date\": \"2026-10-21\", \"duration_minutes\": 20} -->"}
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/comments/c1000000-0000-4000-8000-000000000004/

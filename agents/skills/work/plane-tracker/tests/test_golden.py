@@ -192,6 +192,7 @@ class Golden(unittest.TestCase):
                  ["comment", "delete", "OMNIFY-3"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID1, "-m", "Texto **nuevo**"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "-m", "<p>HTML nuevo</p>"],
+                 ["comment", "edit", "OMNIFY-1", "--comment-id", CID1, "-m", "Con bloque\n<!-- PLANE_WORKLOG_METADATA {\"date\": \"2026-10-21\", \"duration_minutes\": 20} -->"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "-m", "Pendiente [COMPLETAR]"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "--duration", "30", "--track", "rev", "--capacity", "research_rd", "--worker-type", "subagent"],
                  ["comment", "edit", "OMNIFY-1", "--comment-id", CID4, "--embed-metadata"],

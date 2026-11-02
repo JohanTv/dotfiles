@@ -24,6 +24,7 @@ from plane_cli.worklog import (
     note_from,
     reject_placeholders,
     replace_metadata_block,
+    strip_metadata_block,
     upsert_worklog,
     worklog_metadata_block,
 )
@@ -105,8 +106,14 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
     row = conn.execute("SELECT raw_payload FROM worklogs WHERE plane_comment_id = ?", (cid,)).fetchone()
     local_meta = json.loads(row["raw_payload"]) if row else None
     if content is not None:
-        html = content if content.strip().startswith("<") and ">" in content else markdown_to_html(content)
-        if "PLANE_WORKLOG_METADATA" not in html:
+        if content.strip().startswith("<") and ">" in content:
+            html, supplied = content, None
+        else:
+            # El bloque oculto se separa antes de convertir el Markdown (el conversor lo escaparía y quedaría visible).
+            html, supplied = markdown_to_html(strip_metadata_block(content)), find_metadata_block(content)
+        if supplied:
+            html += "\n" + supplied
+        elif "PLANE_WORKLOG_METADATA" not in html:
             # Editar el texto no debe perder la telemetría: se conserva el bloque que ya traía el comentario.
             existing = find_metadata_block(api_request(url, api_key).get("comment_html"))
             if existing:
