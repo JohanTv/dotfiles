@@ -43,8 +43,13 @@ ROWS = [
     ("propose-duration OPS-13 --json", "'propose-duration' ya no existe; usa: plane-tracker worklog propose OPS-13 --json"),
     ("report --check --week -p OPS", "'report --check' ya no existe; usa: plane-tracker worklog check --week -p OPS"),
     ("report --check --track main --sync", "'report --check' ya no existe; usa: plane-tracker worklog check"),
-    ("report --flow --date 2026-10-14", "'report --flow' ya no existe; usa: plane-tracker report flow --date 2026-10-14"),
-    ("report --sync", "'--sync' ya no existe; usa: plane-tracker report --refresh"),
+    ("report --flow --date 2026-10-14", "'report --flow' ya no existe; usa: plane-tracker report flow --from 2026-10-14"),
+    ("report --sync", "'--sync' ya no existe; usa: plane-tracker report time --refresh"),
+    ("report", "falta la vista (time|flow); ej: plane-tracker report time --week"),
+    ("report --date 2026-10-20", "falta la vista (time|flow); ej: plane-tracker report time --from 2026-10-20"),
+    ("report time --date 2026-10-20 --refresh", "'report time --date' ya no existe; usa: plane-tracker report time --from 2026-10-20 --refresh"),
+    ("report flow --today", "'report flow --today' ya no existe; usa: plane-tracker report flow"),
+    ("worklog check --date 2026-10-20 --json", "'worklog check --date' ya no existe; usa: plane-tracker worklog check --from 2026-10-20 --json"),
     ("report --flow --sync", "'report --flow' ya no existe; usa: plane-tracker report flow --refresh"),
     ("comment rm OPS-1", "'comment rm' no existe; usa: plane-tracker comment delete OPS-1"),
     ("comment update OPS-1 -m x", "'comment update' no existe; usa: plane-tracker comment edit OPS-1 -m x"),
@@ -70,7 +75,7 @@ ROWS = [
 ]
 
 # Entradas válidas (o con error ajeno a la nomenclatura): no deben producir pista.
-SILENT = ["", "--json", "-h", "--help", "get OPS-13", "list --json", "report --week", "report flow --refresh", "comment add OPS-13 -m '--check'",
+SILENT = ["", "--json", "-h", "--help", "get OPS-13", "list --json", "report time --week", "report flow --refresh", "report time --from 2026-10-20 --to 2026-10-22", "worklog check --from 2026-10-20", "comment add OPS-13 -m '--check'",
           "comment edit OPS-1 --force", "comment --json add OPS-1", "comment --help", "comment -h", "attachment list OPS-1", "attachment delete OPS-1 x",
           "focus set OPS-1", "outbox flush --retry-failed", "outbox drop 3 --force", "focus status --agent claude", "focus clear", "worklog check --week", "link add OPS-1 https://x.example",
           "list --text x", "list -p OPS --open --limit 5", "list --text 'a b'", "zzzzzz", "attachment list attachments", "comment add -m '--off'"]

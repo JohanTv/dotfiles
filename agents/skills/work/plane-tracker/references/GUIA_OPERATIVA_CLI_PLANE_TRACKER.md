@@ -55,15 +55,15 @@ plane-tracker labels [-p OMNIFY]
 plane-tracker projects
 
 # 8. Generador de reportes de actividad con Interval Merging de Klee
-plane-tracker report --today
-plane-tracker report --week
+plane-tracker report time
+plane-tracker report time --week
 ```
 
 ### Convenciones de nombrado
 
 * En la raíz viven los verbos del ticket (`get`, `list`, `create`, `update`), `handoff`, los catálogos en plural (`labels`, `projects`), los diagnósticos (`whoami`, `health`) y `report`.
 * Toda otra familia es un grupo `<sustantivo singular> <verbo>`: `comment`, `attachment`, `link`, `outbox`, `focus`, `worklog`.
-* Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección (p. ej. `get --history`, `report --refresh`).
+* Un flag nunca elige la operación: solo modifica el comportamiento o añade una sección (p. ej. `get --history`, `report time --refresh`).
 * Verbos: `add` / `list` / `edit` / `delete` / `replace` / `flush`; marcas `set` / `clear` / `status`; derivados `propose` / `check`.
 * El ID de un hijo que es obligatorio va posicional (`attachment delete ISSUE ID`); si es opcional (por defecto, tu último comentario) va como `--comment-id`.
 * `--json` es global: funciona antes o después del comando.
@@ -203,7 +203,7 @@ plane-tracker comment add OMNIFY-197 -m "..." --accept-proposal                 
 plane-tracker get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
 plane-tracker get OMNIFY-129 --include attachments,links   # adjuntos y enlaces (+1 GET cada uno; sin el flag no se leen)
 plane-tracker get OMNIFY-129 --all                # todo lo incluible hoy (attachments y links); relations y children avisan: aún no implementados
-plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas
+plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas (con --offline, sobre lo almacenado)
 ```
 - **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.
 - **Cycle time** = suma del tiempo en estados del grupo *started* (Progreso, Revisión, Pruebas); **Pausado se excluye del activo** y se muestra en el bruto. Reaperturas suman cada tramo.
@@ -226,7 +226,7 @@ plane-tracker comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"      
 plane-tracker comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
 plane-tracker delete OMNIFY-205 [--yes] [--discard-worklogs]                                         # elimina el ticket (irreversible); sin --yes solo muestra el alcance; con horas propias exige --discard-worklogs; con horas de otros se niega (ver docs 0018)
 ```
-*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
+*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report time --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
 
 Prefiere `link add` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
 
@@ -248,7 +248,7 @@ Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la p
 ### C.5 Relevo y consistencia
 ```bash
 plane-tracker handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
-plane-tracker worklog check [--today|--week|--date D] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
+plane-tracker worklog check [--week | --from D [--to D]] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
 ```
 `worklog check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --refresh`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible), `pending` (fila en cola de publicación) y `unlinked`. Sale con código 1 si hay inconsistencias.
 
@@ -308,27 +308,27 @@ plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_suppo
 
 ---
 
-### F. `plane-tracker report` (Reporte Ejecutivo para Jefatura)
+### F. `plane-tracker report time` (Reporte Ejecutivo para Jefatura)
 Genera el consolidado diario o semanal utilizando la **Unión de Intervalos de Klee** para evitar duplicar horas en paralelo.
 
 ```bash
 # Reporte del día actual (formato para la jefatura a las 6:00 pm)
-plane-tracker report --today
+plane-tracker report time
 
 # Reporte semanal (balance de sprint los viernes)
-plane-tracker report --week
+plane-tracker report time --week
 
 # Filtrar por proyecto específico
-plane-tracker report --today -p OMNIFY
+plane-tracker report time -p OMNIFY
 
 # Forzar sincronización remota previa
-plane-tracker report --today --refresh
+plane-tracker report time --refresh
 
 # Vista de flujo (lead/cycle time y esfuerzo por ticket; no sincroniza, ignora --refresh)
 plane-tracker report flow --week
 
 # Salida en JSON para paneles o visualizaciones
-plane-tracker report --today --json
+plane-tracker report time --json
 ```
 
 ---

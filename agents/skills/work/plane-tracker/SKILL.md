@@ -53,10 +53,10 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Cola de salida (Plane caído) | `plane-tracker outbox list` · `plane-tracker outbox flush` · `plane-tracker outbox drop N` |
 | Marcar foco | `plane-tracker focus set T` · `plane-tracker focus clear` · `plane-tracker focus status` |
 | Medir duración / auditar | `plane-tracker worklog propose [T]` · `plane-tracker worklog check` |
-| Reporte | `plane-tracker report [flow] [--today\|--week\|--date D]` |
+| Reporte de horas / flujo | `plane-tracker report time [--week \| --from D [--to D]] [--offline]` · `plane-tracker report flow [--week \| --from D [--to D]] [--offline]` (la vista es obligatoria; sin `--from`, hoy) |
 | Catálogos y diagnóstico | `plane-tracker labels` `plane-tracker projects` `plane-tracker whoami` `plane-tracker health` `plane-tracker handoff` |
 
-Convenciones: en la raíz viven los verbos del ticket, `handoff`, los catálogos en plural, los diagnósticos y `report`; toda otra familia es `<sustantivo singular> <verbo>`. Un flag nunca elige la operación. `--json` es global. Un nombre antiguo o un verbo faltante termina con exit 2 y el comando correcto.
+Convenciones: en la raíz viven los verbos del ticket, `handoff`, los catálogos en plural, los diagnósticos; toda otra familia (`report time\|flow`, `comment`, `worklog`...) es `<sustantivo singular> <verbo>`. Un flag nunca elige la operación. `--json` es global. Un nombre antiguo o un verbo faltante termina con exit 2 y el comando correcto.
 
 - **Duplicados:** `plane-tracker create` rechaza (exit 1) el mismo título creado en el proyecto en las últimas 24 h. Tras un error de red incierto, comprueba con `plane-tracker list --text "<título>" --brief` antes de reintentar; `--allow-duplicate` lo permite a propósito.
 - **Plane caído (exit 3):** no insistas y sigue trabajando. Las lecturas responden con lo local y avisan su antigüedad; `comment add` guarda comentario y tiempo y los encola (`⏳ En cola`, exit 0); `update`, `create`, `link add`, `attachment` y `comment edit|delete` fallan con exit 3 y se repiten luego. Al terminar la sesión, `plane-tracker outbox flush` publica la cola; nunca hay envío automático.

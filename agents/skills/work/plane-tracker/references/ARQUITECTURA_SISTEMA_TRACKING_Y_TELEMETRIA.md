@@ -236,8 +236,8 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica la bitácora corta (`SKILL.md` §4); la CLI agrega la telemetría. |
 | **`labels`** | `plane-tracker labels [-p OMNIFY] [--refresh]` | Lista etiquetas indexadas desde caché local (**< 2ms**). |
 | **`projects`**| `plane-tracker projects [--refresh]` | Lista proyectos dinámicos del workspace (`mi-workspace`). |
-| **`report`** | `plane-tracker report --today [--week] [--refresh] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |
-| **`report flow`** | `plane-tracker report flow --week [-p OMNIFY] [--json]` | Flujo por ticket del periodo: lead/cycle time, tiempo por estado, esfuerzo y medianas (no sincroniza). |
+| **`report`** | `plane-tracker report time [--week] [--refresh] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |
+| **`report flow`** | `plane-tracker report time flow --week [-p OMNIFY] [--json]` | Flujo por ticket del periodo: lead/cycle time, tiempo por estado, esfuerzo y medianas (no sincroniza). |
 | **`get --history`** | `plane-tracker get OMNIFY-197 --history [--no-comments] [--last N] [--full]` | Ciclo de vida, estado, flujo y transiciones; flags para ahorrar tokens. |
 | **`worklog propose`** | `plane-tracker worklog propose OMNIFY-197 [--split A=60%,B=rest] [--since H --until H] [--date D]` | Mide la sesión del agente y propone la duración (solo lectura). `comment add --accept-proposal` la registra. |
 | **`focus set` / `focus clear` / `focus status`** | `plane-tracker focus set OMNIFY-197` · `plane-tracker focus clear` · `plane-tracker focus status` | Marca en qué ticket trabaja la sesión para atribuir el tiempo medido por ticket. |
@@ -246,7 +246,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`attachment add` / `list` / `delete` / `replace`** | `plane-tracker attachment add T archivo...` · `plane-tracker attachment list T` · `plane-tracker attachment delete T ID` · `plane-tracker attachment replace T ID archivo` · `create ... --attach F` | Sube, lista, reemplaza y elimina adjuntos (50 MB máx.). |
 | **`outbox list` / `flush` / `drop`** | `plane-tracker outbox list` · `plane-tracker outbox flush [--limit N]` · `plane-tracker outbox drop ID [--force]` | Cola de salida de `comment add` cuando Plane no responde: lista, publica en orden y descarta registros pendientes. |
 | **`handoff`** | `plane-tracker handoff [TICKET] [--base dev]` | Borrador del Handoff Snapshot con hechos de git local (rama, SHA, repo, sin pushear → bloquea); no publica. `comment add` rechaza `[COMPLETAR]`. |
-| **`worklog check`** | `plane-tracker worklog check [--today\|--week\|--date D] [-p OMNIFY] [--json]` | Solo lectura (exit 1 si hay inconsistencias): duplicados, huérfanos y diferencias entre `worklogs` y los bloques ocultos de los comentarios. |
+| **`worklog check`** | `plane-tracker worklog check [--week \| --from D [--to D]] [-p OMNIFY] [--json]` | Solo lectura (exit 1 si hay inconsistencias): duplicados, huérfanos y diferencias entre `worklogs` y los bloques ocultos de los comentarios. |
 | **`health`** | `plane-tracker health [--hours 24]` | Latencia (p50/p95) y errores recientes de la API desde `requests.log`. |
 
 ---

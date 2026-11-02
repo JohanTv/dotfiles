@@ -55,7 +55,7 @@ Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara 
 - Valores de `get --include`: `attachments`, `links`, `relations`, `children`
 - Incluibles cubiertos por `get`: `attachments`, `links`
 
-`person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas). Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
+`person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas; en `report time` es siempre quien lo pide, sin flag para ver a otros). `period` es `{from, to, tz}`: fechas inclusivas del calendario local con `tz` el desplazamiento con que se interpretaron (`--from` solo es ese día, `--week` la semana ISO en curso, sin nada hoy); el cierre de un ticket (instante UTC) se compara en esa zona. Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
 
 Serialización: `ensure_ascii=False`, claves ordenadas, separadores compactos. Mismo estado, reloj y zona horaria dan bytes idénticos.
 
@@ -103,11 +103,12 @@ Vista `get`: todos los campos de `ticket` más los siguientes. `links` y `attach
 
 ### Familia `hours`
 
-Vista `report time`. `author` es el UUID de quien registró las horas (`null` = sin autor registrado). `provenance` indica por campo `measured` o `default`.
+Vista `report time`. `author` es el UUID de quien registró las horas (`null` = sin autor registrado; esas horas no cuentan como tuyas). `provenance` lista **solo** los campos que no vinieron en el comentario (por ejemplo `{"capacity": "default"}`): lo ausente es medido.
 
 | Campo | Tipo | Significado |
 | :--- | :--- | :--- |
 | `ticket` | `str!` | etiqueta del ticket |
+| `title` | `str?` | título del ticket |
 | `project` | `str` | identificador del proyecto |
 | `date` | `str!` | fecha |
 | `start_time` | `str!` | hora de inicio |
@@ -120,7 +121,9 @@ Vista `report time`. `author` es el UUID de quien registró las horas (`null` = 
 | `worker_type` | `str` | tipo de trabajador |
 | `notes` | `str` | notas |
 | `author` | `str?` | UUID del autor |
-| `provenance` | `dict` | `measured` o `default` por campo |
+| `provenance` | `dict` | campos con valor por defecto (`default`); lo ausente es medido |
+| `stoppers` | `list` | bloqueos externos declarados (cadenas) |
+| `segments` | `list` | tramos de un registro con actividad intercalada entre tickets: `{start, end, minutes, start_utc, end_utc}` |
 
 ### Familia `flow`
 
@@ -225,7 +228,7 @@ Vista `outbox list`: registros de la cola de salida de `comment add`. `scope.sta
 
 ### Resumen `hours_summary`
 
-`summary` de `report time`. `by_day`, `by_project` y `by_capacity` son listas de `{key, minutes}`; lo no medido por defecto va en `by_capacity` bajo la clave `undeclared`, nunca sumado a `deep_work`.
+`summary` de `report time`. `by_day`, `by_project` y `by_capacity` son listas de `{key, minutes}`: `by_day` lleva los minutos de **reloj** del día (unión de intervalos) y `by_project` y `by_capacity` el **esfuerzo** (suma de `minutes`); lo no medido por defecto va en `by_capacity` bajo la clave `undeclared`, nunca sumado a `deep_work`.
 
 | Campo | Tipo | Significado |
 | :--- | :--- | :--- |
@@ -259,6 +262,7 @@ Vista `outbox list`: registros de la cola de salida de `comment add`. `scope.sta
 | :--- | :--- | :--- |
 | `ok` | `bool` | sin errores de comprobación |
 | `unreachable` | `int` | tickets que no se pudieron comprobar |
+| `checked` | `list` | por ticket comprobado: `{ticket, worklogs}` |
 
 ### Objetos anidados
 
@@ -270,6 +274,8 @@ Claves permitidas de cada elemento de estas listas dentro de una fila.
 | `assignment_events` | `at`, `kind`, `user_id`, `user_name` |
 | `comments` | `id`, `author`, `created_at`, `text` |
 | `transitions` | `at`, `from`, `to` |
+| `segments` | `start`, `end`, `minutes`, `start_utc`, `end_utc` |
+| `checked` | `ticket`, `worklogs` |
 | `attachments` | `id`, `name`, `size`, `created_at` |
 | `links` | `id`, `title`, `url`, `created_at` |
 

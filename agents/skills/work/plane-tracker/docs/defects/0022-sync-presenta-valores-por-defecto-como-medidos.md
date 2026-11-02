@@ -1,7 +1,7 @@
 ---
 id: "0022"
 title: La sincronización presenta valores por defecto como si estuvieran medidos
-status: abierto
+status: corregido
 created: 2026-11-02
 summary: "`sync` rellena balde, fase, rol y horas con valores por defecto cuando el comentario no los trae, y la caché no distingue lo medido de lo supuesto; los estados desconocidos caen en 'Pendiente'."
 ---
@@ -39,7 +39,7 @@ Lo que no viene en el comentario queda **marcado como no medido**: no se inventa
 
 Hecho: la sincronización ya **no deriva fecha ni hora del reloj** (sin fecha u hora de inicio medidas, el comentario no entra y se cuenta: `worklog_sync.unmeasured`; el extractor del formato de tabla heredado tampoco inventa fecha, `worker_type`, `phase` ni balde); el fin se calcula desde el inicio medido y la duración; las notas ya no se rellenan con el título del ticket; balde, fase, rol, tipo de trabajador, pista y notas que no vengan en el comentario se guardan con su **procedencia** (`worklogs.defaulted_json`, también en `comment add` para lo que completó por defecto); un estado que la caché no conoce se muestra como `unknown` (`state_group: unknown`), no como Pendiente; dos sincronizaciones del mismo comentario en instantes distintos dan filas idénticas.
 
-**Pendiente (fase 5):** que un reporte por balde separe lo no declarado de `deep_work` (`report time`, `summary.by_capacity` con `undeclared`, nota `hours_defaulted`, prueba F10). Mientras tanto el defecto sigue **abierto**.
+**Hecho también (fase 5):** `report time` separa lo no declarado de `deep_work` (`summary.by_capacity` con la clave `undeclared`), cada fila lista en `provenance` los campos por defecto y la nota `hours_defaulted` avisa; lo prueba F10 (`tests/test_architecture.py`) y `tests/test_report_views.py`. Con eso se cumplen los tres criterios de cierre.
 
 ## Criterio de cierre
 

@@ -111,7 +111,7 @@ def _extra_notes(conn, scope):
         unsigned = store_issues.unsigned_hours(conn)
         if unsigned:
             notes.append({"code": "hours_unsigned", "text": f"{unsigned} registro(s) de horas sin autor registrado (anteriores a esta versión o sin identidad).",
-                          "hint": "plane-tracker report --refresh"})
+                          "hint": "plane-tracker report time --refresh"})
     return tuple(notes)
 
 

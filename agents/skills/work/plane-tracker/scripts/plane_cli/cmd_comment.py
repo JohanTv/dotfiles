@@ -204,7 +204,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     _record_measurement(meta, args, proposal, worker_type)
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
-    # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report --refresh`.
+    # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report time --refresh`.
     entry = {
         "id": None,
         "ticket_id": ticket_label,

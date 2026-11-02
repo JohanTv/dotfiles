@@ -34,5 +34,5 @@ plane-tracker create "[FEAT] Validaciones de esquema SMS" -p OMNIFY --priority h
 plane-tracker get OMNIFY-197
 
 # Reporte para la jefatura a las 6:00 pm (Interval Merging de Klee)
-plane-tracker report --today
+plane-tracker report time
 ```

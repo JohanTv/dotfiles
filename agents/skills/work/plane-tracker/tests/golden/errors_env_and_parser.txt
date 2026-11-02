@@ -69,16 +69,21 @@ usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
                             [issue]
 plane.py comment add: error: argument --capacity/--capacity-bucket: invalid choice: 'nada' (choose from deep_work, toil_support, coordination, tooling_dx, research_rd, tech_debt_paydown)
 
-$ plane.py report --today --week
-[exit 2]
+$ plane.py report time --week --from 2026-10-20
+[exit 1]
 --- stdout ---
 
 --- stderr ---
-usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
-                       [--track TRACK] [--worker-type WORKER_TYPE] [--refresh]
-                       [--json]
-                       [{flow}]
-plane.py report: error: argument --week: not allowed with argument --today
+Error: --week no se combina con --from ni --to.
+Usa --week o un rango con --from/--to.
+
+$ plane.py report time --from 2026-10-21 --to 2026-10-20
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: El periodo está invertido: 2026-10-21 es posterior a 2026-10-20.
+Usa --from <fecha anterior> --to <fecha posterior>.
 
 $ plane.py get X1
 [exit 1]

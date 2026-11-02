@@ -86,7 +86,7 @@ El asistente debe destilar la información ignorando logs crudos extensos y resp
   En Plane CE, cada comentario almacena el autor que lo publicó (`created_by`).
 * **Cálculo en SQLite:**  
   La base de datos local `worklogs.db` asocia cada bloque de trabajo a la sesión activa.
-* **Reporte a Jefatura (`plane-tracker report --today`):**  
+* **Reporte a Jefatura (`plane-tracker report time`):**  
   A las 6:00 pm, el colega B solo reporta a la jefatura el tiempo que **él** efectivamente dedicó durante ese día a ese ticket, garantizando transparencia absoluta.
 
 ---

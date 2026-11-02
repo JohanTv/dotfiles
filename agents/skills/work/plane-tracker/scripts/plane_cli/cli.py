@@ -40,7 +40,7 @@ COMMANDS = (
     ("focus", "Foco de la sesión: set | clear | status",
      (cmd_ops.register_focus_set, cmd_ops.register_focus_clear, cmd_ops.register_focus_status)),
     ("worklog", "Tiempos: propose | check", (cmd_comment_ops.register_worklog_propose, cmd_report.register_worklog_check)),
-    cmd_report.register_report,
+    ("report", "Reportes: time | flow", (cmd_report.register_report_time, cmd_report.register_report_flow)),
     cmd_ops.register_handoff,
     cmd_read.register_labels,
     cmd_read.register_projects,

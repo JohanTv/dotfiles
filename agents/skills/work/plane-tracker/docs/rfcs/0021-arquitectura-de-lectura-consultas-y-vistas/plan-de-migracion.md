@@ -82,7 +82,7 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | 2 | cerrada | Commits `6319c27` «feat(plane-tracker)!: retire search in favor of list --text (phase 2)» y `b76f42e` «docs(rules): point the Momento Cero rule to list --text»; el dueño verificó la regla nueva en una sesión limpia (2026-11-02). Hallazgos V29-V30 |
 | 3 | cerrada | Commits `c1a255b` «feat(plane-tracker): move the remaining reads onto the envelope (phase 3)» y `87e9880` (`get --include`, refresco de etiquetas); validado por el dueño (2026-11-02). Pendiente declarado: `--include relations\|children` (ver abajo). Hallazgos V31-V38 |
 | 4 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker): fix the worklog sync defects 0017, 0010 and 0022 (phase 4)»); 0017 y 0010 `corregidos`; 0022 sigue `abierto` (le falta el reporte por balde, F10, de la fase 5). No se marca `cerrada` porque F15 exige cerrar las fases en orden. Hallazgos V39-V43 y V45 (convergencia verificada con la API real) |
-| 5 | pendiente | |
+| 5 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker)!: make report a group with time and flow views (phase 5)»); `0022` queda `corregido`. No se marca `cerrada` porque F15 exige cerrar las fases en orden y la 4 espera tu validación. Verificada con la API real (solo lectura): `report time` converge en 2 rondas y `report flow` en 3. Hallazgos V46-V54 |
 | 6 | pendiente | |
 | 7 | pendiente | |
 | 8 | pendiente | |

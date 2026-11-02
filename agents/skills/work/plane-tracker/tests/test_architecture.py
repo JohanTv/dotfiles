@@ -37,7 +37,7 @@ DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
-    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox"), 1),
+    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary", "outbox", "worklog", "store_transitions", "store_worklogs"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox", "vocabulary", "timeutil", "clock", "flow"), 1),
     "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
     # los comandos solo registran y llaman: además de lo del modelo necesitan los flags comunes (config), el sobre y su salida (V44); `cmd_read` conserva history_sweep hasta la fase 6
     "cmd_read": (COMMAND_DEPS + ("history_sweep",), 3), "cmd_report": (COMMAND_DEPS, 5), "cmd_sync": (COMMAND_DEPS, 6),
@@ -116,8 +116,11 @@ def pending(fid, what):
 
 # vista -> argv de su comando (lo que F5, F6 y F7 recorren); `seed` prepara la caché de la vista y `attachment list` es una lectura de red (queda fuera de F5)
 VIEW_COMMANDS = {"list": ["list"], "get": ["get", "OMNIFY-1"], "labels": ["labels"], "projects": ["projects"], "whoami": ["whoami"],
-                 "attachment list": ["attachment", "list", "OMNIFY-1"], "outbox list": ["outbox", "list"]}
-CACHE_VIEWS = {"list", "get", "labels", "projects"}  # vistas de caché: sobre una caché vencida dan stale y complete null
+                 "attachment list": ["attachment", "list", "OMNIFY-1"], "outbox list": ["outbox", "list"], "report time": ["report", "time", "--from", "2026-10-20"],
+                 "report flow": ["report", "flow", "--from", "2026-10-20"], "worklog check": ["worklog", "check", "--from", "2026-10-20"]}
+NETWORK_VIEWS = {"attachment list", "worklog check"}  # auditorías de red por diseño: quedan fuera de F5 y de la parte sin conexión de F7
+SEED = {"report flow": [["report", "time", "--from", "2026-10-20"]]}  # lo que una vista necesita haber leído antes (el flujo parte de horas ya sincronizadas)
+CACHE_VIEWS = {"list", "get", "labels", "projects", "report time", "report flow"}  # vistas de caché: sobre una caché vencida dan stale y complete null
 NON_DIMENSIONAL_FLAGS = {"-h", "--help", "--json"}  # flags que no son dimensiones ni controles (lista blanca de F2; cada vista declara además sus extra_flags)
 
 
@@ -126,7 +129,7 @@ def age_caches(sandbox, seconds):
     import sqlite3
     conn = sqlite3.connect(os.path.join(sandbox.home, ".cache", "plane", "worklogs.db"))
     for table, column in (("issues_cache", "updated_at"), ("issue_sync", "as_of"), ("projects", "updated_at"), ("labels", "updated_at"), ("states", "updated_at"),
-                          ("members", "updated_at"), ("issue_snapshots", "fetched_at")):
+                          ("members", "updated_at"), ("issue_snapshots", "fetched_at"), ("worklog_sync", "as_of")):
         conn.execute(f"UPDATE {table} SET {column} = {column} - ?", (seconds,))
     conn.commit()
     conn.close()
@@ -289,10 +292,12 @@ class Architecture(unittest.TestCase):
     @gate("F5")
     def test_f5_cache_views_answer_offline_over_a_cache_older_than_the_ttl(self):
         for view, argv in VIEW_COMMANDS.items():
-            if view == "attachment list":
-                continue  # excepción declarada: es una auditoría de red por diseño
+            if view in NETWORK_VIEWS:
+                continue  # excepción declarada: son auditorías de red por diseño
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
+            for seed in SEED.get(view, []):
+                self.assertEqual(sandbox.run(seed)[0], 0, f"{view}: {seed}")
             self.assertEqual(sandbox.run(argv)[0], 0, view)
             age_caches(sandbox, 2 * 86400 + 3600)  # más vieja que cualquier TTL: si no, la prueba no probaría nada
             before = len(sandbox.fake.requests)
@@ -300,7 +305,7 @@ class Architecture(unittest.TestCase):
             self.assertEqual(code, 0, f"{view}: {err}")
             doc = json.loads(out)
             self.assertEqual(envelope.validate(doc), [], view)
-            self.assertIn(doc["coverage"]["source"], ("cache", "local", "snapshot"), view)
+            self.assertIn(doc["coverage"]["source"], ("cache", "local", "snapshot") + (("mixed",) if view == "report flow" else ()), view)  # `report flow` declara `mixed` (decisión 4)
             if view in CACHE_VIEWS:
                 self.assertTrue(doc["coverage"]["stale"] and doc["coverage"]["complete"] is None, f"{view}: una caché vencida no es completa")
             self.assertEqual(len(sandbox.fake.requests), before, f"{view}: PLANE_OFFLINE=1 no puede tocar la red")
@@ -316,8 +321,10 @@ class Architecture(unittest.TestCase):
         for view, argv in VIEW_COMMANDS.items():
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
-            for extra in ([], ["--refresh"], ["--all-projects", "--refresh"], ["--involved", "--refresh-history", "--budget", "2"]) if view == "list" else [[]]:
-                self.assertEqual(sandbox.run(argv + extra)[0], 0, f"{view} {extra}")
+            variants = {"list": [argv, argv + ["--refresh"], argv + ["--all-projects", "--refresh"], argv + ["--involved", "--refresh-history", "--budget", "2"]],
+                        "report time": [argv, argv + ["--refresh"], ["report", "time", "--week"]], "report flow": [argv, argv + ["--refresh"]]}.get(view, [argv])
+            for variant in variants:
+                self.assertEqual(sandbox.run(variant)[0], 0, f"{view}: {variant}")
             methods = {method for method, _path, _body in sandbox.fake.requests}
             self.assertLessEqual(methods, {"GET"}, f"{view}: una lectura solo puede emitir GET (`whoami` con PLANE_ACTOR_UUID no emite nada)")
         # `sync` y `attachment list` se suman a esta comprobación en las fases 6 y 3.
@@ -328,9 +335,18 @@ class Architecture(unittest.TestCase):
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
             self.assertEqual(sandbox.run(argv)[0], 0)
-            offline = {"PLANE_OFFLINE": "1"} if view != "attachment list" else {}
-            outputs = {zone: sandbox.run(argv + ["--json"], env_set={"TZ": zone, **offline})[1] for zone in ("UTC", "America/Lima", "Asia/Tokyo", "UTC")}
-            self.assertEqual(len(set(outputs.values())), 1, f"{view}: la salida cambia con la zona horaria o entre ejecuciones")
+            for seed in SEED.get(view, []):
+                self.assertEqual(sandbox.run(seed)[0], 0)
+            self.assertEqual(sandbox.run(argv)[0], 0)
+            offline = {"PLANE_OFFLINE": "1"} if view not in NETWORK_VIEWS else {}
+
+            def run(zone):
+                doc = json.loads(sandbox.run(argv + ["--json"], env_set={"TZ": zone, **offline})[1])
+                doc.get("scope", {}).get("period", {}).pop("tz", None)  # el sobre repite la zona con que se interpretó el periodo: lo único que puede cambiar con TZ
+                return envelope.dumps(doc)
+
+            outputs = [run(zone) for zone in ("UTC", "America/Lima", "Asia/Tokyo", "UTC")]
+            self.assertEqual(len(set(outputs)), 1, f"{view}: la salida cambia con la zona horaria o entre ejecuciones")
 
     # F8 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F8")
@@ -363,11 +379,41 @@ class Architecture(unittest.TestCase):
     # F10-F11 -------------------------------------------------------------------------------------------------------------------------
     @gate("F10")
     def test_f10_report_time_summarizes_by_capacity_without_summing_defaults(self):
-        pending("F10", "golden de report time con telemetría parcial: summary.by_capacity con undeclared, by_project, y provenance default fuera de los baldes declarados")
+        import test_worklog_sync as tws
+        sandbox = gs.Sandbox()
+        self.addCleanup(sandbox.close)
+        tws.add_issue(sandbox.fake, gs.P1, 50, [tws.block(date=tws.DAY, start_time="08:00", end_time="09:00", duration_minutes=60, capacity_bucket="deep_work", phase="dev",
+                                                         role="r", worker_type="human", track="main", notes="declarado")])
+        tws.add_issue(sandbox.fake, gs.P1, 51, [tws.block(date=tws.DAY, start_time="09:30", duration_minutes=40, notes="sin balde")])  # el balde no vino en el comentario
+        code, out, err = sandbox.run(["report", "time", "--from", tws.DAY, "--json"])
+        self.assertEqual(code, 0, err)
+        doc = json.loads(out)
+        summary = doc["summary"]
+        capacities = {c["key"]: c["minutes"] for c in summary["by_capacity"]}
+        self.assertEqual(capacities.get("undeclared"), 40, "lo no declarado va aparte")
+        self.assertEqual(capacities.get("deep_work", 0), 60 + sum(r["minutes"] for r in doc["results"] if r["ticket"] != "OMNIFY-50" and r["capacity"] == "deep_work" and "capacity" not in r["provenance"]),
+                         "deep_work solo suma lo declarado")
+        self.assertEqual(sum(capacities.values()), summary["effort_compute_minutes"])
+        self.assertTrue({p["key"] for p in summary["by_project"]} >= {"OMNIFY"})
+        self.assertEqual([r["provenance"].get("capacity") for r in doc["results"] if r["ticket"] == "OMNIFY-51"], ["default"])
+        self.assertIn("hours_defaulted", [n["code"] for n in doc["notes"]])
+        self.assertIsNot(doc["coverage"]["complete"], True, "con un aviso propio de la vista complete no puede ser true (F14)")
+        self.assertEqual(envelope.validate(doc), [])
 
     @gate("F11")
     def test_f11_personal_views_default_to_the_actor_and_have_no_flag_for_others(self):
-        pending("F11", "golden sin flags: scope.ticket_person o scope.hours_author igual al actor, y ningún flag para ver a otros")
+        sandbox = gs.Sandbox()
+        self.addCleanup(sandbox.close)
+        code, out, err = sandbox.run(["report", "time", "--from", "2026-10-20", "--json"])
+        self.assertEqual(code, 0, err)
+        doc = json.loads(out)
+        self.assertEqual(doc["scope"]["hours_author"], gs.ME)
+        self.assertTrue(all(r["author"] == gs.ME for r in doc["results"]), "solo las horas del actor")
+        root = cli._subparsers_of(cli.build_parser()).choices
+        flags = {opt for action in cli._subparsers_of(root["report"]).choices["time"]._actions for opt in action.option_strings}
+        self.assertFalse({f for f in flags if "author" in f or f in ("--all", "--user", "--everyone")}, "no existe un flag para ver las horas de otros")
+        code, out, err = sandbox.run(["report", "time", "--json"], env_drop=("PLANE_ACTOR_UUID",))
+        self.assertEqual((code, json.loads(out)["code"]), (1, "actor_unknown"), "sin identidad no se mezclan horas ajenas")
 
     # F12 -----------------------------------------------------------------------------------------------------------------------------
     @gate("F12")

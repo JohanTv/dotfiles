@@ -1,7 +1,7 @@
 """Vocabulario cerrado del contrato de lectura `plane-tracker/1` (decisión 0025): una sola fuente de nombres.
 
 Expone: SCHEMA, DIMENSIONS, CONTROLS, PERSON_RELATIONS, SCOPE_KEYS, ENVELOPE_KEYS, COVERAGE_SOURCES, COVERAGE_KEYS, DETAIL_KEYS,
-VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, ALWAYS_SHOWN, GET_INCLUDES, GET_INCLUDES_COVERED, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
+VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, CHECK_ERROR_CODES, ALWAYS_SHOWN, GET_INCLUDES, GET_INCLUDES_COVERED, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
 No hace: importar nada del paquete, validar sobres (eso es envelope) ni calcular cobertura (coverage). Son datos puros.
 Un campo se declara como "tipo" con sufijos: `?` admite null y `!` es obligatorio (ej. "str?!"); tipos: str, int, num, bool, list, dict.
 La especificación legible es docs/decisions/0025-contrato-json-de-lectura; una prueba (F4) comprueba que no se desincronizan.
@@ -41,8 +41,9 @@ FAMILIES = {
     "ticket": _TICKET,
     "ticket_detail": {**_TICKET, "description": "str?", "comments": "list", "links": "list", "attachments": "list",
                       "flow": "dict"},  # `get --history` anida los nombres de la familia `flow` (sin ticket ni title)
-    "hours": {"ticket": "str!", "project": "str", "date": "str!", "start_time": "str!", "end_time": "str!", "minutes": "int!", "track": "str",
-              "capacity": "str", "phase": "str", "role": "str", "worker_type": "str", "notes": "str", "author": "str?", "provenance": "dict"},
+    "hours": {"ticket": "str!", "title": "str?", "project": "str", "date": "str!", "start_time": "str!", "end_time": "str!", "minutes": "int!", "track": "str",
+              "capacity": "str", "phase": "str", "role": "str", "worker_type": "str", "notes": "str", "author": "str?", "provenance": "dict",
+              "stoppers": "list", "segments": "list"},
     "flow": _FLOW,
     "check": {"code": "str!", "ticket": "str!", "comment_id": "str?", "detail": "str"},
     "label": {"id": "str!", "name": "str!", "color": "str"},
@@ -55,7 +56,8 @@ FAMILIES = {
 }
 # Objetos anidados dentro de una fila: nombre del campo -> claves permitidas de cada elemento.
 NESTED = {"assignees": {"id", "name"}, "assignment_events": {"at", "kind", "user_id", "user_name"}, "comments": {"id", "author", "created_at", "text"},
-          "transitions": {"at", "from", "to"}, "attachments": {"id", "name", "size", "created_at"}, "links": {"id", "title", "url", "created_at"}}
+          "transitions": {"at", "from", "to"}, "attachments": {"id", "name", "size", "created_at"}, "links": {"id", "title", "url", "created_at"},
+          "segments": {"start", "end", "minutes", "start_utc", "end_utc"}, "checked": {"ticket", "worklogs"}}
 # `get --include`: qué se puede pedir y qué cubre hoy (cada cubierto cuesta 1 GET). Lo demás se acepta pero solo avisa (`include_not_covered`): V37.
 GET_INCLUDES = ("attachments", "links", "relations", "children")
 GET_INCLUDES_COVERED = ("attachments", "links")
@@ -64,7 +66,7 @@ SUMMARIES = {
     "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int"},
     "flow_summary": {"tickets": "int", "completed": "int", "cancelled": "int", "open": "int", "excluded": "int", "n_lead": "int", "n_cycle": "int",
                      "median_lead_minutes": "num?", "median_cycle_minutes": "num?"},
-    "check_summary": {"ok": "bool", "unreachable": "int"},
+    "check_summary": {"ok": "bool", "unreachable": "int", "checked": "list"},
 }
 SUMMARY_ITEM_KEYS = {"key", "minutes"}  # elementos de by_day, by_project y by_capacity
 # vista -> (familia de filas, familia de resumen o None, lleva `scope`). `get` no lleva alcance: el alcance es un ticket, en `results`.
@@ -77,8 +79,8 @@ VIEWS = {"list": ("ticket", None, True), "get": ("ticket_detail", None, False), 
 REPLACES = {
     "ticket": {"ticket": ("ticket_id", "issue", "issue_id"), "uuid": ("id",), "title": ("name",), "state": ("state_name",),
                "project": ("project_id",), "target_date": ("due_date",), "plane_updated_at": ("updated_at",), "description": ("description_html",)},
-    "hours": {"ticket": ("ticket_id",), "project": ("project_id",), "minutes": ("duration_minutes",), "capacity": ("capacity_bucket",),
-              "author": ("author_id",), "provenance": ("defaulted_json",)},
+    "hours": {"ticket": ("ticket_id",), "title": ("issue_name",), "project": ("project_id",), "minutes": ("duration_minutes",), "capacity": ("capacity_bucket",),
+              "author": ("author_id",), "provenance": ("defaulted_json",), "stoppers": ("stoppers_json",), "segments": ("raw_payload",)},
     "assignment_events": {"at": ("at_utc",)},
     "outbox_item": {"minutes": ("duration_minutes",)},
     "comments": {"author": ("actor", "created_by"), "text": ("comment_html",)},
@@ -87,7 +89,7 @@ REPLACES = {
 DROPPED = {
     "ticket": ("sequence_id", "updated_by"),  # sequence_id ya va dentro de `ticket`
     "ticket_detail": ("total_comments", "comments_skipped", "stale", "fetched_at", "metadata_only"),
-    "hours": ("issue_name", "stoppers_json", "raw_payload", "plane_comment_id", "created_at", "updated_at"),
+    "hours": ("plane_comment_id", "created_at", "updated_at"),
 }
 
 # --- Notas -------------------------------------------------------------------------------------------------------------------------------
@@ -125,6 +127,7 @@ ERRORS = {"usage": 2, "unknown_project": 1, "unknown_state": 1, "unknown_label":
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_UNAVAILABLE = 0, 1, 2, 3
 # Espacio propio de `worklog check` (no se confunde con códigos de nota ni de error).
 CHECK_CODES = ("duplicate", "orphan", "mismatch", "missing_local", "pending", "unlinked", "no_block", "unreachable")
+CHECK_ERROR_CODES = ("duplicate", "orphan", "mismatch", "missing_local")  # inconsistencias (`summary.ok` falso y salida 1); el resto son avisos o falta de comprobación
 
 
 def field_spec(spec):

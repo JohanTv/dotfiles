@@ -124,7 +124,7 @@ class SandboxClock(unittest.TestCase):
     def test_the_cli_sees_the_sandbox_instant(self):
         sb = gs.Sandbox()
         self.addCleanup(sb.close)
-        code, out, _ = sb.run(["report", "--today"], env_set={"PLANE_OFFLINE": "1"})
+        code, out, _ = sb.run(["report", "time"], env_set={"PLANE_OFFLINE": "1"})
         self.assertEqual(code, 0)
         self.assertIn(datetime.fromisoformat(gs.FROZEN_NOW).strftime("%d/%m/%Y"), out)
 

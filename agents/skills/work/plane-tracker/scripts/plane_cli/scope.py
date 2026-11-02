@@ -7,6 +7,7 @@ Una vista declara `dims` (dimensiones que acepta), `controls` y `defaults`; el a
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 
 from plane_cli.errors import CliError
 
@@ -44,6 +45,13 @@ class Scope:
             doc["projects"] = [p.ident for p in self.projects]
         if "person" in view.dims and self.ticket_person:
             doc["ticket_person"] = dict(self.ticket_person)
+        if "period" in view.dims and self.period:
+            doc["period"] = dict(self.period)
+        if view.defaults.get("person") == "hours_author" and self.hours_author:
+            doc["hours_author"] = self.hours_author
+        for name in ("track", "worker_type"):
+            if getattr(self, name):
+                doc[name] = getattr(self, name)
         if "state" in view.dims:
             doc["state"] = self.state
         if "text" in view.dims and self.text:
@@ -56,7 +64,7 @@ class Scope:
 
 def _projects(args, catalogs, view):
     by_ident = {p.ident: p for p in catalogs.projects}
-    if getattr(args, "all_projects", False):
+    if getattr(args, "all_projects", False) or (view and view.defaults.get("projects") == "all" and not getattr(args, "project", None)):
         return tuple(catalogs.projects)
     asked = getattr(args, "project", None)
     if asked:
@@ -66,6 +74,30 @@ def _projects(args, catalogs, view):
         return (by_ident[ident],)
     default = by_ident.get(catalogs.default)
     return (default,) if default else ()
+
+
+def _day(text, flag):
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        raise CliError("bad_date", f"Fecha inválida en {flag}: '{text}'.", "Usa YYYY-MM-DD.") from None
+
+
+def _period(args, catalogs):
+    """{from, to, tz} (fechas inclusivas del calendario local): `--week` es la semana ISO en curso; `--from` solo es ese día; sin nada, hoy."""
+    first, last, week = getattr(args, "date_from", None), getattr(args, "date_to", None), getattr(args, "week", False)
+    today = date.fromisoformat(catalogs.today)
+    if week and (first or last):
+        raise CliError("bad_period", "--week no se combina con --from ni --to.", "Usa --week o un rango con --from/--to.")
+    if week:
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+    else:
+        start = _day(first, "--from") if first else (_day(last, "--to") if last else today)
+        end = _day(last, "--to") if last else start
+    if end < start:
+        raise CliError("bad_period", f"El periodo está invertido: {start} es posterior a {end}.", "Usa --from <fecha anterior> --to <fecha posterior>.")
+    return {"from": start.isoformat(), "to": end.isoformat(), "tz": catalogs.tz}
 
 
 def single_project(args, catalogs):
@@ -83,8 +115,15 @@ def resolve_scope(args, catalogs, view):
         raise CliError("actor_unknown", "No sé quién eres.", "Define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).")
     text = (getattr(args, "text", None) or "").strip() or None
     limit = getattr(args, "limit", None) or view.defaults.get("limit")
+    hours_author = None
+    if view.defaults.get("person") == "hours_author":  # las vistas de horas son personales: el autor es quien las pide, sin flag para ver a otros
+        hours_author = catalogs.actor
+        if not hours_author:
+            raise CliError("actor_unknown", "No sé quién eres.", "Define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).")
     return Scope(projects=_projects(args, catalogs, view) if "projects" in view.dims else (),
                  ticket_person={"relation": person, "actor": catalogs.actor} if person else None,
                  state="open" if getattr(args, "open", False) else view.defaults.get("state", "all"), text=text,
-                 order=ORDER_TEXT if text else ORDER_RECENT, limit=limit, offline=bool(getattr(args, "offline", False)),
+                 period=_period(args, catalogs) if "period" in view.dims else None, hours_author=hours_author,
+                 track=getattr(args, "track", None), worker_type=getattr(args, "worker_type", None),
+                 order=view.defaults["order"] if "order" in view.defaults else ORDER_TEXT if text else ORDER_RECENT, limit=limit, offline=bool(getattr(args, "offline", False)),
                  refresh=bool(getattr(args, "refresh", False)), brief=bool(getattr(args, "brief", False)))

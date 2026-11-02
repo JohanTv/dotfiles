@@ -1,267 +1,86 @@
-"""Comandos `report` (actividad por día/semana; `report flow` delega en flow.py) y `worklog check`.
+"""Comandos `report time`, `report flow` y `worklog check`: cada uno orquesta alcance, frescura, consulta, sobre y salida; el cálculo vive en query_* y el texto en render_*.
 
-Expone: register_report(), register_worklog_check(), add_period_args(), cmd_report(), cmd_worklog_check(), cmd_report_check().
-No hace: el cálculo del flujo por ticket (vive en flow.py).
+Expone: register_report_time(), register_report_flow(), register_worklog_check(), cmd_report_time(), cmd_report_flow(), cmd_worklog_check().
+No hace: lógica de reportes. `report` es un grupo con vista obligatoria (`report` a secas lo rechaza `renamed.py` con código 2). El periodo es `--from/--to/--week` (sin `--date` ni `--today`).
+`worklog check` sale con 1 si hay inconsistencias y con 3 si algún ticket no se pudo comprobar y no hay inconsistencias.
 """
 
-import json
+import os
 import sys
-import urllib.error
-from datetime import datetime, timedelta
 
-from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli import vocabulary
 from plane_cli.config import add_json_flag
-from plane_cli.flow import cmd_report_flow
-from plane_cli.outbox import count_open, open_keys
-from plane_cli.resolve import resolve_issue, resolve_project_and_seq
-from plane_cli.store_worklogs import accessible_idents, hours_status
-from plane_cli.sync import SYNC_COOLDOWN, sync_remote_worklogs
-from plane_cli.timeutil import (
-    DIAS_SEMANA,
-    age_text,
-    calculate_klee_union_minutes,
-    expand_segments,
-    format_minutes,
-    render_day_block,
-    time_to_minutes,
-)
-from plane_cli.worklog import CHECK_ERRORS, check_worklogs, extract_metadata_from_comment, find_metadata_block
-from plane_cli import clock
+from plane_cli.envelope import build
+from plane_cli.freshness import Env, audit_worklogs, catalogs, ensure_flow, ensure_hours
+from plane_cli.output import emit
+from plane_cli.scope import resolve_scope
+from plane_cli.scope_flags import add_scope_args
+from plane_cli.views import VIEWS
 
 
-
-def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str):
-    """Solo lectura: detecta duplicados, huérfanos, diferencias y filas sin telemetría en el periodo."""
-    proj = getattr(args, "project", None)
-    like = f"{proj.upper()}-%" if proj else "%"
-    rows = [dict(r) for r in conn.execute("SELECT * FROM worklogs WHERE date >= ? AND date <= ? AND ticket_id LIKE ? ORDER BY ticket_id, date, start_time",
-                                          (s_str, e_str, like))]
-    by_ticket = {}
-    for r in rows:
-        by_ticket.setdefault(r["ticket_id"], []).append(r)
-    results, issues = {}, []
-    pending_keys = open_keys(conn)
-    for label, t_rows in sorted(by_ticket.items()):
-        try:
-            project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, label)
-            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-            c_url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
-            raw = api_request(c_url, api_key, raise_on_error=True).get("results", [])
-        except (SystemExit, urllib.error.URLError, OSError):
-            issues.append({"code": "unreachable", "ticket": label, "comment_id": None, "detail": "no se pudo consultar el ticket en Plane"})
-            continue
-        comments = {}
-        for c in raw:
-            html = c.get("comment_html") or ""
-            has_block = bool(find_metadata_block(html))
-            comments[c["id"]] = {"has_block": has_block, "meta": extract_metadata_from_comment(html) if has_block else None}
-        found = check_worklogs(t_rows, comments, s_str, e_str, pending_keys)
-        results[label] = (len(t_rows), found)
-        issues += found
-    errors = [i for i in issues if i["code"] in CHECK_ERRORS]
-    unreachable = sum(1 for i in issues if i["code"] == "unreachable")
-    if getattr(args, "json", False):
-        print(json.dumps({"period": [s_str, e_str], "issues": issues, "ok": not errors, "unreachable": unreachable}, indent=2, ensure_ascii=False))
-    else:
-        print(f"\n🔎 Consistencia worklogs ↔ comentarios · {s_str} → {e_str}")
-        if not by_ticket:
-            print("   (no hay worklogs locales en el periodo)")
-        for label, (count, found) in results.items():
-            print(f"   {'✔' if not [i for i in found if i['code'] in CHECK_ERRORS] else '✖'} {label}: {count} worklog(s)")
-            for i in found:
-                print(f"      [{i['code']}] {i['detail']}" + (f"  ({i['comment_id'][:8]})" if i["comment_id"] else ""))
-        for i in issues:
-            if i["code"] == "unreachable":
-                print(f"   ? {i['ticket']}: {i['detail']}")
-        print(f"\n   Resumen: {len(errors)} inconsistencia(s), {len(issues) - len(errors)} aviso(s). Solo lectura: corrige con comment edit o report --refresh.\n")
-    if unreachable and not errors:
-        sys.stderr.write(f"⚠ {unreachable} ticket(s) no se pudieron comprobar en Plane: el resultado está incompleto.\n")
-    sys.exit(1 if errors else 3 if unreachable else 0)
+def _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal, local_fallback=True):
+    env = Env(base_url, api_key, workspace, default_project_id)
+    if getattr(args, "offline", False):
+        os.environ["PLANE_OFFLINE"] = "1"  # --offline corta toda la red del proceso
+    cats = catalogs(conn, env, need_actor=personal, local_fallback=local_fallback)
+    return env, cats, resolve_scope(args, cats, view)
 
 
-def _period(args, today):
-    """(inicio, fin) del periodo pedido: semana actual, fecha concreta o hoy; termina si la fecha es inválida."""
-    custom_date = getattr(args, "date", None)
-    if getattr(args, "week", False):
-        start_date = today - timedelta(days=today.weekday())
-        return start_date, start_date + timedelta(days=6)
-    if custom_date:
-        try:
-            target = datetime.strptime(custom_date, "%Y-%m-%d").date()
-        except ValueError:
-            sys.stderr.write(f"Error: Formato de fecha inválido '{custom_date}'. Usa YYYY-MM-DD.\n")
-            sys.exit(1)
-        return target, target
-    return today, today
+def cmd_report_time(args, conn, base_url, api_key, workspace, default_project_id):
+    """`report time`: las horas del autor en el periodo (sincroniza por proyecto y periodo si hace falta); el texto es un render del mismo sobre que el JSON."""
+    view = VIEWS["report time"]
+    env, _cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=True)
+    doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_hours(conn, env, scope)), verbose=args.verbose)
+    emit(view, doc, getattr(args, "json", False))
+
+
+def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id):
+    """`report flow`: lead/cycle time y esfuerzo por ticket del periodo; con `--offline` se calcula con lo almacenado."""
+    view = VIEWS["report flow"]
+    env, cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=False)
+    doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_flow(conn, env, scope, cats)), verbose=args.verbose)
+    emit(view, doc, getattr(args, "json", False))
 
 
 def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_id):
-    start_date, end_date = _period(args, clock.local_today())
-    return cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id,
-                            start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
+    """`worklog check`: auditoría contra Plane (solo lectura); sale con 1 si hay inconsistencias y con 3 si faltó comprobar algún ticket."""
+    view = VIEWS["worklog check"]
+    env, _cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=False, local_fallback=False)
+    audit, coverage = audit_worklogs(conn, env, scope)
+    doc = build(view.name, scope.to_dict(view), view.query(audit, coverage))
+    emit(view, doc, getattr(args, "json", False))
+    errors = [i for i in audit.issues if i["code"] in vocabulary.CHECK_ERROR_CODES]
+    if errors or doc["summary"]["unreachable"]:
+        sys.exit(1 if errors else 3)
 
 
-def _warn_unpublished(args, conn, s_str, e_str):
-    """Los registros en cola ya cuentan en el reporte (están en `worklogs`); se avisa de que siguen sin publicarse."""
-    count = count_open(conn, s_str, e_str, getattr(args, "project", None), getattr(args, "track", None))
-    if count:
-        sys.stderr.write(f"⏳ {count} registro(s) de este periodo siguen sin publicarse (outbox list).\n")
+def register_report_time(sub):
+    view = VIEWS["report time"]
+    p = sub.add_parser("time", help="Horas registradas por día y ticket",
+                       description="Horas del autor en el periodo (por defecto hoy) con Interval Merging; sincroniza con Plane por proyecto y periodo si falta o venció (5 min). "
+                                   "Sin conexión usa lo local y lo dice (--offline). Con --json, sobre plane-tracker/1 con resumen por día, proyecto y balde.")
+    add_scope_args(p, view.dims, view.controls)
+    p.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
+    p.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
+    add_json_flag(p)
+    p.set_defaults(handler=cmd_report_time)
 
 
-def _warn_hours_coverage(status, now):
-    """Un reporte nunca presenta como completo un periodo que no se ha comparado con Plane: si no está verificado, lo dice y cómo corregirlo."""
-    if status.verified:
-        if now - status.as_of > SYNC_COOLDOWN:
-            sys.stderr.write(f"ℹ Horas sincronizadas con Plane hace {age_text(now - status.as_of)}.\n")
-        return
-    if status.verified is None:
-        sys.stderr.write("⚠ No se pudo comprobar qué proyectos cubre el reporte (sin catálogo local de proyectos): usa `report --refresh` con conexión.\n")
-        return
-    if status.never:
-        sys.stderr.write(f"⚠ Sin sincronizar con Plane para este periodo: {', '.join(status.never)}. El reporte puede estar incompleto; usa `report --refresh`.\n")
-    if status.partial:
-        sys.stderr.write(f"⚠ La última sincronización quedó incompleta en: {', '.join(status.partial)}. El reporte puede estar incompleto; usa `report --refresh`.\n")
-
-
-def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
-    today = clock.local_today()
-    is_week = getattr(args, "week", False)
-    force_sync = getattr(args, "refresh", False)
-
-    start_date, end_date = _period(args, today)
-
-    s_str = start_date.strftime("%Y-%m-%d")
-    e_str = end_date.strftime("%Y-%m-%d")
-
-    if getattr(args, "view", None) == "flow":
-        _warn_unpublished(args, conn, s_str, e_str)
-        return cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
-
-    # Se sincroniza si se fuerza o si algún proyecto del alcance no tiene una sincronización COMPLETA y reciente que cubra todo el periodo (defecto 0010): que haya
-    # algún registro local no prueba que el periodo esté al día.
-    project = getattr(args, "project", None)
-    status = hours_status(conn, accessible_idents(conn, workspace, project), s_str, e_str)
-    now = clock.timestamp()
-    if force_sync or not (status.verified and now - status.as_of <= SYNC_COOLDOWN):
-        try:
-            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=project, force=force_sync)
-        except PlaneUnavailable as exc:
-            sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); se omite la sincronización y se usan los datos locales.\n")
-        status = hours_status(conn, accessible_idents(conn, workspace, project), s_str, e_str)
-    _warn_hours_coverage(status, now)
-
-    _warn_unpublished(args, conn, s_str, e_str)
-
-    # Construir query SQL indexada con filtros opcionales
-    query = "SELECT * FROM worklogs WHERE date >= ? AND date <= ?"
-    params = [s_str, e_str]
-
-    if getattr(args, "project", None):
-        query += " AND project_id = ?"
-        params.append(args.project.upper())
-
-    if getattr(args, "track", None):
-        query += " AND track = ?"
-        params.append(args.track)
-
-    if getattr(args, "worker_type", None):
-        query += " AND worker_type = ?"
-        params.append(args.worker_type)
-
-    query += " ORDER BY date ASC, start_time ASC"
-    rows = conn.execute(query, params).fetchall()
-
-    if getattr(args, "json", False):
-        result = [dict(r) for r in rows]
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-        return
-
-    # Renderizado en texto
-    if is_week:
-        num_semana = start_date.isocalendar()[1]
-        print("=" * 80)
-        print(f"📅 REPORTE SEMANAL - SEMANA {num_semana} ({start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')})")
-        print("=" * 80 + "\n")
-
-        all_week_intervals = []
-        total_week_compute = 0
-        week_by_project = {}
-        all_week_stoppers = []
-
-        cur = start_date
-        limit_day = min(end_date, today)
-        while cur <= limit_day:
-            cur_s = cur.strftime("%Y-%m-%d")
-            day_rows = [r for r in rows if r["date"] == cur_s]
-            dia_nombre = DIAS_SEMANA[cur.weekday()]
-            print(f"[{dia_nombre} {cur.strftime('%d/%m/%Y')}]")
-            print(render_day_block(cur, day_rows))
-            print("")
-
-            for r in expand_segments(day_rows):
-                s_m = time_to_minutes(r["start_time"])
-                e_m = time_to_minutes(r["end_time"])
-                dur = r["duration_minutes"]
-                all_week_intervals.append((s_m, e_m))
-                total_week_compute += dur
-                pref = r["ticket_id"].split("-")[0] if "-" in r["ticket_id"] else "Otros"
-                week_by_project[pref] = week_by_project.get(pref, 0) + dur
-                try:
-                    for st in json.loads(r["stoppers_json"]):
-                        if st and st not in all_week_stoppers:
-                            all_week_stoppers.append(st)
-                except Exception:
-                    pass
-
-            cur += timedelta(days=1)
-
-        week_wall_clock = calculate_klee_union_minutes(all_week_intervals)
-        proj_parts = [f"{k}: {format_minutes(v)}" for k, v in week_by_project.items()]
-        proj_str = " | ".join(proj_parts) if proj_parts else "N/A"
-
-        print("=" * 80)
-        print(f"🏆 TOTAL SEMANA: {format_minutes(week_wall_clock)} reloj activa ({proj_str})")
-        if total_week_compute > week_wall_clock:
-            leverage = round(total_week_compute / week_wall_clock, 2) if week_wall_clock > 0 else 1.0
-            print(f"🚀 AI Leverage Multiplier: {leverage}x ({format_minutes(total_week_compute)} de esfuerzo total entregado)")
-        if all_week_stoppers:
-            print(f"⏸️ STANDBY TOTAL: {', '.join(all_week_stoppers)}")
-        print("=" * 80 + "\n")
-
-    else:
-        target = start_date
-        dia_nombre = DIAS_SEMANA[target.weekday()]
-        print("=" * 80)
-        print(f"📋 REPORTE DE ACTIVIDAD - {dia_nombre.upper()} {target.strftime('%d/%m/%Y')}")
-        print("=" * 80 + "\n")
-        print(render_day_block(target, rows))
-        print("\n" + "=" * 80)
-
-
-def add_period_args(parser):
-    """Periodo y proyecto compartidos por `report` y `worklog check`."""
-    group_date = parser.add_mutually_exclusive_group()
-    group_date.add_argument("--today", action="store_true", help="Día actual (por defecto)")
-    group_date.add_argument("--week", action="store_true", help="Semana actual")
-    group_date.add_argument("--date", help="Fecha específica (YYYY-MM-DD)")
-    parser.add_argument("-p", "--project", help="Filtrar por proyecto (ej: OMNIFY, OPS)")
-
-
-def register_report(sub):
-    p_report = sub.add_parser("report", help="Reporte de actividad; report flow: flujo por ticket",
-                            description="Reporte de actividad con Interval Merging; `report flow` muestra el flujo por ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).")
-    p_report.add_argument("view", nargs="?", choices=["flow"], help="Vista: flujo por ticket (por defecto, actividad)")
-    add_period_args(p_report)
-    p_report.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
-    p_report.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
-    p_report.add_argument("--refresh", action="store_true", help="Forzar sincronización remota con Plane (vista de actividad)")
-    add_json_flag(p_report)
-    p_report.set_defaults(handler=cmd_report)
+def register_report_flow(sub):
+    view = VIEWS["report flow"]
+    p = sub.add_parser("flow", help="Flujo por ticket del periodo",
+                       description="Lead/cycle time, tiempo por estado y esfuerzo de los tickets con horas en el periodo o cerrados en él. Se calcula con lo almacenado: "
+                                   "--refresh trae las transiciones que falten (1 GET por ticket) y --offline no consulta Plane.")
+    add_scope_args(p, view.dims, view.controls)
+    add_json_flag(p)
+    p.set_defaults(handler=cmd_report_flow)
 
 
 def register_worklog_check(sub):
-    p_check = sub.add_parser("check", help="Comparar los worklogs locales con Plane",
-                             description="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias). Sale con código 1 si hay inconsistencias.")
-    add_period_args(p_check)
-    add_json_flag(p_check)
-    p_check.set_defaults(handler=cmd_worklog_check)
+    view = VIEWS["worklog check"]
+    p = sub.add_parser("check", help="Comparar los worklogs locales con Plane",
+                       description="Solo lectura: compara los worklogs locales con sus comentarios en Plane (duplicados, huérfanos, diferencias). Sale con código 1 si hay inconsistencias "
+                                   "y con 3 si algún ticket no se pudo comprobar.")
+    add_scope_args(p, view.dims, view.controls)
+    add_json_flag(p)
+    p.set_defaults(handler=cmd_worklog_check)

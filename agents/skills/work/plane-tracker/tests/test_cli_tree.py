@@ -18,7 +18,7 @@ TREE = {
     "outbox": ("list", "flush", "drop"),
     "focus": ("set", "clear", "status"),
     "worklog": ("propose", "check"),
-    "report": (), "handoff": (), "labels": (), "projects": (), "whoami": (), "health": (),
+    "report": ("time", "flow"), "handoff": (), "labels": (), "projects": (), "whoami": (), "health": (),
 }
 
 LEAF_ARGS = {

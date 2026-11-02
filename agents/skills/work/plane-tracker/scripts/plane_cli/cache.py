@@ -45,6 +45,12 @@ class RateBudgetExhausted(Exception):
     """El presupuesto de peticiones por ventana se agotó a mitad de una lectura: lo traído hasta ahora es parcial."""
 
 
+def _budget_ok():
+    """False si el presupuesto de tasa anunciado por Plane llegó a la reserva (hay que parar antes de agotarlo)."""
+    limit = api.rate_limit()
+    return not (limit and limit["remaining"] is not None and limit["remaining"] <= RATE_RESERVE)
+
+
 def _check_budget():
     remaining = api.rate_limit()
     if remaining and remaining["remaining"] is not None and remaining["remaining"] <= RATE_RESERVE:
@@ -117,8 +123,8 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
     now = clock.timestamp()
     try:
         _check_budget()
-        states_by_id = {s["id"]: (s["name"], s.get("group", "")) for s in
-                        api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/", api_key, raise_on_error=True).get("results", [])}
+        state_items = api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/", api_key, raise_on_error=True).get("results", [])
+        states_by_id = {s["id"]: (s["name"], s.get("group", "")) for s in state_items}
         results, total, capped = _fetch_all_issues(base_url, api_key, workspace, project_id)
     except RateBudgetExhausted:
         if previous:
@@ -136,6 +142,10 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
 
     label_names = _label_names_by_id(conn, project_id)
     with conn:
+        for st in state_items:  # los estados ya están en la mano: se guardan para que el flujo y `get` los tengan sin otra petición
+            conn.execute("INSERT INTO states (id, project_id, name, slug, group_name, is_default, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                         "ON CONFLICT(id) DO UPDATE SET name = excluded.name, slug = excluded.slug, group_name = excluded.group_name, is_default = excluded.is_default, "
+                         "updated_at = excluded.updated_at", (st["id"], project_id, st["name"], st.get("slug") or st["name"].lower(), st.get("group", ""), 1 if st.get("default") else 0, now))
         conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
         for iss in results:
             seq = iss.get("sequence_id")

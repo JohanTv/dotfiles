@@ -8,9 +8,9 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "report", "handoff", "labels", "projects", "whoami", "health"]
+ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "handoff", "labels", "projects", "whoami", "health"]
 GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
-          "focus": ("set", "clear", "status"), "worklog": ("propose", "check")}
+          "focus": ("set", "clear", "status"), "worklog": ("propose", "check"), "report": ("time", "flow")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
 NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJECT_ID", "PLANE_ACTOR_UUID")
 WORKLOG_COLS = ("ticket_id", "track", "date", "start_time", "end_time", "duration_minutes", "plane_comment_id", "project_id", "issue_name",
@@ -46,7 +46,7 @@ class Golden(unittest.TestCase):
             {"args": ["get", "--last", "0", "OMNIFY-1"]},
             {"args": ["health", "--hours", "x"]},
             {"args": ["comment", "add", "OMNIFY-1", "--capacity", "nada"]},
-            {"args": ["report", "--today", "--week"]},
+            {"args": ["report", "time", "--week", "--from", "2026-10-20"]}, {"args": ["report", "time", "--from", "2026-10-21", "--to", "2026-10-20"]},
             {"args": ["get", "X1"]},
             {"args": ["get", "OTRO-5"]},
             {"args": ["list"], "env_set": {"PLANE_BASE_URL": "{DEAD}"}},
@@ -111,21 +111,21 @@ class Golden(unittest.TestCase):
 
     # --- reportes -------------------------------------------------------------
     def test_report(self):
-        steps = [["report", "--date", "2026-10-20"], ["report", "--date", "2026-10-20", "--json"], ["--json", "report", "--date", "2026-10-20"],
-                 ["report", "--date", "2026-10-20", "--track", "subagent"], ["report", "--date", "2026-10-20", "--worker-type", "human"],
-                 ["report", "--date", "2026-10-20", "-p", "OPS"], ["report", "--date", "2026-10-20", "-p", "OPS", "--json"],
-                 ["report", "--date", "bad"], ["worklog", "check", "--date", "2026-10-20"], ["worklog", "check", "--date", "2026-10-20", "--json"],
-                 ["report", "--date", "2026-01-01"], ["report", "--date", "2026-10-20", "--refresh"]]
+        steps = [["report", "time", "--from", "2026-10-20"], ["report", "time", "--from", "2026-10-20", "--json"], ["--json", "report", "time", "--from", "2026-10-20"],
+                 ["report", "time", "--from", "2026-10-20", "--track", "subagent"], ["report", "time", "--from", "2026-10-20", "--worker-type", "human"],
+                 ["report", "time", "--from", "2026-10-20", "-p", "OPS"], ["report", "time", "--from", "2026-10-20", "-p", "OPS", "--json"],
+                 ["report", "time", "--from", "bad"], ["worklog", "check", "--from", "2026-10-20"], ["worklog", "check", "--from", "2026-10-20", "--json"],
+                 ["report", "time", "--from", "2026-01-01"], ["report", "time", "--from", "2026-10-20", "--refresh"]]
         self.golden("report", steps, sort_requests=True, db_queries=[WORKLOGS])
 
     def test_report_week_header(self):
-        self.golden("report_noactor", [{"args": ["report", "--date", "2026-10-20"], "env_drop": ("PLANE_ACTOR_UUID",)}],
+        self.golden("report_noactor", [{"args": ["report", "time", "--from", "2026-10-20"], "env_drop": ("PLANE_ACTOR_UUID",)}],
                     sort_requests=True, db_queries=[WORKLOGS])
 
     def test_report_flow(self):
-        steps = [["report", "--date", "2026-10-14", "--refresh"], ["report", "flow", "--date", "2026-10-14"],
-                 ["report", "flow", "--date", "2026-10-14", "--json"], ["worklog", "check", "--date", "2026-10-14"],
-                 ["report", "flow", "--date", "2026-10-14", "-p", "OPS"], ["report", "flow", "--date", "2026-10-14", "--refresh"]]
+        steps = [["report", "time", "--from", "2026-10-14", "--refresh"], ["report", "flow", "--from", "2026-10-14"],
+                 ["report", "flow", "--from", "2026-10-14", "--json"], ["worklog", "check", "--from", "2026-10-14"],
+                 ["report", "flow", "--from", "2026-10-14", "-p", "OPS"], ["report", "flow", "--from", "2026-10-14", "--refresh"]]
         self.golden("report_flow", steps, sort_requests=True)
 
     # --- escritura ------------------------------------------------------------

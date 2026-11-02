@@ -1,6 +1,6 @@
-"""Flujo por work item: lead/cycle time, tiempo por estado y esfuerzo, y el reporte `report flow`.
+"""Flujo por work item: lead/cycle time, tiempo por estado y esfuerzo (para `get --history`) y la lectura incremental de las transiciones de estado.
 
-Expone: build_ticket_flow(), flow_to_json(), print_flow(), format_lifecycle(), format_span(), cmd_report_flow().
+Expone: build_ticket_flow(), flow_to_json(), fetch_transitions(), transitions_fresh(), worklogs_from_comments().
 No hace: escribir en Plane.
 """
 
@@ -12,26 +12,12 @@ import urllib.parse
 import flow_metrics
 import session_clock
 
-from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.api import api_request
 from plane_cli.assignments import assignment_rows, record_assignments
-from plane_cli.resolve import get_states_map, resolve_issue, resolve_project_and_seq
-from plane_cli.timeutil import format_minutes, format_span, time_to_minutes
+from plane_cli.resolve import get_states_map
+from plane_cli.timeutil import time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
 from plane_cli import clock
-
-
-def format_lifecycle(issue):
-    """'completado' con su lead time, o 'abierto desde hace …' (calendario, UTC)."""
-    created = session_clock.parse_time(issue.get("created_at"))
-    if not created:
-        return "Ciclo     : ?"
-    completed = session_clock.parse_time(issue.get("completed_at"))
-    end = completed or clock.now()
-    days = (end - created).total_seconds() / 86400.0
-    span = f"{days:.1f} días" if days >= 1 else format_minutes(int((end - created).total_seconds() // 60))
-    if completed:
-        return f"Ciclo     : completado {completed.astimezone().strftime('%Y-%m-%d %H:%M')} (lead time {span})"
-    return f"Ciclo     : abierto desde hace {span}"
 
 
 FLOW_TTL_SECONDS = 3600
@@ -44,6 +30,13 @@ def load_states_by_id(conn, base_url, api_key, workspace, project_id):
     return {r["id"]: {"name": r["name"], "group": r["group_name"]} for r in rows}
 
 
+def transitions_fresh(conn, issue):
+    """True si las transiciones del ticket están al día: traídas con su historial, sin que el ticket haya cambiado, y (si sigue abierto) hace menos de una hora."""
+    cached = conn.execute("SELECT fetched_at, issue_updated_at, assignments_fetched FROM flow_fetch WHERE issue_id = ?", (issue["id"],)).fetchone()
+    return bool(cached and cached["issue_updated_at"] == issue.get("updated_at") and cached["assignments_fetched"]
+                and (issue.get("completed_at") or clock.timestamp() - cached["fetched_at"] < FLOW_TTL_SECONDS))
+
+
 def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, ticket_label, strict=False):
     """Transiciones de estado del issue (Plane no tiene endpoint por proyecto: una llamada por ticket).
 
@@ -51,12 +44,7 @@ def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, tic
     cambios de asignado (assignments.py); un ticket sin ese historial se vuelve a pedir una vez. Con `strict` una falla de red se propaga (barrido).
     """
     now = clock.timestamp()
-    cached = conn.execute("SELECT fetched_at, issue_updated_at, assignments_fetched FROM flow_fetch WHERE issue_id = ?", (issue["id"],)).fetchone()
-    fresh = bool(
-        cached and cached["issue_updated_at"] == issue.get("updated_at") and cached["assignments_fetched"]
-        and (issue.get("completed_at") or now - cached["fetched_at"] < FLOW_TTL_SECONDS)
-    )
-    if not fresh:
+    if not transitions_fresh(conn, issue):
         found, assigned, cursor = [], [], None
         try:
             for _ in range(FLOW_MAX_PAGES):
@@ -141,72 +129,3 @@ def flow_to_json(flow):
     for key in ("created", "closed"):
         out[key] = out[key].isoformat() if out.get(key) else None
     return out
-
-
-def print_flow(flow, transitions, states, stream=None):
-    out = stream or sys.stdout
-    outcome = {"completed": "completado", "cancelled": "cancelado", "open": "abierto"}[flow["outcome"]]
-    out.write("\n🔁 Flujo (calendario; esfuerzo = worklogs locales + metadata en comentarios)\n")
-    out.write(f"   • Resultado : {outcome}\n")
-    out.write(f"   • Lead time : {format_span(flow['lead_minutes'])}{' (hasta hoy)' if flow['outcome'] == 'open' else ''}\n")
-    out.write(f"   • Cycle     : {format_span(flow['cycle_active_minutes'])} activo · {format_span(flow['cycle_gross_minutes'])} bruto (Pausado excluido del activo)\n")
-    out.write(f"   • Esfuerzo  : {format_span(flow['effort_clock_minutes'])} reloj · {format_span(flow['effort_compute_minutes'])} cómputo ({flow['worklogs']} worklogs)\n")
-    if flow["effort_clock_over_cycle"] is not None:
-        out.write(f"   • Reloj/cycle: {flow['effort_clock_over_cycle']:.2f} (señal secundaria: espera de terceros y paralelismo la distorsionan)\n")
-    if flow["by_state_minutes"]:
-        out.write("   • Estados   : " + " · ".join(f"{k} {format_span(v)}" for k, v in flow["by_state_minutes"].items()) + "\n")
-    if flow["worklogs_before_created"] or flow["worklogs_after_closed"]:
-        out.write(f"   • Fuera de ventana: {flow['worklogs_before_created']} antes de crear · {flow['worklogs_after_closed']} después de cerrar\n")
-    if flow["flags"]:
-        out.write("   • Flags     : " + ", ".join(flow["flags"]) + "\n")
-    for t in transitions:
-        a = states.get(t["from_id"], {}).get("name", "?")
-        b = states.get(t["to_id"], {}).get("name", "?")
-        out.write(f"   {t['at'].astimezone().strftime('%Y-%m-%d %H:%M')}  {a} → {b}\n")
-    out.write("\n")
-
-
-def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str):
-    """Flujo por ticket del periodo: los que tienen worklogs en caché o se cerraron en él."""
-    proj = getattr(args, "project", None)
-    like = f"{proj.upper()}-%" if proj else "%"
-    labels = {r["ticket_id"] for r in conn.execute(
-        "SELECT DISTINCT ticket_id FROM worklogs WHERE date >= ? AND date <= ? AND ticket_id LIKE ?", (s_str, e_str, like))}
-    labels |= {r["ticket_id"] for r in conn.execute(
-        "SELECT ticket_id FROM issues_cache WHERE completed_at IS NOT NULL AND substr(completed_at, 1, 10) >= ? "
-        "AND substr(completed_at, 1, 10) <= ? AND ticket_id LIKE ?", (s_str, e_str, like))}
-    rows, flows = [], []
-    for label in sorted(labels):
-        try:
-            project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, label)
-            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
-            flow, transitions, states = build_ticket_flow(conn, base_url, api_key, workspace, project_id, issue, label)
-        except PlaneUnavailable as exc:
-            sys.stderr.write(f"⚠ {label}: Plane no responde ({exc.cause}); se omite.\n")
-            continue
-        except SystemExit:
-            sys.stderr.write(f"⚠ {label}: no se pudo consultar en Plane (¿eliminado?); se omite.\n")
-            continue
-        if flow:
-            flows.append(flow)
-            rows.append((label, issue.get("name", ""), flow))
-    agg = flow_metrics.aggregate(flows)
-
-    if getattr(args, "json", False):
-        print(json.dumps({"period": [s_str, e_str], "tickets": [{"ticket": l, "title": n, **flow_to_json(f)} for l, n, f in rows], "summary": agg},
-                         indent=2, ensure_ascii=False))
-        return
-    print(f"\n🔁 Flujo por ticket · {s_str} → {e_str} (calendario; lead/cycle en UTC)")
-    if not rows:
-        print("   (sin tickets con worklogs en caché ni cerrados en el periodo; `report --refresh` trae a la caché los worklogs de Plane)\n")
-        return
-    for label, title, f in rows:
-        outcome = {"completed": "✔", "cancelled": "✖", "open": "…"}[f["outcome"]]
-        flags = f" [{', '.join(f['flags'])}]" if f["flags"] else ""
-        print(f"  {outcome} {label:<10} lead {format_span(f['lead_minutes']):<8} cycle {format_span(f['cycle_active_minutes']):<8} "
-              f"esfuerzo {format_span(f['effort_clock_minutes'])} reloj / {format_span(f['effort_compute_minutes'])} cómputo{flags}")
-        print(f"      {title[:70]}")
-    print(f"\n   Resumen: {agg['completed']} completados · {agg['cancelled']} cancelados · {agg['open']} abiertos")
-    print(f"   Mediana lead {format_span(agg['median_lead_minutes'])} (n={agg['n_lead']}) · cycle {format_span(agg['median_cycle_minutes'])} (n={agg['n_cycle']}); "
-          f"{agg['excluded']} excluidos (umbrella, instant_close, no_transition)")
-    print("   Nota: el esfuerzo sale de los worklogs de la caché local y de la metadata en los comentarios; lo no registrado no aparece.\n")

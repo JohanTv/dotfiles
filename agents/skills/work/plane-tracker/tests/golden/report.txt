@@ -1,4 +1,4 @@
-$ plane.py report --date 2026-10-20
+$ plane.py report time --from 2026-10-20
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -25,155 +25,21 @@ notas: [General (10:00-11:00)]: Avance del formulario | [Track: subagent (10:30-
 🔄 Sincronizando registros de actividad desde Plane API...
 ✔ Se sincronizaron 3 registros telemétricos en SQLite3.
 
-$ plane.py report --date 2026-10-20 --json
+$ plane.py report time --from 2026-10-20 --json
 [exit 0]
 --- stdout ---
-[
-  {
-    "ticket_id": "OPS-13",
-    "track": "support",
-    "date": "2026-10-20",
-    "start_time": "09:30",
-    "end_time": "10:15",
-    "duration_minutes": 45,
-    "plane_comment_id": "c3000000-0000-4000-8000-000000000006",
-    "project_id": "OPS",
-    "issue_name": "Tareas Rápidas y Soporte - W43",
-    "worker_type": "human",
-    "capacity_bucket": "toil_support",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Soporte a usuarios",
-    "stoppers_json": "[]",
-    "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
-    "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  },
-  {
-    "ticket_id": "OMNIFY-1",
-    "track": "main",
-    "date": "2026-10-20",
-    "start_time": "10:00",
-    "end_time": "11:00",
-    "duration_minutes": 60,
-    "plane_comment_id": "c1000000-0000-4000-8000-000000000001",
-    "project_id": "OMNIFY",
-    "issue_name": "Validaciones de formulario SMS",
-    "worker_type": "human",
-    "capacity_bucket": "deep_work",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Avance del formulario",
-    "stoppers_json": "[]",
-    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"}",
-    "created_at": "2026-10-20T11:05:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  },
-  {
-    "ticket_id": "OMNIFY-1",
-    "track": "subagent",
-    "date": "2026-10-20",
-    "start_time": "10:30",
-    "end_time": "11:30",
-    "duration_minutes": 60,
-    "plane_comment_id": "c1000000-0000-4000-8000-000000000002",
-    "project_id": "OMNIFY",
-    "issue_name": "Validaciones de formulario SMS",
-    "worker_type": "agent:claude",
-    "capacity_bucket": "deep_work",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Revisión",
-    "stoppers_json": "[\"Esperando credenciales\"]",
-    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:30\", \"notes\": \"Revisión\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [\"Esperando credenciales\"], \"track\": \"subagent\", \"worker_type\": \"agent:claude\"}",
-    "created_at": "2026-10-20T11:35:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  }
-]
+{"count":3,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"hours_scope":"synced","hours_verified":true},"source":"local","stale":false,"unavailable":[]},"notes":[],"results":[{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"toil_support","date":"2026-10-20","end_time":"10:15","minutes":45,"notes":"Soporte a usuarios","phase":"dev","project":"OPS","provenance":{"role":"default"},"role":"backend_engineer","start_time":"09:30","ticket":"OPS-13","title":"Tareas Rápidas y Soporte - W43","track":"support","worker_type":"human"},{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"deep_work","date":"2026-10-20","end_time":"11:00","minutes":60,"notes":"Avance del formulario","phase":"dev","project":"OMNIFY","provenance":{"role":"default"},"role":"backend_engineer","start_time":"10:00","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","track":"main","worker_type":"human"},{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"deep_work","date":"2026-10-20","end_time":"11:30","minutes":60,"notes":"Revisión","phase":"dev","project":"OMNIFY","provenance":{"role":"default"},"role":"backend_engineer","start_time":"10:30","stoppers":["Esperando credenciales"],"ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","track":"subagent","worker_type":"agent:claude"}],"schema":"plane-tracker/1","scope":{"hours_author":"aaaaaaaa-0000-4000-8000-000000000001","order":"date,start_time,ticket","period":{"from":"2026-10-20","to":"2026-10-20","tz":"+00:00"},"projects":["OMNIFY","OPS"]},"summary":{"by_capacity":[{"key":"deep_work","minutes":120},{"key":"toil_support","minutes":45}],"by_day":[{"key":"2026-10-20","minutes":120}],"by_project":[{"key":"OMNIFY","minutes":120},{"key":"OPS","minutes":45}],"effort_clock_minutes":120,"effort_compute_minutes":165},"total":3,"view":"report time"}
 --- stderr ---
 
 
-$ plane.py --json report --date 2026-10-20
+$ plane.py --json report time --from 2026-10-20
 [exit 0]
 --- stdout ---
-[
-  {
-    "ticket_id": "OPS-13",
-    "track": "support",
-    "date": "2026-10-20",
-    "start_time": "09:30",
-    "end_time": "10:15",
-    "duration_minutes": 45,
-    "plane_comment_id": "c3000000-0000-4000-8000-000000000006",
-    "project_id": "OPS",
-    "issue_name": "Tareas Rápidas y Soporte - W43",
-    "worker_type": "human",
-    "capacity_bucket": "toil_support",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Soporte a usuarios",
-    "stoppers_json": "[]",
-    "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
-    "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  },
-  {
-    "ticket_id": "OMNIFY-1",
-    "track": "main",
-    "date": "2026-10-20",
-    "start_time": "10:00",
-    "end_time": "11:00",
-    "duration_minutes": 60,
-    "plane_comment_id": "c1000000-0000-4000-8000-000000000001",
-    "project_id": "OMNIFY",
-    "issue_name": "Validaciones de formulario SMS",
-    "worker_type": "human",
-    "capacity_bucket": "deep_work",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Avance del formulario",
-    "stoppers_json": "[]",
-    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:00\", \"notes\": \"Avance del formulario\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:00\", \"stoppers\": [], \"track\": \"main\", \"worker_type\": \"human\"}",
-    "created_at": "2026-10-20T11:05:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  },
-  {
-    "ticket_id": "OMNIFY-1",
-    "track": "subagent",
-    "date": "2026-10-20",
-    "start_time": "10:30",
-    "end_time": "11:30",
-    "duration_minutes": 60,
-    "plane_comment_id": "c1000000-0000-4000-8000-000000000002",
-    "project_id": "OMNIFY",
-    "issue_name": "Validaciones de formulario SMS",
-    "worker_type": "agent:claude",
-    "capacity_bucket": "deep_work",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Revisión",
-    "stoppers_json": "[\"Esperando credenciales\"]",
-    "raw_payload": "{\"capacity_bucket\": \"deep_work\", \"date\": \"2026-10-20\", \"duration_minutes\": 60, \"end_time\": \"11:30\", \"notes\": \"Revisión\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"10:30\", \"stoppers\": [\"Esperando credenciales\"], \"track\": \"subagent\", \"worker_type\": \"agent:claude\"}",
-    "created_at": "2026-10-20T11:35:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  }
-]
+{"count":3,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"hours_scope":"synced","hours_verified":true},"source":"local","stale":false,"unavailable":[]},"notes":[],"results":[{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"toil_support","date":"2026-10-20","end_time":"10:15","minutes":45,"notes":"Soporte a usuarios","phase":"dev","project":"OPS","provenance":{"role":"default"},"role":"backend_engineer","start_time":"09:30","ticket":"OPS-13","title":"Tareas Rápidas y Soporte - W43","track":"support","worker_type":"human"},{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"deep_work","date":"2026-10-20","end_time":"11:00","minutes":60,"notes":"Avance del formulario","phase":"dev","project":"OMNIFY","provenance":{"role":"default"},"role":"backend_engineer","start_time":"10:00","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","track":"main","worker_type":"human"},{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"deep_work","date":"2026-10-20","end_time":"11:30","minutes":60,"notes":"Revisión","phase":"dev","project":"OMNIFY","provenance":{"role":"default"},"role":"backend_engineer","start_time":"10:30","stoppers":["Esperando credenciales"],"ticket":"OMNIFY-1","title":"Validaciones de formulario SMS","track":"subagent","worker_type":"agent:claude"}],"schema":"plane-tracker/1","scope":{"hours_author":"aaaaaaaa-0000-4000-8000-000000000001","order":"date,start_time,ticket","period":{"from":"2026-10-20","to":"2026-10-20","tz":"+00:00"},"projects":["OMNIFY","OPS"]},"summary":{"by_capacity":[{"key":"deep_work","minutes":120},{"key":"toil_support","minutes":45}],"by_day":[{"key":"2026-10-20","minutes":120}],"by_project":[{"key":"OMNIFY","minutes":120},{"key":"OPS","minutes":45}],"effort_clock_minutes":120,"effort_compute_minutes":165},"total":3,"view":"report time"}
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-20 --track subagent
+$ plane.py report time --from 2026-10-20 --track subagent
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -193,7 +59,7 @@ notas: [Track: subagent (10:30-11:30)]: Revisión
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-20 --worker-type human
+$ plane.py report time --from 2026-10-20 --worker-type human
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -219,7 +85,7 @@ notas: [General (10:00-11:00)]: Avance del formulario
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-20 -p OPS
+$ plane.py report time --from 2026-10-20 -p OPS
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -239,79 +105,42 @@ notas: [Track: support (09:30-10:15)]: Soporte a usuarios
 --- stderr ---
 
 
-$ plane.py report --date 2026-10-20 -p OPS --json
+$ plane.py report time --from 2026-10-20 -p OPS --json
 [exit 0]
 --- stdout ---
-[
-  {
-    "ticket_id": "OPS-13",
-    "track": "support",
-    "date": "2026-10-20",
-    "start_time": "09:30",
-    "end_time": "10:15",
-    "duration_minutes": 45,
-    "plane_comment_id": "c3000000-0000-4000-8000-000000000006",
-    "project_id": "OPS",
-    "issue_name": "Tareas Rápidas y Soporte - W43",
-    "worker_type": "human",
-    "capacity_bucket": "toil_support",
-    "phase": "dev",
-    "role": "backend_engineer",
-    "notes": "Soporte a usuarios",
-    "stoppers_json": "[]",
-    "raw_payload": "{\"capacity_bucket\": \"toil_support\", \"date\": \"2026-10-20\", \"duration_minutes\": 45, \"end_time\": \"10:15\", \"notes\": \"Soporte a usuarios\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"09:30\", \"stoppers\": [], \"track\": \"support\", \"worker_type\": \"human\"}",
-    "created_at": "2026-10-20T10:20:00Z",
-    "updated_at": 1793620800.0,
-    "author_id": "aaaaaaaa-0000-4000-8000-000000000001",
-    "defaulted_json": "[\"role\"]"
-  }
-]
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"hours_scope":"synced","hours_verified":true},"source":"local","stale":false,"unavailable":[]},"notes":[],"results":[{"author":"aaaaaaaa-0000-4000-8000-000000000001","capacity":"toil_support","date":"2026-10-20","end_time":"10:15","minutes":45,"notes":"Soporte a usuarios","phase":"dev","project":"OPS","provenance":{"role":"default"},"role":"backend_engineer","start_time":"09:30","ticket":"OPS-13","title":"Tareas Rápidas y Soporte - W43","track":"support","worker_type":"human"}],"schema":"plane-tracker/1","scope":{"hours_author":"aaaaaaaa-0000-4000-8000-000000000001","order":"date,start_time,ticket","period":{"from":"2026-10-20","to":"2026-10-20","tz":"+00:00"},"projects":["OPS"]},"summary":{"by_capacity":[{"key":"toil_support","minutes":45}],"by_day":[{"key":"2026-10-20","minutes":45}],"by_project":[{"key":"OPS","minutes":45}],"effort_clock_minutes":45,"effort_compute_minutes":45},"total":1,"view":"report time"}
 --- stderr ---
 
 
-$ plane.py report --date bad
+$ plane.py report time --from bad
 [exit 1]
 --- stdout ---
 
 --- stderr ---
-Error: Formato de fecha inválido 'bad'. Usa YYYY-MM-DD.
+Error: Fecha inválida en --from: 'bad'.
+Usa YYYY-MM-DD.
 
-$ plane.py worklog check --date 2026-10-20
+$ plane.py worklog check --from 2026-10-20
 [exit 1]
 --- stdout ---
 
 🔎 Consistencia worklogs ↔ comentarios · 2026-10-20 → 2026-10-20
    ✖ OMNIFY-1: 2 worklog(s)
-      [missing_local] comentario con telemetría (2026-10-20 12:00, 60 min) sin fila local; usa report --refresh  (c1000000)
+      [missing_local] comentario con telemetría (2026-10-20 12:00, 60 min) sin fila local; usa report time --refresh  (c1000000)
    ✔ OPS-13: 1 worklog(s)
 
-   Resumen: 1 inconsistencia(s), 0 aviso(s). Solo lectura: corrige con comment edit o report --refresh.
+   Resumen: 1 inconsistencia(s), 0 aviso(s). Solo lectura: corrige con comment edit o report time --refresh.
 --- stderr ---
 
 
-$ plane.py worklog check --date 2026-10-20 --json
+$ plane.py worklog check --from 2026-10-20 --json
 [exit 1]
 --- stdout ---
-{
-  "period": [
-    "2026-10-20",
-    "2026-10-20"
-  ],
-  "issues": [
-    {
-      "code": "missing_local",
-      "ticket": "OMNIFY-1",
-      "comment_id": "c1000000-0000-4000-8000-000000000003",
-      "detail": "comentario con telemetría (2026-10-20 12:00, 60 min) sin fila local; usa report --refresh"
-    }
-  ],
-  "ok": false,
-  "unreachable": 0
-}
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"api","stale":false,"unavailable":[]},"notes":[],"results":[{"code":"missing_local","comment_id":"c1000000-0000-4000-8000-000000000003","detail":"comentario con telemetría (2026-10-20 12:00, 60 min) sin fila local; usa report time --refresh","ticket":"OMNIFY-1"}],"schema":"plane-tracker/1","scope":{"order":"ticket,date,start_time","period":{"from":"2026-10-20","to":"2026-10-20","tz":"+00:00"},"projects":["OMNIFY","OPS"]},"summary":{"checked":[{"ticket":"OMNIFY-1","worklogs":2},{"ticket":"OPS-13","worklogs":1}],"ok":false,"unreachable":0},"total":1,"view":"worklog check"}
 --- stderr ---
 
 
-$ plane.py report --date 2026-01-01
+$ plane.py report time --from 2026-01-01
 [exit 0]
 --- stdout ---
 ================================================================================
@@ -326,7 +155,7 @@ $ plane.py report --date 2026-01-01
 🔄 Sincronizando registros de actividad desde Plane API...
 ✔ Se sincronizaron 1 registros telemétricos en SQLite3.
 
-$ plane.py report --date 2026-10-20 --refresh
+$ plane.py report time --from 2026-10-20 --refresh
 [exit 0]
 --- stdout ---
 ================================================================================

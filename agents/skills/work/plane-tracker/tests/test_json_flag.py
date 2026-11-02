@@ -15,8 +15,8 @@ ON = [
     ["get", "--json", "OMNIFY-1"],
     ["--json", "list"],
     ["list", "--json", "-p", "OPS"],
-    ["--json", "report", "--date", "2026-10-20"],
-    ["report", "--json", "--week"],
+    ["--json", "report", "time", "--from", "2026-10-20"],
+    ["report", "time", "--json", "--week"],
     ["report", "flow", "--json"],
     ["--json", "list", "--text", "x"],
     ["list", "--text", "x", "--json", "--json"],
@@ -51,7 +51,7 @@ class JsonFlag(unittest.TestCase):
                 self.assertTrue(PARSER.parse_args(argv).json)
 
     def test_off_by_default(self):
-        for argv in (["get", "OMNIFY-1"], ["list"], ["report"], ["comment", "add", "OMNIFY-1", "-m", "x"], ["whoami"],
+        for argv in (["get", "OMNIFY-1"], ["list"], ["report", "time"], ["comment", "add", "OMNIFY-1", "-m", "x"], ["whoami"],
                      ["worklog", "check"], ["focus", "status"]):
             with self.subTest(argv=argv):
                 self.assertFalse(getattr(PARSER.parse_args(argv), "json", False))

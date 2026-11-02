@@ -5,7 +5,7 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
                    rutas de caché y variables de entorno; reloj central (única fuente de la hora real); vocabulario cerrado y error de comando
                    (datos y excepciones puros: vocabulary no importa nada del paquete y errors solo importa vocabulary)
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
-  3. mdhtml, cache, resolve, timeutil, coverage, envelope, store_worklogs, scope, scope_flags, freshness, store_issues, query_issues, query_get, query_catalogs, query_misc, render_issues, render_get, render_catalogs, render_misc, views, output, history_sweep, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
+  3. mdhtml, cache, resolve, timeutil, coverage, envelope, store_worklogs, scope, scope_flags, freshness, store_issues, store_transitions, query_time, query_flow, query_check, render_time, render_flow, render_check, query_issues, query_get, query_catalogs, query_misc, render_issues, render_get, render_catalogs, render_misc, views, output, history_sweep, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -32,7 +32,7 @@ Módulos:
   store_worklogs  proyectos accesibles y estado de verificación de las horas por proyecto y periodo (solo lectura)
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)
-  flow            lead/cycle time y esfuerzo por ticket; `report flow`
+  flow            lead/cycle time y esfuerzo de un ticket (`get --history`) y lectura incremental de sus transiciones
   renamed         pistas de error para nombres retirados y verbos ausentes
   attachments     subida, borrado y listado de adjuntos; `attachment add|list|delete|replace`
   cmd_comment     `comment add`
@@ -54,7 +54,14 @@ Módulos:
   views           View y VIEWS: registro de vistas de lectura (list, get, labels, projects, whoami, attachment list, outbox list)
   history_sweep   barrido de `list --refresh-history` (se retira en la fase 6)
   cmd_read        `get`, `list`, `labels`, `projects`, `whoami` (orquestan catálogos, frescura, consulta, sobre y salida)
-  cmd_report      `report`, `worklog check`
+  query_time      consulta de `report time` (horas del autor, resumen por día, proyecto y balde)
+  query_flow      consulta de `report flow` con lo almacenado (funciona sin conexión)
+  query_check     consulta de `worklog check` (transforma la auditoría de red)
+  render_time     texto de `report time` desde el sobre
+  render_flow     texto de `report flow` desde el sobre
+  render_check    texto de `worklog check` desde el sobre
+  store_transitions  tickets del periodo, estados y transiciones para `report flow` (solo lectura)
+  cmd_report      `report time`, `report flow`, `worklog check`
   cmd_outbox      `outbox list|flush|drop`
   cmd_ops         `health`, `focus set|clear|status`, `handoff`
   cli             parser raíz, grupos de verbos y despacho

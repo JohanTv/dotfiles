@@ -36,7 +36,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/store_worklogs.py` | Solo lectura: proyectos accesibles y `hours_status()` (si el periodo está verificado contra Plane, por proyecto). |
 | `plane_cli/proposal_store.py` | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
-| `plane_cli/flow.py` | Lead/cycle time y esfuerzo por ticket, y la vista `report flow`. |
+| `plane_cli/flow.py` | Lead/cycle time y esfuerzo de un ticket (`get --history`) y la lectura incremental de sus transiciones (`fetch_transitions()`, `transitions_fresh()`). |
 | `plane_cli/renamed.py` | `suggestion(argv, tree)`: pista de error para nombres retirados, verbos ausentes o mal escritos. |
 | `plane_cli/attachments.py` | Subida firmada, borrado y listado de adjuntos; grupo `attachment` (`add`, `list`, `delete`, `replace`). |
 | `plane_cli/cmd_comment.py` | Comando `comment add`. |
@@ -50,12 +50,14 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/store_issues.py` | Lecturas de solo lectura de `issues_cache` (con FTS), `issue_sync` y datos de personas. |
 | `plane_cli/query_issues.py` | Consulta de `list`: selección por persona y estado, orden total, filas del vocabulario `ticket` y `Result` con cobertura y `complete`. |
 | `plane_cli/query_get.py`, `query_catalogs.py`, `query_misc.py` | Consultas de `get` (fila `ticket_detail` con nombres locales; `complete` solo con API y comentarios completos), `labels`/`projects`, y `whoami`/`attachment list`/`outbox list`. |
-| `plane_cli/render_issues.py`, `render_get.py`, `render_catalogs.py`, `render_misc.py` | Texto de cada vista a partir del sobre (nunca de la base de datos). |
+| `plane_cli/query_time.py`, `query_flow.py`, `query_check.py` | Consultas de `report time` (horas del autor, resumen por día, proyecto y balde con `undeclared`, notas propias; solo cuentan las horas con autor igual al del alcance), `report flow` (calculado solo con lo almacenado: funciona con `--offline`) y `worklog check` (transforma la auditoría de red). |
+| `plane_cli/render_issues.py`, `render_get.py`, `render_catalogs.py`, `render_misc.py`, `render_time.py`, `render_flow.py`, `render_check.py` | Texto de cada vista a partir del sobre (nunca de la base de datos). |
+| `plane_cli/store_transitions.py` | Solo lectura para `report flow`: tickets del periodo (el cierre se compara en la zona declarada), estados, transiciones y recuento de las transiciones al día. |
 | `plane_cli/output.py` | `emit()`: el sobre en `--json` o su render en texto. |
 | `plane_cli/views.py` | `View` y `VIEWS`: registro de las siete vistas de lectura (`list`, `get`, `labels`, `projects`, `whoami`, `attachment list`, `outbox list`) con su comando y flags extra (F2). |
 | `plane_cli/history_sweep.py` | Barrido de `list --refresh-history` (se retira en la fase 6). |
 | `plane_cli/assignments.py` | Historial de asignación medido (`assignment_events`), su cobertura y el barrido con presupuesto (`--refresh-history`). |
-| `plane_cli/cmd_report.py` | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
+| `plane_cli/cmd_report.py` | Comandos `report time`, `report flow` (el grupo `report` exige la vista) y `worklog check`: orquestan alcance, frescura, consulta, sobre y salida. El periodo es `--from/--to/--week`. |
 | `plane_cli/cmd_outbox.py` | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
 | `plane_cli/cmd_ops.py` | Comandos `health`, `focus set\|clear\|status` y `handoff`, con sus ayudantes de git. |
 | `plane_cli/cli.py` | Parser raíz, `COMMANDS` (árbol ordenado), `add_group()`, `command_tree()`, aviso de pendientes y `main()`. |

@@ -18,7 +18,7 @@ positional arguments:
     outbox      Cola de salida: list | flush | drop
     focus       Foco de la sesión: set | clear | status
     worklog     Tiempos: propose | check
-    report      Reporte de actividad; report flow: flujo por ticket
+    report      Reportes: time | flow
     handoff     Borrador del relevo con los hechos de git
     labels      Listar las etiquetas del proyecto
     projects    Listar los proyectos de Plane
@@ -186,36 +186,6 @@ options:
   --yes               Confirma la eliminación
   --discard-worklogs  Acepta perder las horas propias registradas en el ticket
   --json              Salida en JSON
---- stderr ---
-
-
-$ plane.py report --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
-[exit 0]
---- stdout ---
-usage: plane.py report [-h] [--today | --week | --date DATE] [-p PROJECT]
-                       [--track TRACK] [--worker-type WORKER_TYPE] [--refresh]
-                       [--json]
-                       [{flow}]
-
-Reporte de actividad con Interval Merging; `report flow` muestra el flujo por
-ticket del periodo (lead/cycle time, tiempo por estado y esfuerzo).
-
-positional arguments:
-  {flow}                Vista: flujo por ticket (por defecto, actividad)
-
-options:
-  -h, --help            show this help message and exit
-  --today               Día actual (por defecto)
-  --week                Semana actual
-  --date DATE           Fecha específica (YYYY-MM-DD)
-  -p, --project PROJECT
-                        Filtrar por proyecto (ej: OMNIFY, OPS)
-  --track TRACK         Filtrar por track (ej: main, subagent)
-  --worker-type WORKER_TYPE
-                        Filtrar por tipo de trabajador (human, subagent)
-  --refresh             Forzar sincronización remota con Plane (vista de
-                        actividad)
-  --json                Salida en JSON
 --- stderr ---
 
 
@@ -400,6 +370,23 @@ positional arguments:
 
 options:
   -h, --help       show this help message and exit
+--- stderr ---
+
+
+$ plane.py report --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py report [-h] {time,flow} ...
+
+Reportes: time | flow
+
+positional arguments:
+  {time,flow}
+    time       Horas registradas por día y ticket
+    flow       Flujo por ticket del periodo
+
+options:
+  -h, --help   show this help message and exit
 --- stderr ---
 
 
@@ -716,20 +703,78 @@ options:
 $ plane.py worklog check --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py worklog check [-h] [--today | --week | --date DATE]
-                              [-p PROJECT] [--json]
+usage: plane.py worklog check [-h] [-p PROJECT] [--all-projects]
+                              [--from FECHA] [--to FECHA] [--week] [--json]
 
 Solo lectura: compara los worklogs locales con sus comentarios en Plane
-(duplicados, huérfanos, diferencias). Sale con código 1 si hay
-inconsistencias.
+(duplicados, huérfanos, diferencias). Sale con código 1 si hay inconsistencias
+y con 3 si algún ticket no se pudo comprobar.
 
 options:
   -h, --help            show this help message and exit
-  --today               Día actual (por defecto)
-  --week                Semana actual
-  --date DATE           Fecha específica (YYYY-MM-DD)
   -p, --project PROJECT
-                        Filtrar por proyecto (ej: OMNIFY, OPS)
+                        Identificador del proyecto (ej: OMNIFY, OPS)
+  --all-projects        Todos los proyectos accesibles del workspace
+  --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
+  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --week                Semana en curso (lunes a domingo)
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py report time --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py report time [-h] [-p PROJECT] [--all-projects] [--from FECHA]
+                            [--to FECHA] [--week] [--refresh] [--offline]
+                            [--verbose] [--track TRACK]
+                            [--worker-type WORKER_TYPE] [--json]
+
+Horas del autor en el periodo (por defecto hoy) con Interval Merging;
+sincroniza con Plane por proyecto y periodo si falta o venció (5 min). Sin
+conexión usa lo local y lo dice (--offline). Con --json, sobre plane-tracker/1
+con resumen por día, proyecto y balde.
+
+options:
+  -h, --help            show this help message and exit
+  -p, --project PROJECT
+                        Identificador del proyecto (ej: OMNIFY, OPS)
+  --all-projects        Todos los proyectos accesibles del workspace
+  --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
+  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --week                Semana en curso (lunes a domingo)
+  --refresh             Forzar la sincronización con Plane
+  --offline             No consultar Plane: solo lo local
+  --verbose             Incluir las notas informativas
+  --track TRACK         Filtrar por track (ej: main, subagent)
+  --worker-type WORKER_TYPE
+                        Filtrar por tipo de trabajador (human, subagent)
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py report flow --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py report flow [-h] [-p PROJECT] [--all-projects] [--from FECHA]
+                            [--to FECHA] [--week] [--refresh] [--offline]
+                            [--verbose] [--json]
+
+Lead/cycle time, tiempo por estado y esfuerzo de los tickets con horas en el
+periodo o cerrados en él. Se calcula con lo almacenado: --refresh trae las
+transiciones que falten (1 GET por ticket) y --offline no consulta Plane.
+
+options:
+  -h, --help            show this help message and exit
+  -p, --project PROJECT
+                        Identificador del proyecto (ej: OMNIFY, OPS)
+  --all-projects        Todos los proyectos accesibles del workspace
+  --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
+  --to FECHA            Último día del periodo (YYYY-MM-DD)
+  --week                Semana en curso (lunes a domingo)
+  --refresh             Forzar la sincronización con Plane
+  --offline             No consultar Plane: solo lo local
+  --verbose             Incluir las notas informativas
   --json                Salida en JSON
 --- stderr ---
 

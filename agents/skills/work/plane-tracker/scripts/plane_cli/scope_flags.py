@@ -7,7 +7,7 @@ No hace: validar valores (eso es scope.resolve_scope) ni leer el entorno. Lo que
 from plane_cli.config import positive_int
 
 DIMENSION_FLAGS = {"projects": ("-p", "--project", "--all-projects"), "person": ("--mine", "--created", "--involved"), "state": ("--open",),
-                   "text": ("--text",), "period": ()}
+                   "text": ("--text",), "period": ("--from", "--to", "--week")}
 CONTROL_FLAGS = {"limit": ("--limit",), "refresh": ("--refresh",), "offline": ("--offline",), "brief": ("--brief",), "verbose": ("--verbose",)}
 
 
@@ -25,6 +25,10 @@ def add_scope_args(parser, dims, controls, default_limit=None):
         who.add_argument("--mine", action="store_true", help="Solo los asignados a ti (según la última sincronización)")
         who.add_argument("--created", action="store_true", help="Solo los creados por ti")
         who.add_argument("--involved", action="store_true", help="Asignados, creados, con horas tuyas o asignados alguna vez, con la razón de cada uno")
+    if "period" in dims:
+        parser.add_argument("--from", dest="date_from", metavar="FECHA", help="Primer día del periodo (YYYY-MM-DD); solo, es ese día")
+        parser.add_argument("--to", dest="date_to", metavar="FECHA", help="Último día del periodo (YYYY-MM-DD)")
+        parser.add_argument("--week", action="store_true", help="Semana en curso (lunes a domingo)")
     if "state" in dims:
         parser.add_argument("--open", action="store_true", help="Sin completados, cancelados ni archivados")
     if "text" in dims:

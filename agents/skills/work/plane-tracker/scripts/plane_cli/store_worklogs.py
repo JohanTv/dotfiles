@@ -40,3 +40,16 @@ def hours_status(conn, idents, date_from, date_to):
         if not row["complete"]:
             partial.append(ident)
     return HoursStatus(not never and not partial, min(as_ofs) if as_ofs else None, tuple(never), tuple(partial), unmeasured)
+
+
+def rows(conn, idents, date_from, date_to, track=None, worker_type=None):
+    """Registros de horas de la base local de los proyectos `idents` en [date_from, date_to], de cualquier autor (el filtro por autor es de la consulta), ordenados."""
+    if not idents:
+        return []
+    sql = f"SELECT * FROM worklogs WHERE date >= ? AND date <= ? AND project_id IN ({','.join('?' for _ in idents)})"
+    params = [date_from, date_to, *idents]
+    for column, value in (("track", track), ("worker_type", worker_type)):
+        if value:
+            sql += f" AND {column} = ?"
+            params.append(value)
+    return conn.execute(sql + " ORDER BY date, start_time, ticket_id", params).fetchall()

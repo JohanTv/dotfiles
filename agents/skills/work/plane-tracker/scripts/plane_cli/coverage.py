@@ -1,6 +1,6 @@
 """Cobertura de una lectura (de dónde salen los datos y si están completos), el resultado que la lleva y las notas que se derivan de ella.
 
-Expone: Coverage (con merge() y to_dict()), Result, combine(), complete_list(), complete_time(), complete_flow(), complete_agenda(),
+Expone: Coverage (con merge() y to_dict()), Result, combine(), settle(), complete_list(), complete_time(), complete_flow(), complete_agenda(),
 complete_get(), completeness_label(), notes_from(), build_notes().
 No hace: leer SQLite, tocar la red ni imprimir. `complete` tiene tres valores: True, False y None (no verificado, nunca equivale a completo).
 `complete` describe la cobertura de la FUENTE (la caché frente al servidor), no si la página muestra todo: eso lo dicen `total`, `count` y la nota `truncated`.
@@ -10,7 +10,7 @@ Los hechos de coverage.detail que alimentan notas y la regla de `complete`: forb
 rate_budget_exhausted, assignment_snapshot (bool), history {verified, total}, hours_scope ("local" o "synced") y hours_verified (True/False/None).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from plane_cli import vocabulary
 from plane_cli.timeutil import age_text
@@ -114,6 +114,12 @@ def complete_flow(cov):
     history = cov.detail.get("history")
     own = None if history is None else history["verified"] >= history["total"]
     return combine(_generic(cov), own)
+
+
+def settle(cov, extra_notes):
+    """`complete: true` es imposible con un aviso (F14): si la vista añade avisos propios y la cobertura decía true, queda en None (no verificado)."""
+    warns = any(vocabulary.NOTES[n["code"]][0] == "warn" for n in extra_notes)
+    return replace(cov, complete=None) if cov.complete is True and warns else cov
 
 
 def complete_agenda(list_cov, time_cov):

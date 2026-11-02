@@ -9,7 +9,8 @@ La firma de `query` depende de la vista (cada una consulta una fuente distinta);
 from dataclasses import dataclass, field
 from typing import Callable
 
-from plane_cli import query_catalogs, query_get, query_issues, query_misc, render_catalogs, render_get, render_issues, render_misc
+from plane_cli import (query_catalogs, query_check, query_flow, query_get, query_issues, query_misc, query_time, render_catalogs, render_check, render_flow, render_get,
+                       render_issues, render_misc, render_time)
 
 LIST_LIMIT = 20
 
@@ -42,6 +43,15 @@ VIEWS = {
     "whoami": View("whoami", NONE, NONE, query_misc.whoami, render_misc.render_whoami, {}, "identidad: variables de entorno, la guardada o /members/", ("whoami",)),
     "attachment list": View("attachment list", NONE, NONE, query_misc.attachments, render_misc.render_attachments, {}, "siempre red: adjuntos del ticket",
                             ("attachment", "list")),
+    "report time": View("report time", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_time.query, render_time.render,
+                        {"person": "hours_author", "projects": "all", "order": "date,start_time,ticket"},
+                        "horas del autor en el periodo: sincronización por proyecto y periodo si falta o venció (5 min); --offline no toca la red", ("report", "time"),
+                        frozenset({"--track", "--worker-type"})),
+    "report flow": View("report flow", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_flow.query, render_flow.render,
+                        {"projects": "all", "order": "ticket"}, "tickets del alcance y las transiciones de los tickets del periodo que falten o hayan cambiado (1 GET por ticket)",
+                        ("report", "flow")),
+    "worklog check": View("worklog check", frozenset({"projects", "period"}), NONE, query_check.query, render_check.render, {"projects": "all", "order": "ticket,date,start_time"},
+                          "siempre red: auditoría de los comentarios de cada ticket con registros locales", ("worklog", "check")),
     "outbox list": View("outbox list", NONE, NONE, query_misc.outbox, render_misc.render_outbox, {"state": "open"}, "solo la cola local", ("outbox", "list"),
                         frozenset({"--all"})),
 }

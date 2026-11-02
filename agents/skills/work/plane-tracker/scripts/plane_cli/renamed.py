@@ -86,16 +86,31 @@ def _list(prefix, rest):
     return f"'list' no acepta texto posicional; usa: plane-tracker {shlex.join([*prefix, 'list', '--text', ' '.join(positional), *flags])}"
 
 
+def _period_flags(tokens):
+    """`--date X` -> `--from X`; `--today` desaparece (es el valor por defecto)."""
+    return ["--from=" + t.split("=", 1)[1] if t.startswith("--date=") else "--from" if t == "--date" else t for t in tokens if t != "--today"]
+
+
+def _period_hint(prefix, cmd, verb, rest):
+    """Pista cuando una vista de periodo usa los flags retirados `--date` o `--today`; None si no los usa."""
+    if not any(t in ("--date", "--today") or t.startswith("--date=") for t in rest):
+        return None
+    flag = next(t for t in rest if t in ("--date", "--today") or t.startswith("--date="))
+    return _retired(f"{cmd} {verb} {flag.split('=')[0]}", [*prefix, cmd, verb, *_period_flags(rest)])
+
+
 def _report(prefix, rest, verbs=()):
     """`report --check|--flow|--sync` -> `worklog check`, `report flow`, `report time --refresh`; con `report` como grupo, la vista es obligatoria."""
     if "--check" in rest:
-        kept = _drop(rest, {"--check": 0, "--flow": 0, "--sync": 0, "--refresh": 0, "--track": 1, "--worker-type": 1})
+        kept = _period_flags(_drop(rest, {"--check": 0, "--flow": 0, "--sync": 0, "--refresh": 0, "--track": 1, "--worker-type": 1}))
         return _retired("report --check", [*prefix, "worklog", "check", *kept])
     core = [t for t in rest if t != "--json"]
-    if verbs and core and (core[0] in verbs or core[0] in HELP_FLAGS):
+    if verbs and core and core[0] in verbs:
+        return _period_hint(prefix, "report", core[0], [t for t in rest if t != core[0]])
+    if verbs and core and core[0] in HELP_FLAGS:
         return None
     labels = [name for flag, name in (("--flow", "report --flow"), ("--sync", "--sync")) if flag in rest]
-    kept = ["--refresh" if t == "--sync" else t for t in rest if t != "--flow"]
+    kept = _period_flags(["--refresh" if t == "--sync" else t for t in rest if t != "--flow"])
     view = ["flow"] if "--flow" in rest else ["time"] if verbs else []
     if labels:
         return _retired(labels[0], [*prefix, "report", *view, *kept])
@@ -150,6 +165,8 @@ def _group(prefix, cmd, verbs, rest):
     if not core:
         return _missing_verb(prefix, cmd, verbs, [])
     first = core[0]
+    if first in verbs and cmd == "worklog" and first == "check":
+        return _period_hint(prefix, cmd, first, [t for t in rest if t != first])
     if first in verbs or first in HELP_FLAGS:
         return None
     hint = _focus(prefix, rest) if cmd == "focus" else None

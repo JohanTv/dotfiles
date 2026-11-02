@@ -68,7 +68,7 @@ class Coverage(Base):
         add_issue(self.fake, P3, 1, [full("07:00")])
         self.fake.data["issues_page_size"] = 7  # fuerza varias páginas por proyecto
         mark = len(self.fake.requests)
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         tickets = {r["ticket_id"] for r in self.rows("SELECT ticket_id FROM worklogs")}
         self.assertTrue({f"OMNIFY-{n}" for n in range(10, 32)} <= tickets, "los 22 tickets se sincronizaron, no solo los 15 más recientes")
         self.assertIn("LAB-1", tickets, "un proyecto fuera de la lista fija se sincroniza igual")
@@ -80,19 +80,21 @@ class Coverage(Base):
     def test_inaccessible_projects_are_not_queried(self):
         add_project(self.fake, P3, "HID", is_member=False)
         add_project(self.fake, P4, "OLD", archived_at="2026-01-01T00:00:00Z")
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         self.assertFalse([p for p in self.paths() if P3 in p or P4 in p])
         self.assertEqual({r["project_ident"] for r in self.rows("SELECT project_ident FROM worklog_sync")}, {"OMNIFY", "OPS"})
 
     def test_a_project_filter_must_be_an_accessible_project(self):
-        out, err = self.cli("report", "--date", DAY, "-p", "NOPE", "--json", code=1)
+        out, err = self.cli("report", "time", "--from", DAY, "-p", "NOPE", "--json", code=1)
         self.assertEqual(json.loads(out)["code"], "unknown_project")
 
     def test_the_rate_budget_stops_the_sync_and_marks_it_incomplete(self):
         self.fake.extra_headers = {"X-RateLimit-Remaining": "2", "X-RateLimit-Reset": "1793620800"}
-        out, err = self.cli("report", "--date", DAY, "--refresh")
+        out, err = self.cli("report", "time", "--from", DAY, "--refresh", "--json")
         self.assertIn("Sincronización parcial", err)
-        self.assertIn("La última sincronización quedó incompleta", err)
+        doc = json.loads(out)
+        self.assertEqual((doc["coverage"]["complete"], doc["coverage"]["detail"]["hours_verified"]), (False, False), "el reporte no se presenta como completo")
+        self.assertIn("hours_local_only", [n["code"] for n in doc["notes"]])
         self.assertFalse([p for p in self.paths() if "/comments/" in p], "no se gastó el presupuesto en comentarios")
         self.assertEqual({r["complete"] for r in self.rows("SELECT complete FROM worklog_sync")}, {0})
 
@@ -104,7 +106,7 @@ class Coverage(Base):
         while True:
             runs += 1
             self.fake.new_window()
-            self.cli("report", "--date", DAY)
+            self.cli("report", "time", "--from", DAY)
             marks = {r["project_ident"]: r["complete"] for r in self.rows("SELECT * FROM worklog_sync")}
             seen.append(len(self.rows("SELECT 1 FROM worklog_issue_sync")))
             if marks and all(marks.values()):
@@ -116,24 +118,24 @@ class Coverage(Base):
 
     def test_only_what_changed_is_read_again_and_refresh_reads_everything(self):
         add_issue(self.fake, gs.P1, 10, [full("08:00")])
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         self.sb.advance(10 * 60)
         mark = len(self.fake.requests)
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         self.assertFalse([p for p in self.paths(mark) if "/comments/" in p], "los tickets sin cambios no se vuelven a pedir")
         issue = self.fake.data["issues"][gs.P1][-1]
         issue["updated_at"] = "2026-10-21T09:00:00Z"
         self.sb.advance(10 * 60)
         mark = len(self.fake.requests)
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         self.assertEqual([p for p in self.paths(mark) if "/comments/" in p], [f"/api/v1/workspaces/ws/projects/{gs.P1}/issues/{issue['id']}/comments/"])
         mark = len(self.fake.requests)
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         self.assertGreater(len([p for p in self.paths(mark) if "/comments/" in p]), 1, "--refresh vuelve a leerlo todo")
 
     def test_a_failed_comment_read_leaves_that_project_incomplete(self):
         self.fake.fail = [("GET", r"/issues/%s/comments/$" % "10000000-0000-4000-8000-000000000001", 404, {"detail": "no"})]
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         marks = {r["project_ident"]: r["complete"] for r in self.rows("SELECT * FROM worklog_sync")}
         self.assertEqual((marks["OMNIFY"], marks["OPS"]), (0, 1))
 
@@ -145,39 +147,43 @@ class Freshness(Base):
         self.cli("comment", "add", "OMNIFY-1", "-m", "<p>local</p>" + block(date=DAY, start_time="18:00", end_time="19:00", duration_minutes=60, notes="local", track="loc"),
                  env_set=OFFLINE)
         self.assertEqual(len(self.rows("SELECT 1 FROM worklogs")), 1)
-        out, err = self.cli("report", "--date", DAY)  # sin --refresh
+        out, err = self.cli("report", "time", "--from", DAY)  # sin --refresh
         self.assertGreater(len(self.rows("SELECT 1 FROM worklogs")), 1, "los registros remotos aparecen sin necesidad de --refresh")
         self.assertIn("Avance del formulario", out)
 
     def test_a_fresh_complete_sync_is_not_repeated_until_the_cooldown_expires(self):
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         mark = len(self.fake.requests)
-        out, err = self.cli("report", "--date", DAY)
+        out, err = self.cli("report", "time", "--from", DAY)
         self.assertEqual(self.fake.requests[mark:], [], "dentro del enfriamiento no hay red")
         self.assertNotIn("⚠", err)
         self.sb.advance(10 * 60)
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         self.assertTrue([p for p in self.paths(mark) if "/issues/?" in p], "pasado el enfriamiento se vuelve a comparar con Plane (listado de tickets)")
         self.assertFalse([p for p in self.paths(mark) if "/comments/" in p], "pero los comentarios de lo que no cambió no se releen")
 
     def test_without_plane_the_report_says_the_period_was_never_synced(self):
-        out, err = self.cli("report", "--date", DAY, env_set=OFFLINE)
-        self.assertIn("se omite la sincronización", err)
-        self.assertIn("No se pudo comprobar qué proyectos cubre el reporte", err)
+        out, err = self.cli("report", "time", "--from", DAY, env_set=OFFLINE)
+        self.assertEqual(err, "")
+        self.assertIn("Las horas salen solo de la base local de esta máquina", out)
         self.cli("projects")  # con el catálogo local pero sin sincronizar las horas
-        out, err = self.cli("report", "--date", DAY, env_set=OFFLINE)
-        self.assertIn("Sin sincronizar con Plane para este periodo: OMNIFY, OPS", err)
+        out, err = self.cli("report", "time", "--from", DAY, "--json", env_set=OFFLINE)
+        doc = json.loads(out)
+        self.assertEqual((doc["scope"]["projects"], doc["coverage"]["complete"], doc["coverage"]["detail"]["hours_scope"]), (["OMNIFY", "OPS"], False, "local"))
+        self.assertEqual(self.fake.requests[-1][0] if self.fake.requests else "GET", "GET")
 
     def test_after_a_sync_without_plane_the_age_of_the_data_is_shown(self):
-        self.cli("report", "--date", DAY)
+        self.cli("report", "time", "--from", DAY)
         self.sb.advance(3 * 3600)
-        out, err = self.cli("report", "--date", DAY, env_set=OFFLINE)
-        self.assertIn("Horas sincronizadas con Plane hace 3 h", err)
+        out, err = self.cli("report", "time", "--from", DAY, "--json", env_set=OFFLINE)
+        doc = json.loads(out)
+        self.assertEqual((doc["coverage"]["stale"], doc["coverage"]["age_s"] >= 3 * 3600, doc["coverage"]["complete"]), (True, True, None))
+        self.assertIn("cache_stale", [n["code"] for n in doc["notes"]], "los datos vencidos que se sirven sin red lo dicen en las notas")
 
     def test_a_wider_period_is_not_covered_by_a_narrower_sync(self):
-        self.cli("report", "--date", "2026-11-02")  # el lunes de la semana en curso (el reloj de las pruebas está congelado ahí)
+        self.cli("report", "time", "--from", "2026-11-02")  # el lunes de la semana en curso (el reloj de las pruebas está congelado ahí)
         mark = len(self.fake.requests)
-        self.cli("report", "--week")
+        self.cli("report", "time", "--week")
         self.assertTrue([p for p in self.paths(mark) if "/issues/?" in p], "la semana no estaba cubierta por la sincronización del día")
 
 
@@ -188,7 +194,7 @@ class Provenance(Base):
         add_issue(self.fake, gs.P1, 40, [block(date=DAY, start_time="09:00", duration_minutes=30),          # sin fin, balde, fase, rol, notas
                                          block(date=DAY, notes="sin hora", duration_minutes=30),           # con fecha pero sin hora de inicio: no se puede ubicar
                                          "<p>**Sesión** | 14:00 - 14:30</p>"])                             # formato de tabla sin fecha: no se toma la del reloj
-        out, err = self.cli("report", "--date", DAY, "--refresh")
+        out, err = self.cli("report", "time", "--from", DAY, "--refresh")
         self.assertIn("2 comentario(s) con telemetría sin fecha u hora no se sincronizaron", err)
         rows = self.rows("SELECT * FROM worklogs WHERE ticket_id = 'OMNIFY-40'")
         self.assertEqual(len(rows), 1)
@@ -200,7 +206,7 @@ class Provenance(Base):
 
     def test_a_fully_declared_comment_has_nothing_defaulted(self):
         add_issue(self.fake, gs.P1, 43, [full("11:00")])
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         self.assertEqual({r["defaulted_json"] for r in self.rows("SELECT defaulted_json FROM worklogs WHERE ticket_id = 'OMNIFY-43'")}, {"[]"})
         self.assertEqual(json.loads(self.rows("SELECT defaulted_json FROM worklogs WHERE ticket_id = 'OMNIFY-1' LIMIT 1")[0]["defaulted_json"]), ["role"],
                          "el comentario de ejemplo no declara el rol: consta como no medido")
@@ -208,10 +214,10 @@ class Provenance(Base):
     def test_two_syncs_at_different_instants_give_identical_rows(self):
         add_issue(self.fake, gs.P1, 41, [block(date=DAY, start_time="10:00", duration_minutes=45)])
         columns = "ticket_id, track, date, start_time, end_time, duration_minutes, worker_type, capacity_bucket, phase, role, notes, created_at, author_id, defaulted_json"
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         first = self.rows(f"SELECT {columns} FROM worklogs ORDER BY ticket_id, track, date, start_time")
         self.sb.advance(5 * 3600)
-        self.cli("report", "--date", DAY, "--refresh")
+        self.cli("report", "time", "--from", DAY, "--refresh")
         self.assertEqual(self.rows(f"SELECT {columns} FROM worklogs ORDER BY ticket_id, track, date, start_time"), first)
 
     def test_comment_add_records_what_it_defaulted(self):

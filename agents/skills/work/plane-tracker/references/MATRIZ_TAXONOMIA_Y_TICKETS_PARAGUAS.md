@@ -97,7 +97,7 @@ Ambos viven en el proyecto **`OPS` (Operaciones)**, no en OMNIFY. El identifier 
      ```
    - `--duration` (minutos netos) es obligatorio. Si el hecho ocurrió **fuera de la conversación** del agente, el agente **pregunta** cuánto demoró antes de comentar; nunca estima.
 3. **Viernes 06:30 pm (Cierre):**
-   - Se ejecuta el balance con `plane-tracker report --week`.
+   - Se ejecuta el balance con `plane-tracker report time --week`.
    - Los dos paraguas se transicionan a `Completado`:
      ```bash
      plane-tracker update OPS-44 --state "Completado"

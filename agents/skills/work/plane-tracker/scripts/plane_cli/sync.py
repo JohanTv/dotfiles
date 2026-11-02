@@ -6,7 +6,7 @@ filtros de fecha), lee los comentarios solo de los tickets con actividad en el p
 incompleta. La marca de sincronización es por proyecto y periodo (tabla `worklog_sync`). Nada se inventa: sin fecha u hora medidas el comentario no entra (se cuenta); balde, fase,
 rol, tipo de trabajador, pista y notas que no vengan en el comentario se guardan con su procedencia (`defaulted_json`). Dos sincronizaciones del mismo comentario dan filas idénticas.
 La lectura de comentarios es incremental por ticket (`worklog_issue_sync`): un ticket cuyo `updated_at` no cambió desde la última lectura completa de sus comentarios no se vuelve a pedir, así
-una sincronización cortada por el presupuesto de tasa AVANZA en la siguiente y converge; `force=True` (`report --refresh`) relee todo. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina
+una sincronización cortada por el presupuesto de tasa AVANZA en la siguiente y converge; `force=True` (`report time --refresh`) relee todo. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina
 con un aviso y sin marcarlo.
 """
 
@@ -185,7 +185,7 @@ def _report(result):
     if result.unmeasured:
         sys.stderr.write(f"ℹ {result.unmeasured} comentario(s) con telemetría sin fecha u hora no se sincronizaron: no se derivan del reloj.\n")
     if result.incomplete:
-        sys.stderr.write(f"⚠ Sincronización parcial de {', '.join(sorted(result.incomplete))} (límite de peticiones o fallo de lectura): el reporte puede estar incompleto; reintenta con `report --refresh`.\n")
+        sys.stderr.write(f"⚠ Sincronización parcial de {', '.join(sorted(result.incomplete))} (límite de peticiones o fallo de lectura): el reporte puede estar incompleto; reintenta con `report time --refresh`.\n")
     elif result.synced:
         sys.stderr.write(f"✔ Se sincronizaron {result.synced} registros telemétricos en SQLite3.\n")
     else:
