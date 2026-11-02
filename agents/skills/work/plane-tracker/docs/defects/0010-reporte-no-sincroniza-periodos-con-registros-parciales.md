@@ -38,6 +38,10 @@ Lo que **no** se reconstruye desde Plane y vive solo en cada máquina: las marca
 - Un reporte nunca presenta como completo un periodo que no se ha comparado con Plane.
 - Si los datos locales no están al día, la primera línea del reporte lo dice y cómo corregirlo (`--refresh`).
 
+## Nota tras la validación con la API real
+
+La marca `sync:<workspace>` es global; la solución debe persistirla **por proyecto y periodo** (ver [0017](./0017-sincronizacion-de-worklogs-incompleta.md), cuyo diagnóstico se corrigió: `limit` no limita nada en la API). "Sincronizar por antigüedad independientemente de `has_entries`" solo es seguro si el sincronizador respeta el límite de tasa.
+
 ## Solución propuesta
 
 1. **Aviso (mínimo):** al imprimir el reporte, mostrar "datos locales sincronizados hace X" o "nunca sincronizado; usa `--refresh`" cuando no haya una sincronización reciente del periodo.

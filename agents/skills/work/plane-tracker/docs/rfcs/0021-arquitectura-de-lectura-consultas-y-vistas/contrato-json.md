@@ -44,7 +44,7 @@ Parte de [0021](./README.md) (versión 2). Lo que un agente puede asumir de cual
 | `coverage` | objeto | obligatorio. `complete`: `true`, `false` o `null` (**no verificado**, nunca equivale a completo). Regla de cálculo por vista en [`modelo-de-consulta.md`](./modelo-de-consulta.md). |
 | `notes` | lista | `{code, text, hint?}`; el agente ramifica por `code`. **Derivadas de la cobertura** (`notes_from`) más las propias de la vista (`extra_notes`). Orden: severidad y luego código. |
 
-Serialización: `ensure_ascii=False`, claves ordenadas, separadores compactos (decisión sobre compacto frente a indentado: ver README, decisión 2; se mide antes de afirmar ahorro). Mismo estado, reloj y zona horaria dan bytes idénticos.
+Serialización: `ensure_ascii=False`, claves ordenadas, separadores compactos (compacto frente a indentado: README, decisión 11, con la medición hecha: el indentado cuesta +36 %). Mismo estado, reloj y zona horaria dan bytes idénticos.
 
 **Notas informativas** (`info`) solo salen con `--verbose`; las de aviso (`warn`) siempre y llevan `hint` (el remedio como comando). Lo que ya va en `notes`/`coverage` **no se repite por stderr** en modo `--json`.
 
@@ -60,7 +60,7 @@ Un nombre por concepto, en inglés y minúsculas, igual en todas las vistas. La 
 | `uuid` | cadena | UUID del ticket; presente siempre en `get`, ausente en listas (se obtiene con `get`) | `id` |
 | `title` | cadena | título | `name` |
 | `state` | cadena | **nombre** del estado (`unknown` si la caché no lo conoce) | `state_name`; el UUID deja de exponerse |
-| `state_group` | cadena | `backlog`, `unstarted`, `started`, `completed`, `cancelled` | |
+| `state_group` | cadena | `backlog`, `unstarted`, `started`, `completed`, `cancelled`; `triage` puede aparecer (la API tiene `is_triage`) | |
 | `priority` | cadena | `urgent`, `high`, `medium`, `low`, `none` | |
 | `project` | cadena | identificador del proyecto | `project_id` |
 | `assignees` | lista | `{id, name}` asignados ahora | |
@@ -70,6 +70,8 @@ Un nombre por concepto, en inglés y minúsculas, igual en todas las vistas. La 
 | `created_at`, `completed_at`, `plane_updated_at` | ISO UTC | | |
 | `reasons` | lista | por qué entra en una selección de persona | |
 | `assignment_events` | lista | `{at, kind, user_id, user_name}` medidos | |
+
+**Filas breves** (propuesta, README decisión 11): `ticket`, `title`, `state`, `state_group`, `project`, sin UUID (`created_by`, `assignees[].id`) ni etiquetas ni fechas. Medidas: 336 tokens frente a 726 del sobre completo para 5 resultados; pensadas para el Momento Cero.
 
 `get` añade `description`, `comments` (`{id, author, created_at, text}`), `links` y `attachments`; no lleva `scope`.
 
@@ -107,6 +109,8 @@ Severidad (`info`, `warn`), origen y remedio. Agregar uno exige añadirlo aquí 
 | `truncated` | info | resultado | `count < total` | subir `--limit` o acotar el alcance |
 | `cache_stale` | warn | cobertura | se sirvió vencido porque Plane no respondió | reintentar con red o `--refresh` |
 | `source_unavailable` | warn | cobertura | proyectos sin datos ni caché | conectar y `--refresh` |
+| `source_forbidden` | warn | cobertura | proyectos a los que el usuario no tiene acceso (403) | revisar la membresía; se omiten |
+| `rate_budget_exhausted` | warn | cobertura | se detuvo antes de agotar el límite de tasa; resultado parcial | reintentar más tarde o `sync` |
 | `legacy_cache` | warn | cobertura | tickets sin datos de asignación (caché anterior) | conectar para renovarla |
 | `assignment_snapshot` | info | cobertura | la asignación es la de la última sincronización | `--refresh` |
 | `history_partial` | warn | cobertura | historial de asignación verificado en `a` de `b` | `sync --history` |

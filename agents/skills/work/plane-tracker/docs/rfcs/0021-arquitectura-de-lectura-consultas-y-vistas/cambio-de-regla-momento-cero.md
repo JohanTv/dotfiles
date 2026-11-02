@@ -26,7 +26,7 @@ No se edita `dist/` ni el archivo global a mano: se perdería en la siguiente re
 > El agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --json` para comprobar si ya existe un ticket (también cerrado o cancelado) en cualquier proyecto. Antes de concluir que no hay duplicado debe leer `coverage`: si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado **no prueba ausencia** y debe decirlo. Con coincidencias, leer `state` y `state_group` antes de decidir. La búsqueda cubre título y etiquetas (`coverage.detail.text_fields`), no la descripción.
 
 Cambios de fondo respecto al texto vigente:
-1. **El comando**: `list --text`, con `--all-projects` (un duplicado puede estar en otro proyecto) y `--limit 5` (el coste en tokens de una respuesta con filas completas es mayor que el de `search`; el límite lo acota. **Medir** los tokens reales de ambas respuestas antes de afirmar un ahorro o un sobrecoste).
+1. **El comando**: `list --text`, con `--all-projects` (un duplicado puede estar en otro proyecto) y `--limit 5` (el coste en tokens de una respuesta con filas completas es mayor que el de `search`; el límite lo acota. Medido: ver abajo).
 2. **"Abierto" sale del texto**: el estado por defecto es `all` para ver cerrados y cancelados.
 3. **Se exige leer la cobertura** (P5): hoy la regla diría "total 0 = no hay duplicado" aunque un proyecto no respondiera.
 4. **Se retira la promesa de "< 2 ms"**: es una medición que no se verifica en cada ejecución.
@@ -37,6 +37,12 @@ El bullet siguiente ("Acción Rápida": confirmar con el usuario y crear la rama
 ## Referencias reales a retirar (verificadas con `rg`)
 
 `plane-tracker search` aparece en **14 líneas de 6 archivos** del árbol de dotfiles (sin contar `.worktrees`): `rules/src/work.md` (1), `SKILL.md` (2) y, en `references/`, `GUIA_OPERATIVA_CLI_PLANE_TRACKER.md` (7), `ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md` (2), `PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md` (1) y `README.md` (1). Además hay **menciones sin el prefijo** que también deben revisarse: `ARCHITECTURE.md` (regla 1 y mapa de módulos), `scripts/plane_cli/__init__.py`, `cmd_read.py` (docstring), `GUIA_OPERATIVA` (tabla de nomenclatura) y `ARQUITECTURA_SISTEMA` (líneas de lectura).
+
+## Lo que la validación real cambió
+
+- **El comando objetivo falla hoy** en un workspace con proyectos sin acceso (403 aborta `list --all-projects`); la regla **solo puede cambiarse después de la fase 1**, que lo corrige ([`hechos-de-la-api.md`](./hechos-de-la-api.md)).
+- **Tokens medidos** (consulta real, 5 resultados): `search --json` actual 314; sobre completo compacto 726; sobre con filas breves 336. Por eso la regla pide `--limit 5` y se propone la **vista breve** (decisión 11 del README).
+- Existe un endpoint de Plane que busca por texto en todo el workspace en 1 GET (máximo 10 resultados, sin estado): sirve como primer filtro barato de una guarda en `create`, no como sustituto de `list --text`.
 
 ## Orden de ejecución (en la fase 2)
 

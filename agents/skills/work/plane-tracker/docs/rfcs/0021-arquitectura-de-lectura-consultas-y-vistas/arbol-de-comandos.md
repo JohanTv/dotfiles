@@ -37,7 +37,7 @@ La raíz conserva **18 entradas**: sale `search`, entra `sync`. El presupuesto d
 
 ## Matriz de dimensiones y controles por vista
 
-Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el contenido; los **controles** (`limit`, `refresh`, `offline`, `verbose`) no. `●` acepta, `○` fijada por la vista, `—` sin flag (argparse la rechaza).
+Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el contenido; los **controles** (`limit`, `refresh`, `offline`) no. `verbose` aplica a **todas** las vistas de lectura y no se repite en la matriz; `track` y `worker_type` son filtros de horas de `report time`. `●` acepta, `○` fijada por la vista, `—` sin flag (argparse la rechaza).
 
 | Vista | projects | person | period | state | text | limit | refresh | offline |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -47,9 +47,9 @@ Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el 
 | `worklog check` | ● | — | ● | — | — | — | — (siempre red) | — |
 
 - `-p` y `--all-projects` en **todas** las vistas que aceptan proyectos; el periodo es `--from/--to/--week` en todas las que lo aceptan. Los valores por defecto son por vista (`View.defaults`).
-- Se **retira `--all-authors`** (propuesta): el sync solo ingiere las horas propias, así que no hay datos de otros, y mostrarlos invertiría P2/P3. Las horas con autor nulo se **excluyen** de "mías" y se cuentan en la nota `hours_unsigned`.
-- Se retiran `--today` y `--date` (una sola forma de declarar el periodo) y, de `list`, `--refresh-history` y `--budget`. Los flags actuales `--track` y `--worker-type` de `report` se **conservan** como filtros de `report time` (la matriz los lista como dimensión `track` del registro de horas, no se pierden en silencio).
-- La validación de proyecto usa los catálogos cargados: no añade red a los reportes locales.
+- **No existe `--all-authors`** (ni en el código actual ni en este diseño): `sync` no ingiere horas de otras personas y verlas invertiría P2/P3. Las horas con autor nulo se **excluyen** de "mías" y se cuentan en la nota `hours_unsigned`; `sync` sin identidad conocida falla con `actor_unknown` en lugar de mezclar horas ajenas (hoy solo avisa).
+- Se retiran `--today` y `--date` (una sola forma de declarar el periodo) y, de `list`, `--refresh-history` y `--budget`. Los flags actuales `--track` y `--worker-type` de `report` se **conservan** como filtros de horas de `report time` (campos `track` y `worker_type` de `Scope`; solo esa vista los acepta).
+- La validación de proyecto usa los catálogos cargados: no añade red a los reportes locales. Con `--all-projects` el alcance son los proyectos **accesibles** (`is_member` y no archivados, según [`hechos-de-la-api.md`](./hechos-de-la-api.md)); un proyecto sin acceso no aborta la lectura.
 
 ## `list`: texto, orden y estado
 
@@ -77,4 +77,4 @@ Las **dimensiones** (`projects`, `person`, `period`, `state`, `text`) acotan el 
 
 ## Qué desaparece del código
 
-`cmd_search` y su atajo numérico, el camino API de `list` (`?limit=50`, imprime 15), `cached_issues()` y `LIST_LIMIT`, `list_filtered.py` (repartido en el modelo), el consejo de rama de la búsqueda, `add_period_args` en `cmd_report` (sube a `scope_flags`), las dos implementaciones del filtro `-p` de los reportes y `--all-authors`.
+`cmd_search` y su atajo numérico, el camino API de `list` (`?limit=50`, imprime 15), `cached_issues()` y `LIST_LIMIT`, `list_filtered.py` (repartido en el modelo), el consejo de rama de la búsqueda, `add_period_args` en `cmd_report` (sube a `scope_flags`), y las dos implementaciones del filtro `-p` de los reportes.

@@ -13,14 +13,14 @@ La versión elegida por el dueño es la **completa** (modelo con registro de vis
 | H01 | BLOQ | "La red solo entra por `freshness`; las consultas son puras" era falso: `resolve_scope`, miembros, actor, `report flow` y los worklogs usan red. | Corregido | modelo §Contrato de adquisición; `resolve_scope` pasa a recibir catálogos ya cargados |
 | H02 | BLOQ | `coverage.complete` sin regla de cálculo ni de fusión; con 0010/0017 abiertos sería siempre `null`. | Corregido | modelo §Cobertura (tabla por vista); F14; el plan hace de 0010/0017 un prerrequisito de `report time` |
 | H03 | BLOQ | Notas y cobertura duplicaban hechos; F13 por AST era frágil. | Corregido | las notas se **derivan** de la cobertura (`notes_from`); F13 se sustituye por validación del registro y F14 |
-| H04 | ALTO | `--all-authors` sin datos (el sync descarta lo ajeno); decisión 4 inconsistente entre documentos; `author_id` NULL. | Propuesta | se **retira** `--all-authors`; NULL se excluye de "mías" y se cuenta en `hours_unsigned`; README decisión 4 |
+| H04 | ALTO | `--all-authors` sin datos (el sync descarta lo ajeno); decisión 4 inconsistente entre documentos; `author_id` NULL. | Propuesta | se **retira** `--all-authors`; NULL se excluye de "mías" y se cuenta en `hours_unsigned`; README decisión 6 |
 | H05 | ALTO | El Momento Cero cuesta más tokens y la regla ignoraba `stale`/`unavailable`/`complete`. | Propuesta | cambio-de-regla (leer la cobertura, filas breves y límite propio); medir tokens antes de afirmar |
 | H06 | ALTO | `sync` fabrica valores por defecto (balde, fase, rol, horas) y el sobre los presentaría como medidos. | Aplazado | defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md); prerrequisito de `report time` |
 | H07 | ALTO | Vocabulario "cerrado" incompleto (flujo, comprobación, `get`, catálogos, códigos de `worklog check`). | Corregido | contrato §Vocabulario por familia; `scope` opcional en `get` |
 | H08 | ALTO | `agenda` necesita persona por fuente y datos que no existen (histórico de compromisos, nombres de estado); `Scope` sin `order`. | Corregido y aplazado | `Scope` con `ticket_person`, `hours_author` y `order`; `report agenda` **sale de este RFC**: la define [0005](../0005-vista-personal-agenda-y-backlog/README.md) sobre el modelo y sus datos (decisión 8 del README) |
 | H09 | ALTO | Fase 1 sin consumidor; validar `-p` con red rompe local-first; fase 2 demasiado ancha; fase 3 depende de H04/H06. | Corregido | plan-de-migracion (reordenado) |
 | H10 | ALTO | El criterio `grep` vacío era falso (los propios documentos citan el comando); había menciones sin prefijo; el conteo era 14 líneas en 6 archivos. | Corregido | cambio-de-regla y plan (criterio verificable y lista completa) |
-| H11 | ALTO | `renamed.py` falla (`KeyError`) con `report` como grupo; las pistas de flags no se traducen. | Corregido | plan fases 2b y 4 (tareas explícitas sobre `renamed.py`) |
+| H11 | ALTO | `renamed.py` falla (`KeyError`) con `report` como grupo; las pistas de flags no se traducen. | Corregido | plan fases 2 y 5 (tareas explícitas sobre `renamed.py`) |
 | H12 | ALTO | `list` sincroniza por TTL, contra "las lecturas responden con lo local". | Propuesta | enmienda propuesta del principio y flag `--offline` (arbol, principios) |
 | H13 | ALTO | Duplicar avisos en stderr y en `notes` cuesta el doble de tokens. | Corregido | contrato §stderr: en `--json` no se repite por stderr lo que va en `notes` |
 | H14 | MEDIO | `limit` indefinido para reportes; F5 no admite `local`; "5 dimensiones" frente a 7 columnas. | Corregido | arbol (dimensiones frente a controles); principios F5/F12 |
@@ -42,9 +42,33 @@ La versión elegida por el dueño es la **completa** (modelo con registro de vis
 | :--- | :--- |
 | `--text` como flag | **Cerrada** (el dueño). |
 | Versión completa del modelo | **Cerrada** (el dueño). |
-| Cambiar la regla externa "Momento Cero" y dejarlo mapeado | **Cerrada**; se ejecuta en la fase 2b. |
+| Cambiar la regla externa "Momento Cero" y dejarlo mapeado | **Cerrada**; se ejecuta en la fase 2. |
 | Decisiones 4 a 11 del README (H01-H05, H12, `agenda`, Momento Cero, tokens) | **Propuesta** de esta versión; pendientes de la validación contra el código y la API real y de la confirmación del dueño. |
 
 ## Alternativas que el revisor añadió
 
 Registradas en [`alternativas.md`](./alternativas.md): abstracción mínima con pruebas de aptitud (descartada por decisión del dueño), mover la guarda de duplicados a `create`, salida columnar o por líneas, modo conciso y detallado.
+
+## Validación contra el código y la API real (2026-11-02)
+
+Una segunda revisión independiente contrastó la versión 2 con el código y con la API real de Plane (solo GET, unas 115 peticiones; sin escrituras). Veredicto: **confirmar con cambios**. Los hechos observados están en [`hechos-de-la-api.md`](./hechos-de-la-api.md). Las decisiones 4 a 10 del README resultaron **confirmadas con cambios** (los cambios están aplicados).
+
+| Id | Sev. | Hallazgo | Estado | Dónde se atiende |
+| :--- | :---: | :--- | :--- | :--- |
+| V1 | BLOQ | `list --all-projects` falla hoy: un 403 de un proyecto sin acceso termina el programa (`fail_http`); la premisa "un proyecto caído no aborta el resto" era falsa. | Corregido | defecto [0023](../../defects/0023-una-lectura-con-403-termina-el-programa.md); modelo §Frescura (alcance por `is_member`, `source_forbidden`); plan fase 1; regla de Momento Cero (solo tras la fase 1) |
+| V2 | ALTO | La API ignora `limit` y todo filtro de servidor; los filtros de persona y fecha son locales; sin sincronización incremental por filtro. | Corregido | hechos-de-la-api; modelo §Contrato de adquisición |
+| V3 | ALTO | Defecto 0017 mal diagnosticado: `limit=15` no hace nada; la causa es la lista fija de proyectos y una lectura de comentarios por ticket. | Corregido | defecto 0017 reescrito; plan fase 4 |
+| V4 | ALTO | `complete` de `list` no puede calcularse con el TTL: falta guardar `total_count` por proyecto, que la API entrega y el código descarta. | Corregido | modelo §Cobertura; plan fase 1 |
+| V5 | ALTO | `--all-authors` **no existe** en el código; los documentos lo describían como existente. | Corregido | README decisión 6, árbol, plan, principios |
+| V6 | ALTO | `report flow --offline` no es viable sin reescribir `build_ticket_flow` (necesita `resolve_issue` y comentarios por red). | Corregido | modelo §Contrato de adquisición; plan fase 5 |
+| V7 | ALTO | `get`/`resolve_issue` recorre el listado paginado del proyecto; existe el endpoint por identificador (1 GET). | Corregido | modelo; plan fase 3; defecto [0024](../../defects/0024-las-lecturas-piden-mas-datos-de-los-que-usan.md) |
+| V8 | ALTO | Límite de tasa de unas 60 peticiones por ventana, con cabeceras que `api.py` descarta; una lectura en frío cuesta `3N + 1` GET. | Corregido | modelo (presupuesto de tasa); plan fase 1; nota `rate_budget_exhausted` |
+| V9 | MEDIO | `renamed.py`: con `report` como grupo, `_report` queda inalcanzable y varias entradas lanzan `KeyError`; no basta añadir `EXAMPLES`. | Corregido | plan fases 2 y 5 |
+| V10 | MEDIO | `sync.sync_remote_worklogs` (149 líneas) y `db.init_db` (148) están al borde del tope de 150; cualquier columna nueva los rompe. | Corregido | plan fases 0 y 4 |
+| V11 | MEDIO | El sobre completo cuesta 2,3x en tokens que `search --json` (726 frente a 314); las filas breves cuestan 336. | Corregido | README decisión 11; contrato (filas breves); regla de Momento Cero |
+| V12 | MEDIO | Numeración de decisiones y fases inconsistente entre documentos; la matriz no incluía `track` ni `worker_type`; `get` no sabía si los comentarios estaban completos; `triage` ausente del contrato. | Corregido | README, alternativas, contrato, árbol, modelo |
+| V13 | BAJO | Constantes de instancia en el código público (`sync.py`, `cli.py`, `db.py`): `Scope` depende del "proyecto por defecto". | Aplazado | defecto 0009; modelo (`catalogs` lee la configuración) |
+| V14 | BAJO | "53 `sys.exit` en 16 archivos" vale para `scripts/plane_cli/` (54 en 17 con `docs_index.py`). | Corregido | modelo §Errores (acotado a `scripts/plane_cli/`) |
+
+Sin verificar aún (ver [`hechos-de-la-api.md`](./hechos-de-la-api.md)): que reasignar solo actualice `updated_at`, el máximo de `per_page` y la paginación real con muchos comentarios.
+

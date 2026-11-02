@@ -11,13 +11,14 @@ summary: Un modelo común (alcance, cobertura, almacenes, consultas, vistas y so
 - **Área:** todos los comandos de lectura (`list`, `search`, `get`, `report*`, `worklog check`, `labels`, `projects`, `whoami`), el contrato de salida y de errores de toda la herramienta, y la regla externa que cita `plane-tracker search`.
 - **Principios:** [`principles.md`](../../principles.md). Cómo se hacen cumplir: [`principios-y-pruebas.md`](./principios-y-pruebas.md).
 - **Contexto de uso:** la herramienta no está en producción ni se comparte; se puede romper compatibilidad. El usuario principal es un agente de IA, así que pesan la economía de tokens, los nombres inequívocos, la salida predecible y los errores con pista de corrección.
-- **Versión:** 2. La primera versión se sometió a una [revisión adversarial](./revision-adversarial.md) (3 bloqueantes, 25 hallazgos); esta versión los atiende. Está además pendiente una **validación contra el código y la API real de Plane** (ver más abajo).
+- **Versión:** 2. La primera versión se sometió a una [revisión adversarial](./revision-adversarial.md) (3 bloqueantes, 25 hallazgos) y la segunda a una **validación contra el código y la API real de Plane** (solo lectura; resultados en [`hechos-de-la-api.md`](./hechos-de-la-api.md) y en el registro de la revisión, que añade 12 hallazgos más).
 - **Alcance elegido por el dueño:** el modelo **completo** (registro de vistas, almacenes y consultas separados, render por vista, pruebas de aptitud y contrato de errores universal).
 
 ## Documentos de esta carpeta
 
 | Documento | Contenido |
 | :--- | :--- |
+| [`hechos-de-la-api.md`](./hechos-de-la-api.md) | Lo que la API real devuelve y no devuelve (paginación, filtros ignorados, límite de tasa, 403), verificado con GET. |
 | [`modelo-de-consulta.md`](./modelo-de-consulta.md) | Las piezas, el **contrato de adquisición**, la regla de cobertura por vista, los invariantes y las capas. |
 | [`contrato-json.md`](./contrato-json.md) | Esquema `plane-tracker/1`: sobre, vocabulario por familia, registro de notas y de errores, códigos de salida, evolución. |
 | [`arbol-de-comandos.md`](./arbol-de-comandos.md) | Árbol objetivo, matriz de dimensiones y controles por vista, qué comandos usan el sobre, `sync`. |
@@ -34,7 +35,8 @@ summary: Un modelo común (alcance, cobertura, almacenes, consultas, vistas y so
 3. **La cobertura solo va por stderr.** Un agente que lee `--json` no ve los avisos de antigüedad ni de datos parciales: P5 depende de que alguien lea stderr.
 4. **La reportería no comparte nada.** `report -p`, `report flow -p` y `worklog check -p` filtran de dos maneras distintas y ninguna valida el proyecto; el periodo no es reutilizable por un comando nuevo (regla de capas).
 5. **`search` tiene defectos propios:** el atajo numérico ignora el prefijo del proyecto, trunca a 5 sin decir cuántos había, y mezcla prosa imperativa con datos.
-6. **La sincronización fabrica datos** (defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md)) y es parcial ([0010](../../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md), [0017](../../defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md)): un reporte robusto necesita arreglarlos primero (fase 4 del plan).
+6. **La API ignora `limit` y todos los filtros de servidor del listado** (hechos verificados): las vistas de persona y fecha son siempre locales, y `list --all-projects` falla hoy con 403 en un workspace con proyectos sin acceso.
+7. **La sincronización fabrica datos** (defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md)) y es parcial ([0010](../../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md), [0017](../../defects/0017-sincronizacion-de-worklogs-incompleta.md)): un reporte robusto necesita arreglarlos primero (fase 4 del plan).
 
 ## Decisión propuesta
 
@@ -60,14 +62,14 @@ Construir **desde ya** un modelo robusto, no tres funciones sueltas, porque la d
 | 3 | Cambiar la regla externa y dejarlo mapeado | **Cerrada** (dueño) | Mapeado; se ejecuta en la fase 2 con la redacción confirmada. |
 | 4 | Modelo de adquisición | Propuesta | Tabla "vista → qué refresca"; `resolve_scope` puro; `report flow` declara `source: mixed`. |
 | 5 | Regla de `complete` | Propuesta | Tabla por vista; notas derivadas; `complete=true` imposible con una nota `warn`. |
-| 6 | `--all-authors` | Propuesta | Retirado (no hay datos y choca con P2/P3); horas con autor nulo excluidas de "mías" y contadas aparte. |
+| 6 | Horas de otras personas | Propuesta | **No existe** un flag `--all-authors` en el código ni se crea (no hay datos de otros y chocaría con P2/P3). Horas con autor nulo, excluidas de "mías" y contadas aparte; `sync` sin identidad deja de mezclar horas ajenas (error `actor_unknown`, hoy solo un aviso). |
 | 7 | Valores por defecto inventados por `sync` | Propuesta | Registrado como defecto [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md); prerrequisito de `report time`. |
 | 8 | `report agenda` | Propuesta | Fuera de este RFC: la define 0005 sobre este modelo. |
 | 9 | Local-first | Propuesta | Enmienda "TTL con degradación" y `--offline`; `principles.md` no se modifica hasta confirmarlo. |
-| 10 | Regla de Momento Cero | Propuesta | `--limit 5`, leer `coverage` antes de concluir "no hay duplicado", medir tokens antes de afirmar ahorros; evaluar `create --check`. |
-| 11 | JSON compacto o indentado; límite por defecto (20); modo conciso | Abierta | **Medir** tokens reales antes de decidir. |
+| 10 | Regla de Momento Cero | Propuesta | `--limit 5`, leer `coverage` antes de concluir "no hay duplicado"; **depende de la fase 1** (hoy `--all-projects` falla con 403). Evaluar `create --check`. |
+| 11 | JSON compacto o indentado; límite por defecto (20); filas breves | Abierta, con medición | Medido: `search --json` actual 314 tokens; sobre completo compacto **726** (2,3x); sobre indentado 989 (+36 %); filas breves compactas **336** (1,07x). Recomendación: compacto, sin UUID en filas breves y vista breve para el Momento Cero. |
 
-Las propuestas (4 a 10) son las que la validación contra el código y la API real debe contrastar antes de darse por cerradas.
+Las propuestas (4 a 10) fueron contrastadas con el código y la API real: **confirmadas con cambios** (los cambios están aplicados en esta versión). Siguen pendientes de la confirmación del dueño.
 
 ## Criterios de aceptación globales
 
@@ -78,4 +80,4 @@ Las propuestas (4 a 10) son las que la validación contra el código y la API re
 
 ## Relacionado
 
-[0005](../0005-vista-personal-agenda-y-backlog/README.md) (`agenda` se construye sobre este modelo), [0019](../../decisions/0019-filtros-de-persona-y-historial-de-asignacion.md) (filtros, cobertura de historial y autoría, que este RFC generaliza), [0017](../../defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md), [0010](../../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) y [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md) (datos de las horas), [0018](../../decisions/0018-eliminar-tickets-sin-destruir-horas.md) (patrón de falla cerrada).
+[0005](../0005-vista-personal-agenda-y-backlog/README.md) (`agenda` se construye sobre este modelo), [0019](../../decisions/0019-filtros-de-persona-y-historial-de-asignacion.md) (filtros, cobertura de historial y autoría, que este RFC generaliza), [0017](../../defects/0017-sincronizacion-de-worklogs-incompleta.md), [0010](../../defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) y [0022](../../defects/0022-sync-presenta-valores-por-defecto-como-medidos.md) (datos de las horas), [0018](../../decisions/0018-eliminar-tickets-sin-destruir-horas.md) (patrón de falla cerrada).

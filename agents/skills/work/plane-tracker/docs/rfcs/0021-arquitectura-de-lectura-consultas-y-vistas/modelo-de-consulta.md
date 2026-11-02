@@ -1,6 +1,6 @@
 # Modelo de consulta
 
-Parte de [0021](./README.md) (versión 2, tras la [revisión adversarial](./revision-adversarial.md)). Define las piezas, sus contratos, los invariantes y dónde viven en las capas de [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
+Parte de [0021](./README.md) (versión 2, tras la [revisión adversarial](./revision-adversarial.md) y la validación con la API real: [`hechos-de-la-api.md`](./hechos-de-la-api.md)). Define las piezas, sus contratos, los invariantes y dónde viven en las capas de [`ARCHITECTURE.md`](../../../ARCHITECTURE.md).
 
 ## Flujo
 
@@ -26,12 +26,16 @@ Toda la red de una lectura sale de `freshness` y es **solo GET**. Cada vista dec
 
 | Vista | `freshness` refresca | Política | Red adicional | `coverage.source` |
 | :--- | :--- | :--- | :--- | :--- |
-| `list` | tickets de los proyectos del alcance; proyectos, estados, etiquetas y miembros si faltan | TTL de tickets 30 min, de catálogos 1 día; `--refresh` fuerza; `--offline` no refresca nada | ninguna | `cache` |
+| `list` | tickets de los proyectos **accesibles** del alcance (`per_page=100` y `fields=` sin descripción); proyectos, estados, etiquetas y miembros si faltan | TTL de tickets 30 min, de catálogos 1 día; `--refresh` fuerza; `--offline` no refresca nada; se guarda `total_count` por proyecto | ninguna | `cache` |
 | `report time` | los worklogs del periodo y de los proyectos del alcance | marca de sincronización **por proyecto y periodo** (hoy es global: defectos 0010/0017) | ninguna | `local` (`cache` si sincronizó) |
-| `report flow` | las transiciones de los tickets del alcance que falten o hayan cambiado | incremental por `plane_updated_at`; `--offline` usa solo lo almacenado | 1 GET de actividades por ticket pendiente | `mixed` |
+| `report flow` | las transiciones de los tickets del alcance que falten o hayan cambiado | incremental por `plane_updated_at`; **`--offline` solo es viable cuando `query_flow` lee `issues_cache` y `state_transitions` y trata los comentarios como opcionales** (hoy `build_ticket_flow` exige `resolve_issue` y comentarios por red: fase 5) | 1 GET de actividades por ticket pendiente y, mientras no se cambie, estados y comentarios | `mixed` |
 | `report agenda` (la define [0005](../0005-vista-personal-agenda-y-backlog/README.md)) | tickets y worklogs (como `list` y `report time`) | las de ambos | ninguna | `mixed` |
-| `worklog check` | **es una auditoría contra Plane**: compara filas locales con los comentarios | siempre red | 1 GET de comentarios por ticket | `api`; queda **fuera** de F5 (documentado) |
-| `get` | el ticket y sus comentarios | API por diseño; instantánea local de respaldo | 1 a 2 GET | `api` o `snapshot` |
+| `worklog check` | **es una auditoría contra Plane**: compara filas locales con los comentarios | siempre red | por ticket: resolución del ticket y sus comentarios | `api`; queda **fuera** de F5 (documentado) |
+| `get` | el ticket y sus comentarios | API por diseño; instantánea local de respaldo | el ticket por su identificador (`GET workspaces/{ws}/issues/{PRJ}-{n}/`, 1 GET; hoy `resolve_issue` recorre el listado paginado), estados y comentarios con `per_page` | `api` o `snapshot` |
+
+**Presupuesto de tasa.** La API responde con `X-RateLimit-Remaining` y `X-RateLimit-Reset` y admite unas 60 peticiones por ventana; `api.py` debe **exponer** esas cabeceras y `freshness` detenerse con cobertura parcial (nota `rate_budget_exhausted`) antes de agotarlas. Una lectura en frío cuesta `3N + 1` GET para `N` proyectos accesibles.
+
+**No hay filtros de servidor** (la API ignora `assignees`, `created_by`, estado y fecha): todo filtro de persona, estado o fecha es local; la sincronización incremental usa `order_by=-updated_at` con corte local.
 
 `--offline` (control de toda vista de caché) impide cualquier GET y devuelve lo local con su cobertura; sin él, un fallo de red degrada a lo local con `stale: true` en vez de fallar.
 
@@ -54,6 +58,8 @@ class Scope:
     limit: int | None                     # None en vistas de reporte
     offline: bool
     refresh: bool
+    track: str | None                     # filtro de horas (solo `report time`)
+    worker_type: str | None               # filtro de horas (solo `report time`)
 ```
 - **Dimensiones** del alcance: `projects`, `person`, `period`, `state`, `text`. **Controles**: `limit`, `refresh`, `offline`, `verbose`. La matriz de [`arbol-de-comandos.md`](./arbol-de-comandos.md) usa estos dos grupos.
 - `person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas): `agenda` necesita ambos a la vez.
@@ -78,11 +84,11 @@ class Coverage:
 
 | Vista | `True` si... | `False` si... | `None` si... |
 | :--- | :--- | :--- | :--- |
-| `list` | todos los proyectos del alcance están dentro del TTL (o recién sincronizados), sin `legacy` ni `capped` | algún proyecto `unavailable` o `capped` | se sirvió vencido, o hay `legacy` (tickets sin datos de asignación) con filtro de persona |
+| `list` | para cada proyecto, los tickets en caché son **todos** los del servidor (`COUNT(*)` = `total_count` guardado en la última sincronización) dentro del TTL, sin `legacy` ni `capped` | algún proyecto `unavailable`, `forbidden` o `capped`, o el recuento no coincide | se sirvió vencido, o hay `legacy` (tickets sin datos de asignación) con filtro de persona |
 | `report time` | la sincronización de horas está verificada para cada proyecto del alcance y todo el periodo | hay periodo o proyecto sin sincronizar | no se puede saber (marca global: hoy, siempre) |
 | `report flow` | todos los tickets del alcance tienen transiciones al día (`plane_updated_at` igual) | faltan transiciones de algún ticket (`detail.history`) | — |
 | `report agenda` (0005) | las dos fuentes son `True` | alguna es `False` | alguna es `None` |
-| `get` | `source` = `api` | — | `source` = `snapshot` |
+| `get` | `source` = `api` **y** los comentarios se leyeron completos | — | `source` = `snapshot`, o los comentarios no se pudieron leer |
 
 `Coverage.merge(*parts)`: `as_of` el más antiguo; `source` `mixed` si difieren; `complete` es `False` si alguna parte lo es, `None` si alguna es desconocida, `True` solo si todas lo son. Invariante **F14**: `complete: true` es **imposible** si hay una nota de severidad `warn`.
 
@@ -93,8 +99,8 @@ Las notas **no se escriben a mano**: `notes_from(coverage, scope, result)` las d
 Repositorios **de solo lectura** sobre SQLite. Cada método devuelve filas ya en el vocabulario y su `Coverage`. Sin red ni `print`. Reemplazan los SQL sueltos de los `cmd_*`.
 
 ### 6. Frescura (`freshness.py`)
-- `catalogs(conn, env, offline) -> Catalogs`: proyectos, estados, etiquetas, miembros y actor; lee SQLite y hace GET solo si vencieron (con degradación a lo almacenado).
-- `ensure(conn, env, view, scope) -> Coverage`: aplica el contrato de adquisición de la vista. Cada proyecto se trata por separado: uno caído no aborta el resto; sin ninguno disponible, error `no_cache`.
+- `catalogs(conn, env, offline) -> Catalogs`: proyectos, estados, etiquetas, miembros y actor (el proyecto por defecto sale de la configuración, no de constantes de instancia: defecto [0009](../../defects/0009-saneamiento-pendiente-de-datos-de-instancia.md)); lee SQLite y hace GET solo si vencieron (con degradación a lo almacenado).
+- `ensure(conn, env, view, scope) -> Coverage`: aplica el contrato de adquisición de la vista. Cada proyecto se trata por separado: uno caído o **sin acceso (403)** no aborta el resto y se registra en `coverage.unavailable` (nota `source_unavailable` o `source_forbidden`); sin ninguno disponible, error `no_cache`. **Hoy no es así**: `fail_http` termina el programa con un 403 (defecto [0023](../../defects/0023-una-lectura-con-403-termina-el-programa.md)); los lectores de red usan `raise_on_error` y traducen el error a cobertura. `Catalogs.projects` solo incluye los proyectos con `is_member` y no archivados.
 - Los sincronizadores de `cache` y `sync` **devuelven estado** `(estado, as_of)` y persisten por proyecto si el resultado fue truncado (`capped`) o servido vencido, para que una lectura posterior pueda emitir la nota desde la caché.
 - **Es la única vía a la red de las vistas** y solo emite GET (F6).
 

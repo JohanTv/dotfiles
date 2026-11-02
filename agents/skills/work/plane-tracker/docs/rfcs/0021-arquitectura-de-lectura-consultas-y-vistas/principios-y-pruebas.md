@@ -7,7 +7,7 @@ Parte de [0021](./README.md) (versión 2). Un principio que solo vive en un docu
 | Principio ([`principles.md`](../../principles.md)) | Mecanismo en el modelo | Pruebas |
 | :--- | :--- | :--- |
 | **P1** visibilidad del trabajo invisible | `report time` agrega por balde de capacidad (`summary.by_capacity`, con `undeclared` aparte) junto al trabajo de ingeniería; toda fila de horas lleva `capacity`. | F10 |
-| **P2** autonomía: nada se envía ni se estima | Las lecturas son solo GET y nunca escriben en Plane; ninguna vista calcula una duración que no se midió; `--all-authors` se retira. | F6 |
+| **P2** autonomía: nada se envía ni se estima | Las lecturas son solo GET y nunca escriben en Plane; ninguna vista calcula una duración que no se midió; no existe forma de ver horas de otras personas. | F6 |
 | **P3** datos para quien trabaja | Alcance por defecto de las vistas personales: **el actor**; el sobre incluye lo necesario para decidir (estado, prioridad, fechas, razones). | F11 |
 | **P4** carga cognitiva | Una sola vista de tickets; límite por defecto con `total` visible; salida compacta; notas informativas solo con `--verbose`; sin prosa imperativa en los datos; sin duplicar avisos por stderr. | F12 |
 | **P5** gestión de expectativas / no afirmar lo no medido | `Coverage` obligatoria con completitud de tres valores y regla por vista; notas derivadas; el sobre declara el alcance resuelto y qué campos cubre la búsqueda; lo por defecto no se presenta como medido. | F3, F4, F8, F13, F14 |
@@ -44,5 +44,5 @@ Además se mantienen: presupuesto de ayuda (280 tokens, **medido** en cada fase 
 ## Qué estas pruebas NO garantizan
 
 - Que el **contenido** de un dato sea correcto (lo cubren los golden y la revisión de cada vista).
-- Que Plane devuelva lo que se supone (asignados, forma de los eventos, paginación, `updated_at` al reasignar): sigue **por verificar contra una instancia real** y cada fase lo declara; la validación con la API real está registrada en el README.
+- Que Plane devuelva lo que se supone (asignados, forma de los eventos, paginación, `updated_at` al reasignar): sigue **por verificar contra una instancia real** y cada fase lo declara; los hechos observados con la API real están en [`hechos-de-la-api.md`](./hechos-de-la-api.md).
 - Que el ahorro de tokens sea real: se **mide** antes de afirmarlo.

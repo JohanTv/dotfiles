@@ -9,7 +9,7 @@ summary: "`sync` rellena balde, fase, rol y horas con valores por defecto cuando
 # 0022 · La sincronización presenta valores por defecto como si estuvieran medidos
 
 - **Área:** `scripts/plane_cli/sync.py` (construcción de la fila de `worklogs`), `worklog.upsert_worklog`, `cache.sync_issues_cache`.
-- **Relacionado:** principio "no afirmar lo que no se midió" ([`principles.md`](../principles.md)), [0017](./0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md), RFC [0021](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) (prerrequisito de `report time`).
+- **Relacionado:** principio "no afirmar lo que no se midió" ([`principles.md`](../principles.md)), [0017](./0017-sincronizacion-de-worklogs-incompleta.md), RFC [0021](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) (prerrequisito de `report time`).
 
 ## Síntoma (verificado en el código)
 
@@ -17,9 +17,12 @@ Al reconstruir un worklog desde un comentario cuya telemetría es parcial, `sync
 
 - `capacity_bucket` → `deep_work`, `phase` → `dev`, `role` → `backend_engineer`, `worker_type` → `human`, `track` → `main`.
 - `date`, `start_time` y `end_time` → derivados de la hora actual y de la duración (el instante de la sincronización, no el del trabajo).
+- `notes` → el título del ticket cuando el comentario no trae notas (otro campo "medido" fabricado).
 - Estado desconocido de un ticket (`cache.sync_issues_cache`) → `("Pendiente", "unstarted")`.
 
 Consecuencias: un reporte agrupado por balde de capacidad atribuye a `deep_work` horas cuyo balde nunca se declaró; las fechas dependen de cuándo se sincronizó (la sincronización deja de ser determinista); y un ticket en un estado que la caché no conoce parece pendiente.
+
+`sync_remote_worklogs` mide 149 de 150 líneas permitidas: el arreglo exige partirla antes.
 
 ## Comportamiento esperado
 
