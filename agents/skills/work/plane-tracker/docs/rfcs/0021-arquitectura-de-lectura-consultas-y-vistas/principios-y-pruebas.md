@@ -1,42 +1,48 @@
 # Principios, mecanismos y pruebas de arquitectura
 
-Parte de [0021](./README.md). Un principio que solo vive en un documento se erosiona; aquí cada uno se convierte en un mecanismo del modelo y en una **función de aptitud** (prueba que falla si se viola). Las pruebas viven en `tests/test_architecture.py` y se escriben **antes** que los módulos que vigilan (en rojo o saltadas con motivo) para que cada fase las vaya activando.
+Parte de [0021](./README.md) (versión 2). Un principio que solo vive en un documento se erosiona; aquí cada uno se convierte en un mecanismo del modelo y en una **función de aptitud** (prueba que falla si se viola). Las pruebas viven en `tests/test_architecture.py`, se escriben **antes** que los módulos que vigilan y un **trinquete** (F15) impide que una prueba de una fase ya cerrada siga saltada.
 
 ## De principio a mecanismo
 
-| Principio ([`principles.md`](../../principles.md)) | Mecanismo en el modelo | Prueba |
+| Principio ([`principles.md`](../../principles.md)) | Mecanismo en el modelo | Pruebas |
 | :--- | :--- | :--- |
-| **P1** visibilidad del trabajo invisible | `report time` agrega por balde de capacidad (`summary.by_capacity`) junto al trabajo de ingeniería, y `report agenda` muestra el trabajo invisible de la semana. El vocabulario incluye `capacity` en toda fila de horas. | F10 |
-| **P2** autonomía: nada se envía ni se estima | Las lecturas son solo GET y nunca escriben en Plane; ninguna vista calcula una duración que no se midió. | F6 |
-| **P3** datos para quien trabaja | El alcance por defecto de las vistas personales es **el actor** (`report time`, `agenda`); ver lo ajeno es un flag explícito. Todo sobre incluye lo que hace falta para decidir (estado, prioridad, fechas, razones). | F11 |
-| **P4** carga cognitiva | Una sola vista de tickets (menos decisiones del agente); límite por defecto con `total` siempre visible; salida compacta; sin prosa imperativa en los datos. | F12 |
-| **P5** gestión de expectativas / no afirmar lo no medido | `Coverage` obligatoria con completitud de tres valores; notas con código; el sobre declara el alcance resuelto y los campos que la búsqueda cubre. | F3, F4, F8 |
-| **Local-first** | Las vistas solo leen la caché; la red es `freshness` (GET de sincronización) y `get`/`sync`. | F5, F6 |
-| **Una sola fuente de verdad** | El vocabulario es la única definición de un campo; el texto es un render del sobre; Plane sigue siendo la fuente del ticket y la caché declara su antigüedad. | F1, F9 |
-| **No afirmar lo que no se midió** | `complete: null` se renderiza como "no verificado", nunca como completo; `hours_local_only`/`history_partial` son notas, no texto libre. | F8, F13 |
+| **P1** visibilidad del trabajo invisible | `report time` agrega por balde de capacidad (`summary.by_capacity`, con `undeclared` aparte) junto al trabajo de ingeniería; toda fila de horas lleva `capacity`. | F10 |
+| **P2** autonomía: nada se envía ni se estima | Las lecturas son solo GET y nunca escriben en Plane; ninguna vista calcula una duración que no se midió; `--all-authors` se retira. | F6 |
+| **P3** datos para quien trabaja | Alcance por defecto de las vistas personales: **el actor**; el sobre incluye lo necesario para decidir (estado, prioridad, fechas, razones). | F11 |
+| **P4** carga cognitiva | Una sola vista de tickets; límite por defecto con `total` visible; salida compacta; notas informativas solo con `--verbose`; sin prosa imperativa en los datos; sin duplicar avisos por stderr. | F12 |
+| **P5** gestión de expectativas / no afirmar lo no medido | `Coverage` obligatoria con completitud de tres valores y regla por vista; notas derivadas; el sobre declara el alcance resuelto y qué campos cubre la búsqueda; lo por defecto no se presenta como medido. | F3, F4, F8, F13, F14 |
+| **Local-first** | Las vistas de caché leen SQLite; la red es `freshness` (GET con TTL y degradación) y `get`/`sync`; `--offline` la corta. | F5, F6 |
+| **Una sola fuente de verdad** | Vocabulario único; el texto es un render del sobre; las notas se derivan de la cobertura. | F1, F9, F13 |
+| **No afirmar lo que no se midió** | `complete: null` se renderiza como "no verificado"; `hours_local_only`, `history_partial` y `hours_defaulted` son notas registradas. | F8, F14 |
+
+### Enmienda propuesta al principio local-first (pendiente de confirmación del dueño)
+
+Redacción vigente: "las lecturas responden con lo local y avisan su antigüedad; la red es para publicar". El modelo la **precisa**, no la contradice: *"las lecturas responden con lo local; pueden refrescarlo por TTL con un GET y degradan a lo almacenado, avisando su antigüedad, si la red falla; `--offline` las limita a lo local; la red de escritura es para publicar"*. Hasta que el dueño la confirme, `principles.md` **no se modifica**.
 
 ## Funciones de aptitud
 
 | ID | Qué comprueba | Cómo |
 | :--- | :--- | :--- |
-| F1 | Capas e imports acíclicos; los `render_*` y `store_*` respetan sus dependencias permitidas. | extiende `test_structure.test_import_graph_is_acyclic_and_layered` con la tabla de [`modelo-de-consulta.md`](./modelo-de-consulta.md). |
-| F2 | Cada vista declara `dims` ⊆ dimensiones del vocabulario, y el parser de su comando tiene flags **solo** para esas dimensiones. | recorre `VIEWS` y el parser (`command_tree`). |
-| F3 | Todo sobre producido por los golden valida: claves ⊆ vocabulario, `schema`, `view`, `scope`, `total`, `count`, `results`, `coverage`, `notes` presentes. | un validador `envelope.validate` aplicado a cada JSON de los golden. |
-| F4 | Todo código de nota y de error emitido está registrado en `vocabulary.py` y documentado en [`contrato-json.md`](./contrato-json.md), y viceversa. | compara el registro con el documento. |
-| F5 | **Todas** las vistas de lectura responden con `PLANE_OFFLINE=1` sobre una caché previa (salida 0, `coverage.source` = `cache` o `snapshot`). | un golden por vista con `env_set` sin red. |
-| F6 | Durante cualquier vista de lectura el servidor falso **no recibe ningún método distinto de GET** (ni a Plane ni al almacenamiento de adjuntos). | el servidor falso registra los métodos; la prueba falla si ve POST, PATCH, PUT o DELETE. |
-| F7 | Determinismo: dos ejecuciones con el mismo estado y reloj producen **bytes idénticos**; el desempate del orden está definido. | ejecución doble y comparación. |
-| F8 | No existe `Result` sin `Coverage`; `complete: None` nunca se renderiza como completo. | prueba unitaria del constructor y del render. |
-| F9 | Los `render_*` consumen **solo** el sobre: no importan `db`, `api`, `cache`, `resolve` ni `store_*`. | AST sobre los módulos `render_*`. |
-| F10 | `report time --json` incluye `summary.by_capacity` y `summary.by_project`; `agenda` incluye el trabajo invisible. | golden de cada vista. |
-| F11 | Las vistas personales aceptan `--all-authors`/`--all-projects` solo como flag explícito; sin él, `scope.person` es el actor. | golden y prueba de matriz. |
-| F12 | `count <= limit`; `total` siempre presente; `count < total` ⇒ nota `truncated`. | prueba de propiedad sobre los golden. |
-| F13 | Ninguna nota de cobertura se emite como texto libre: todas vienen de `vocabulary`. | AST: los `notes.append` usan el constructor del registro. |
+| F1 | Capas, ciclos y **tabla de dependencias permitidas por módulo** ([`modelo-de-consulta.md`](./modelo-de-consulta.md)); capa 1 = `config`, `clock`, `vocabulary`, `errors`. | extiende `test_structure` con la tabla como datos. |
+| F2 | Cada vista declara `dims`/`controls` ⊆ vocabulario y el parser de su comando tiene flags **solo** para ellos (más una lista blanca de flags no dimensionales). | recorre `VIEWS` y el parser. |
+| F3 | Todo sobre producido por los golden valida: claves ⊆ vocabulario de su familia; `schema`, `view`, `total`, `count`, `results`, `coverage`, `notes` presentes; `scope` presente salvo en `get`. | `envelope.validate` enganchado a `run_scenario` para cada JSON de los golden. |
+| F4 | Todo código de nota, de error y de comprobación emitido está registrado en `vocabulary.py` y documentado en [`contrato-json.md`](./contrato-json.md), y viceversa. | compara el registro con el documento **estable** (la decisión del contrato, no el RFC). |
+| F5 | Toda vista de **caché** responde con `PLANE_OFFLINE=1` sobre una caché previa **más vieja que el TTL** (si no, no probaría nada): salida 0, `coverage.source` ∈ {`cache`, `local`, `snapshot`}. Excepciones declaradas: `worklog check` (siempre red) y `get` sin instantánea. | un golden por vista con `env_set` y la caché envejecida. |
+| F6 | Durante cualquier vista de lectura, `sync` y `attachment list`, el servidor falso **no recibe ningún método distinto de GET**. | el servidor falso registra los métodos (ya registra `/upload`); además un AST sobre `freshness` y los almacenes rechaza `api_request(..., method=...)` no GET. Test de `Sandbox`, no golden de texto. |
+| F7 | Determinismo: mismo estado y reloj ⇒ **bytes idénticos**, también bajo dos zonas horarias distintas; orden total. | doble ejecución y comparación bajo `TZ=UTC` y otra zona. |
+| F8 | No existe `Result` sin `Coverage`; `complete: None` nunca se renderiza como completo. | unitaria del constructor y del render. |
+| F9 | Los `render_*` consumen **solo** el sobre: no importan `sqlite3`, `os`, `clock`, `db`, `api`, `cache`, `resolve`, `store_*` ni `freshness`, y ninguna función recibe `conn`. | AST. |
+| F10 | `report time --json` incluye `summary.by_capacity` (con `undeclared`) y `by_project`; los valores `provenance: default` **no** se suman a un balde declarado. | golden con comentarios de telemetría parcial (requiere el defecto 0022 corregido). |
+| F11 | Las vistas personales sin flag tienen `scope.ticket_person` o `scope.hours_author` = el actor; no existe flag para ver a otros. | golden y prueba de la matriz. |
+| F12 | `count <= limit` cuando hay límite; `total` siempre presente; `count < total` ⇒ nota `truncated`. | propiedad sobre los golden. |
+| F13 | **No hay dos fuentes del mismo hecho**: las notas de origen "cobertura" solo existen si la cobertura las implica, y `extra_notes` no puede usar códigos derivados. | prueba unitaria de `notes_from` y del registro (sustituye al AST de `notes.append`). |
+| F14 | `complete: true` ⇒ ninguna nota `warn`. | propiedad sobre los golden y unitaria. |
+| F15 | **Trinquete**: una constante `CURRENT_PHASE` en la prueba lista qué F debe estar activa en cada fase; fallar si una F de una fase ≤ `CURRENT_PHASE` está saltada. | prueba meta. |
 
-Además se mantienen las salvaguardas vigentes: presupuesto de ayuda (280 tokens), tope de archivo (450) y de función (150), cero lecturas directas de la hora, y `test_docs`.
+Además se mantienen: presupuesto de ayuda (280 tokens, **medido** en cada fase que toque descripciones), tope de archivo (450) y de función (150), cero lecturas directas de la hora, y `test_docs`.
 
 ## Qué estas pruebas NO garantizan
 
-- Que el **contenido** de un dato sea correcto (eso lo cubren los golden y la revisión de cada vista).
-- Que Plane devuelva lo que se supone (asignados, forma de los eventos de asignación, paginación de comentarios): sigue "por verificar contra una instancia real" y cada decisión lo declara.
-- Que el ahorro de tokens sea real: se **mide** antes de afirmarlo (decisión abierta 2 de [0021](./README.md)).
+- Que el **contenido** de un dato sea correcto (lo cubren los golden y la revisión de cada vista).
+- Que Plane devuelva lo que se supone (asignados, forma de los eventos, paginación, `updated_at` al reasignar): sigue **por verificar contra una instancia real** y cada fase lo declara; la validación con la API real está registrada en el README.
+- Que el ahorro de tokens sea real: se **mide** antes de afirmarlo.
