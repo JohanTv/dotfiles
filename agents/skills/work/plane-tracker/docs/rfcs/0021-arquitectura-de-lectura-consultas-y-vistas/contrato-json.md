@@ -1,6 +1,6 @@
 # Contrato JSON `plane-tracker/1`
 
-Parte de [0021](./README.md) (versión 2). Lo que un agente puede asumir de cualquier salida `--json`. Los nombres definitivos viven en `vocabulary.py`; este documento es su especificación y una prueba (F4) comprueba que no se desincronizan. En la fase 0 se promueve a una decisión estable en `docs/decisions/` (este RFC cambia de estado; el contrato no debe depender de él).
+Parte de [0021](./README.md) (versión 2). Lo que un agente puede asumir de cualquier salida `--json`. Los nombres definitivos viven en `vocabulary.py`. Promovido en la fase 0 a la decisión estable [0025](../../decisions/0025-contrato-json-de-lectura.md), que es la que F4 compara con `vocabulary.py`; a partir de ahí **la fuente es la 0025** y este documento queda como el razonamiento original.
 
 ## Sobre de lectura
 
