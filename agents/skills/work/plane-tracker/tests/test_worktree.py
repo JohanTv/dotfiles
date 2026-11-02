@@ -483,6 +483,43 @@ class PlaneWorktreeTests(unittest.TestCase):
             names = tar.getnames()
             self.assertTrue(any("uncommitted.txt" in n for n in names))
 
+    def test_audit_implicit_fetch_vs_no_fetch(self):
+        # 1. Crear worktree para OMNIFY-103
+        code, out, err = self.run_script([
+            "add", "OMNIFY-103", "fetch-test",
+            self.repo_a,
+            "--dir", self.wt_dir
+        ])
+        self.assertEqual(code, 0)
+        branch = "feat/OMNIFY-103-fetch-test"
+        wt_path = os.path.join(self.wt_dir, "OMNIFY-103-fetch-test", "repo-a")
+
+        # 2. Hacer commit en el worktree y push a origin
+        with open(os.path.join(wt_path, "feature.txt"), "w") as f:
+            f.write("fetch feature\n")
+        run_cmd(["git", "-C", wt_path, "add", "feature.txt"])
+        run_cmd(["git", "-C", wt_path, "commit", "-m", "feat: remote test"])
+        run_cmd(["git", "-C", wt_path, "push", "origin", branch])
+
+        # 3. Simular merge en remoto origin/dev (desde seed) sin que repo_a haya hecho fetch aún
+        seed_dir = os.path.join(self.root, "seed")
+        run_cmd(["git", "-C", seed_dir, "fetch", "origin"])
+        run_cmd(["git", "-C", seed_dir, "checkout", "dev"])
+        run_cmd(["git", "-C", seed_dir, "merge", f"origin/{branch}"])
+        run_cmd(["git", "-C", seed_dir, "push", "origin", "dev"])
+
+        # 4. Con --no-fetch: repo_a usa caché local desactualizada -> EN_CURSO
+        code, out, err = self.run_script(["audit", "OMNIFY-103-fetch-test", "--no-fetch", "--dir", self.wt_dir, "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        self.assertEqual(data[0]["category"], "EN_CURSO")
+
+        # 5. Sin flag (fetch implícito por defecto): sincroniza origin y detecta el merge
+        code, out, err = self.run_script(["audit", "OMNIFY-103-fetch-test", "--dir", self.wt_dir, "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        self.assertEqual(data[0]["category"], "SEGURO_PARA_PODAR")
+
 
 if __name__ == "__main__":
     unittest.main()

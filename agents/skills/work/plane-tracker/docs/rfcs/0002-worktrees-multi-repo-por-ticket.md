@@ -73,10 +73,10 @@ plane-worktree add TICKET DESCRIPTION REPO[=SLUG]... \
 plane-worktree list [--dir .worktrees] [--json]
 
 # Auditoría de salud y podabilidad (Filesystem + Git merge-tree + Plane SQLite)
-plane-worktree audit [TARGET] [--dir .worktrees] [--json]
+plane-worktree audit [TARGET] [--dir .worktrees] [--no-fetch] [--json]
 
 # Poda asistida segura (Dry-run por defecto, --include-stale con respaldo .tar.gz)
-plane-worktree prune [TARGET] [--dir .worktrees] [--execute] [--include-stale] [--backup-dir DIR]
+plane-worktree prune [TARGET] [--dir .worktrees] [--execute] [--include-stale] [--backup-dir DIR] [--no-fetch] [--json]
 ```
 
 | Elemento | Regla |
@@ -88,7 +88,7 @@ plane-worktree prune [TARGET] [--dir .worktrees] [--execute] [--include-stale] [
 | `--base` | Default `dev`. Se verifica `refs/remotes/origin/<base>` antes de crear. |
 | `--repo` | Ruta a un clon; un nombre suelto se resuelve contra el cwd y sus hermanos exigiendo una única coincidencia. |
 | `--reuse-branch` | Permite hacer attach a una rama local existente que diverge de `origin/<base>`. Sin este flag, falla en pre-flight como salvaguarda. |
-| Fetch | Best-effort: si falla, aviso y se continúa con refs locales. |
+| Fetch | Best-effort implícito en `add`, `audit` y `prune` (deduplicado por repo base en paralelo; si falla, aviso y continúa con refs locales). `--no-fetch` disponible para ejecución offline instantánea. |
 
 Matriz de comportamiento:
 

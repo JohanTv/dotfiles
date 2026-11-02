@@ -390,19 +390,19 @@ plane-worktree list --json
 Para evitar la acumulación de worktrees obsoletos sin riesgo de pérdida accidental de datos:
 
 1. **Auditoría profunda (`audit`):**
-   Cruza el estado de archivos (`clean`/`dirty`), la integración en Git (`is-ancestor` y detección de squash-merge con `git merge-tree`) y el estado del ticket en la caché local de Plane:
+   Cruza el estado de archivos (`clean`/`dirty`), la integración en Git (`is-ancestor` y detección de squash-merge con `git merge-tree`) y el estado del ticket en la caché local de Plane. Por defecto sincroniza `origin` en paralelo (con deduplicación de repos base); usa `--no-fetch` para modo offline puro:
    ```bash
-   plane-worktree audit [--dir .worktrees] [--json]
+   plane-worktree audit [--dir .worktrees] [--no-fetch] [--json]
    ```
 2. **Poda simulada (Dry-run por defecto):**
    Muestra qué worktrees y ramas se eliminarían sin tocar nada en disco:
    ```bash
-   plane-worktree prune [--dir .worktrees]
+   plane-worktree prune [--dir .worktrees] [--no-fetch]
    ```
 3. **Poda efectiva de worktrees 100% integrados y limpios:**
    Desregistra los worktrees de Git (`git worktree remove`), elimina las ramas locales integradas y borra los contenedores vacíos:
    ```bash
-   plane-worktree prune --execute [--dir .worktrees]
+   plane-worktree prune --execute [--dir .worktrees] [--no-fetch]
    ```
 4. **Poda de tickets cancelados o abandonados con respaldo previo (`--include-stale`):**
    Solo si el usuario lo solicita explícitamente, empaqueta automáticamente todo el contenido del contenedor en `~/.cache/plane/worktree-backups/<ticket>-<timestamp>.tar.gz` antes de forzar su eliminación:

@@ -7,6 +7,7 @@ mutaciones atómicas en Fase 2).
 """
 
 import argparse
+import concurrent.futures
 import datetime
 import json
 import os
@@ -24,16 +25,21 @@ DEFAULT_BACKUP_DIR = os.path.expanduser("~/.cache/plane/worktree-backups")
 DEFAULT_DB_FILE = os.path.expanduser("~/.cache/plane/worklogs.db")
 
 
-def run_git(cmd, cwd=None, check=False):
+def run_git(cmd, cwd=None, check=False, timeout=None):
     """Ejecuta un comando git y devuelve (returncode, stdout, stderr)."""
     full_cmd = ["git"]
     if cwd:
         full_cmd += ["-C", cwd]
     full_cmd += cmd
-    res = subprocess.run(full_cmd, capture_output=True, text=True)
-    if check and res.returncode != 0:
-        raise RuntimeError(f"Fallo ejecutando git {' '.join(cmd)}: {res.stderr.strip()}")
-    return res.returncode, res.stdout.strip(), res.stderr.strip()
+    try:
+        res = subprocess.run(full_cmd, capture_output=True, text=True, timeout=timeout)
+        if check and res.returncode != 0:
+            raise RuntimeError(f"Fallo ejecutando git {' '.join(cmd)}: {res.stderr.strip()}")
+        return res.returncode, res.stdout.strip(), res.stderr.strip()
+    except subprocess.TimeoutExpired:
+        if check:
+            raise RuntimeError(f"Timeout ({timeout}s) ejecutando git {' '.join(cmd)}")
+        return 124, "", f"Timeout ({timeout}s)"
 
 
 def resolve_repo(token):
@@ -430,6 +436,83 @@ def check_git_merged(repo_path, branch, base_branch):
     return False, "unmerged", base_ref
 
 
+def sync_worktree_remotes(base_dir, target=None, timeout=10):
+    """
+    Sincroniza referencias de 'origin' (git fetch) deduplicando por repositorio base.
+    Se ejecuta de forma concurrente con timeout por repo y tolera fallos de red silenciosamente.
+    """
+    if not os.path.isdir(base_dir):
+        return
+
+    candidate_containers = []
+    if target:
+        direct = os.path.join(base_dir, target)
+        if os.path.isdir(direct):
+            candidate_containers.append(direct)
+        else:
+            for entry in os.listdir(base_dir):
+                if entry.upper().startswith(target.upper()) or target.upper() in entry.upper():
+                    candidate_containers.append(os.path.join(base_dir, entry))
+    else:
+        for entry in os.listdir(base_dir):
+            cp = os.path.join(base_dir, entry)
+            if os.path.isdir(cp):
+                candidate_containers.append(cp)
+
+    repo_dirs = []
+    for cpath in candidate_containers:
+        code, root, _ = run_git(["rev-parse", "--show-toplevel"], cwd=cpath)
+        if code == 0 and os.path.abspath(root) == os.path.abspath(cpath):
+            repo_dirs.append(cpath)
+        else:
+            try:
+                for child in sorted(os.listdir(cpath)):
+                    ch_path = os.path.join(cpath, child)
+                    if os.path.isdir(ch_path):
+                        code_ch, root_ch, _ = run_git(["rev-parse", "--show-toplevel"], cwd=ch_path)
+                        if code_ch == 0 and os.path.abspath(root_ch) == os.path.abspath(ch_path):
+                            repo_dirs.append(ch_path)
+            except OSError:
+                pass
+
+    if not repo_dirs:
+        return
+
+    unique_repos = {}
+    for rpath in repo_dirs:
+        code_gcd, gcd_out, _ = run_git(["rev-parse", "--git-common-dir"], cwd=rpath)
+        if code_gcd == 0 and gcd_out:
+            gcd_abs = os.path.abspath(os.path.join(rpath, gcd_out.strip()))
+            gcd_real = os.path.realpath(gcd_abs)
+            if gcd_real not in unique_repos:
+                unique_repos[gcd_real] = rpath
+
+    if not unique_repos:
+        return
+
+    def _fetch_single(repo_path):
+        code_rem, remotes, _ = run_git(["remote"], cwd=repo_path)
+        if code_rem != 0 or "origin" not in remotes.splitlines():
+            return None
+        code, out, err = run_git(["fetch", "origin", "--quiet"], cwd=repo_path, timeout=timeout)
+        return (repo_path, code, err)
+
+    failed = []
+    workers = min(8, len(unique_repos))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_fetch_single, path): path for path in unique_repos.values()}
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                res = fut.result()
+                if res and res[1] != 0:
+                    failed.append(res[0])
+            except Exception:
+                failed.append(futures[fut])
+
+    if failed:
+        sys.stderr.write(f"[WARN] No se pudo sincronizar 'origin' para {len(failed)} repositorio(s) (modo offline/sin red). Evaluando con caché local.\n")
+
+
 def audit_repo_state(repo_dir, preferred_base=None):
     """Auditoría profunda de un worktree: filesystem, git integration y metadatos."""
     code, root, _ = run_git(["rev-parse", "--show-toplevel"], cwd=repo_dir)
@@ -448,8 +531,28 @@ def audit_repo_state(repo_dir, preferred_base=None):
     dirty_lines = [l for l in status_out.splitlines() if l.strip()]
     is_clean = len(dirty_lines) == 0
 
-    base_branch = resolve_base_branch(repo_dir, preferred_base)
-    is_merged, merge_method, base_ref = check_git_merged(repo_dir, branch, base_branch)
+    candidates = [preferred_base] if preferred_base else ["dev", "staging", "main", "master"]
+    found_base_branch = None
+    found_base_ref = None
+    is_merged = False
+    merge_method = None
+
+    for cand in candidates:
+        if not cand:
+            continue
+        merged, method, b_ref = check_git_merged(repo_dir, branch, cand)
+        if b_ref and not found_base_ref:
+            found_base_branch = cand
+            found_base_ref = b_ref
+        if merged:
+            is_merged = True
+            merge_method = method
+            found_base_branch = cand
+            found_base_ref = b_ref
+            break
+
+    base_branch = found_base_branch
+    base_ref = found_base_ref
 
     commits_ahead = 0
     if base_ref:
@@ -588,6 +691,9 @@ def cmd_audit(args):
             print(f"Directorio de worktrees '{base_dir}' no existe.")
         return 0
 
+    if not getattr(args, "no_fetch", False):
+        sync_worktree_remotes(base_dir, target=getattr(args, "target", None))
+
     entries = sorted(os.listdir(base_dir))
     containers = []
     target = args.target.strip() if getattr(args, "target", None) else None
@@ -684,6 +790,9 @@ def cmd_prune(args):
         else:
             print(f"Directorio de worktrees '{base_dir}' no existe.")
         return 0
+
+    if not getattr(args, "no_fetch", False):
+        sync_worktree_remotes(base_dir, target=getattr(args, "target", None))
 
     execute = getattr(args, "execute", False)
     include_stale = getattr(args, "include_stale", False)
@@ -891,6 +1000,7 @@ def build_parser():
     p_audit = sub.add_parser("audit", help="Auditar estado de integración, salud y podabilidad de worktrees")
     p_audit.add_argument("target", nargs="?", default=None, help="Contenedor o ticket específico a auditar (opcional)")
     p_audit.add_argument("--dir", default=".worktrees", help="Directorio contenedor (default: .worktrees)")
+    p_audit.add_argument("--no-fetch", action="store_true", help="Omitir fetch de origin antes de auditar (modo offline puro)")
     p_audit.add_argument("--json", action="store_true", help="Salida en formato JSON")
     p_audit.set_defaults(handler=cmd_audit)
 
@@ -900,6 +1010,7 @@ def build_parser():
     p_prune.add_argument("--execute", action="store_true", help="Ejecutar eliminación real (por defecto es simulación dry-run)")
     p_prune.add_argument("--include-stale", action="store_true", help="Habilitar poda de worktrees cancelados/abandonados generando respaldo previo .tar.gz")
     p_prune.add_argument("--backup-dir", default=None, help=f"Directorio de respaldos (default: {DEFAULT_BACKUP_DIR})")
+    p_prune.add_argument("--no-fetch", action="store_true", help="Omitir fetch de origin antes de podar (modo offline puro)")
     p_prune.add_argument("--json", action="store_true", help="Salida en formato JSON")
     p_prune.set_defaults(handler=cmd_prune)
 
