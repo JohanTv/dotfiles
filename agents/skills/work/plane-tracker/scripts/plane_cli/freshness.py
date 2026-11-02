@@ -1,7 +1,7 @@
 """Frescura de las lecturas: carga de catálogos y adquisición de datos; única vía a la red de las vistas, y solo con GET.
 
 Expone: Env, Catalogs, TicketSource, AuditData, catalogs(), ensure(), ensure_get(), ensure_catalog(), fetch_attachments(), resolve_identity(), ensure_hours(), ensure_flow(),
-audit_worklogs().
+audit_worklogs(), SyncReport, run_sync().
 No hace: consultar filas para el usuario (query_*), imprimir ni escribir en Plane. Cada vista declara qué refresca (modelo de consulta, contrato de adquisición):
 `list` sincroniza los tickets de los proyectos accesibles del alcance con TTL de 30 min (`--refresh` fuerza, `--offline` no toca la red). Cada proyecto se trata por
 separado: uno caído o sin acceso (403) no aborta el resto y queda en la cobertura (`unavailable`, `forbidden`); sin ningún dato disponible, error `no_cache`.
@@ -29,8 +29,9 @@ from plane_cli.flow import build_ticket_flow, fetch_transitions, flow_to_json, t
 from plane_cli.resolve import (PROJECTS_TTL, get_actor_uuid, get_labels_map, get_members_map, get_projects_map, get_states_map, known_actor,
                                resolve_issue, resolve_issue_by_label, resolve_project_and_seq)
 from plane_cli import store_transitions, store_worklogs
+from plane_cli.assignments import sweep_history
 from plane_cli.scope import ProjectRef
-from plane_cli.sync import SYNC_COOLDOWN, sync_remote_worklogs
+from plane_cli.worklog_sync import SYNC_COOLDOWN, sync_remote_worklogs
 from plane_cli.timeutil import iso_z
 from plane_cli.vocabulary import GET_INCLUDES_COVERED
 
@@ -390,3 +391,48 @@ def audit_worklogs(conn, env, scope):
         checked.append({"ticket": label, "worklogs": len(t_rows)})
     unreachable = sum(1 for i in issues if i["code"] == "unreachable")
     return AuditData(checked, issues), Coverage(source="api", as_of=iso_z(clock.timestamp()), age_s=0, complete=unreachable == 0)
+
+
+# --- sync: mantenimiento con coste en peticiones (solo GET; escribe únicamente la base local) ------------------------------------------------------
+@dataclass(frozen=True)
+class SyncReport:
+    issues: dict      # proyecto -> estado de la sincronización de tickets (synced, fresh, stale, rate_limited, forbidden, unavailable)
+    hours: object     # SyncResult de las horas, o None (con --history o si Plane no respondió)
+    history: tuple    # (tickets traídos, interrumpido, pendientes, por presupuesto de tasa) del barrido de historial, o None
+    complete: bool    # todo lo pedido quedó al día; si no, repetir el comando continúa donde quedó
+
+
+def _sweep(conn, env, project_ids, budget):
+    """Historial de asignación y transiciones de hasta `budget` tickets pendientes del alcance (1 GET por ticket), reanudable; para al agotar el presupuesto de tasa."""
+    rows = conn.execute(f"SELECT * FROM issues_cache WHERE project_id IN ({','.join('?' for _ in project_ids)})", list(project_ids)).fetchall() if project_ids else []
+    state = {"rate": False}
+
+    def fetch(row):
+        if not cache._budget_ok():
+            state["rate"] = True
+            raise OSError("presupuesto de tasa")
+        issue = {"id": row["id"], "updated_at": row["plane_updated_at"], "completed_at": row["completed_at"]}
+        return fetch_transitions(conn, env.base_url, env.api_key, env.workspace, row["project_id"], issue, row["ticket_id"], strict=True)
+
+    done, interrupted, left = sweep_history(conn, env.base_url, env.api_key, env.workspace, rows, budget, fetch)
+    return done, interrupted, left, state["rate"]
+
+
+def run_sync(conn, env, scope, history=False, budget=25):
+    """Sincroniza los tickets del alcance y después, según el modo: las horas del periodo (sin `--history`) o el historial pendiente (con `--history`).
+
+    Sin `--history` los tickets se renuevan siempre (ignora el TTL: para eso se pide `sync`); con `--history` se usa el TTL normal, para no gastar el presupuesto de tasa en lo que ya está al día
+    antes de traer el historial (así cada ejecución avanza)."""
+    issues = {ident: status for ident, (status, _as_of) in _ensure_issues(conn, env, replace(scope, refresh=not history)).items()}
+    hours, swept = None, None
+    if history:
+        swept = _sweep(conn, env, [p.uuid for p in scope.projects], budget)
+    else:
+        idents, period = [p.ident for p in scope.projects], scope.period
+        try:
+            hours = sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"], filter_project=idents[0] if len(idents) == 1 else None)
+        except PlaneUnavailable:
+            hours = None
+    complete = all(s in ("synced", "fresh") for s in issues.values()) and (swept is None or (swept[2] == 0 and not swept[1])) \
+        and (history or (hours is not None and not hours.unavailable and not hours.incomplete))
+    return SyncReport(issues, hours, swept, complete)

@@ -68,7 +68,18 @@ $ plane.py list --involved
 --- stderr ---
 
 
-$ plane.py list --involved --refresh-history --budget 2
+$ plane.py sync --history --budget 2
+[exit 0]
+--- stdout ---
+
+🔄 sync · OMNIFY
+   tickets OMNIFY: fresh
+   historial: 2 ticket(s) traído(s), 1 pendiente(s)
+   ⚠ Quedó a medias: repite `plane-tracker sync` (continúa donde quedó).
+--- stderr ---
+
+
+$ plane.py list --involved
 [exit 0]
 --- stdout ---
 
@@ -82,14 +93,28 @@ $ plane.py list --involved --refresh-history --budget 2
   ⚠ Historial de asignación verificado en 2 de 3 tickets. → plane-tracker sync --history
   ⚠ Las horas salen solo de la base local de esta máquina. → plane-tracker report time --refresh
 --- stderr ---
-🔄 Historial de asignación: 2 ticket(s) traído(s); quedan 1 pendiente(s)
 
-$ plane.py list --involved --refresh-history --budget 5 --json
+
+$ plane.py sync --history --budget 5 --json
+[exit 0]
+--- stdout ---
+{"action":"sync","complete":true,"history":{"fetched":1,"interrupted":false,"left":0,"rate_limited":false},"issues":{"OMNIFY":"fresh"},"projects":["OMNIFY"],"schema":"plane-tracker/1","status":"ok"}
+--- stderr ---
+
+
+$ plane.py list --involved --json
 [exit 0]
 --- stdout ---
 {"count":3,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":null,"detail":{"assignment_snapshot":true,"history":{"total":3,"verified":3},"hours_scope":"local"},"source":"cache","stale":false,"unavailable":[]},"notes":[{"code":"hours_local_only","hint":"plane-tracker report time --refresh","text":"Las horas salen solo de la base local de esta máquina."}],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"assignment_events":[{"at":"2026-10-02T09:00:00Z","kind":"added","user_id":"aaaaaaaa-0000-4000-8000-000000000001","user_name":"tester"},{"at":"2026-10-08T09:00:00Z","kind":"removed","user_id":"aaaaaaaa-0000-4000-8000-000000000001","user_name":"tester"},{"at":"2026-10-08T09:00:01Z","kind":"added","user_id":"bbbbbbbb-0000-4000-8000-000000000002","user_name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","reasons":["fue asignado"],"start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"assignees":[{"id":"aaaaaaaa-0000-4000-8000-000000000001","name":"tester"}],"assignment_events":[],"completed_at":"2026-10-15T12:00:00Z","created_at":"2026-10-10T09:00:00Z","created_by":"aaaaaaaa-0000-4000-8000-000000000001","labels":["bug"],"plane_updated_at":"2026-10-15T12:00:00Z","priority":"medium","project":"OMNIFY","reasons":["asignado","creador"],"start_date":null,"state":"Completado","state_group":"completed","target_date":null,"ticket":"OMNIFY-2","title":"Acortador de enlaces"},{"assignees":[],"assignment_events":[],"completed_at":null,"created_at":"2026-10-05T09:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["sms"],"plane_updated_at":"2026-10-06T12:00:00Z","priority":"low","project":"OMNIFY","reasons":["horas tuyas (10 min)"],"start_date":null,"state":"Cancelado","state_group":"cancelled","target_date":null,"ticket":"OMNIFY-3","title":"Webhook SMS duplicado"}],"schema":"plane-tracker/1","scope":{"limit":20,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all","ticket_person":{"actor":"aaaaaaaa-0000-4000-8000-000000000001","relation":"involved"}},"summary":null,"total":3,"view":"list"}
 --- stderr ---
-🔄 Historial de asignación: 1 ticket(s) traído(s)
+
+
+$ plane.py list --involved --refresh-history --budget 2
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+plane-tracker: error: 'list --refresh-history' ya no existe; usa: plane-tracker sync --history --budget 2
 
 $ plane.py list --mine --limit 1
 [exit 0]
@@ -116,8 +141,7 @@ $ plane.py list --mine --created
 --- stderr ---
 usage: plane.py list [-h] [-p PROJECT] [--all-projects] [--mine | --created |
                      --involved] [--open] [--text TEXTO] [--limit N]
-                     [--refresh] [--offline] [--brief] [--verbose]
-                     [--refresh-history] [--budget N] [--json]
+                     [--refresh] [--offline] [--brief] [--verbose] [--json]
 plane.py list: error: argument --created: not allowed with argument --mine
 
 $ plane.py list --mine --refresh

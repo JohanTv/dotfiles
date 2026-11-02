@@ -15,7 +15,7 @@ import os
 import sqlite3
 import sys
 
-from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_delete, cmd_ops, cmd_outbox, cmd_read, cmd_report, cmd_tickets_write, renamed
+from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_delete, cmd_ops, cmd_outbox, cmd_read, cmd_report, cmd_sync, cmd_tickets_write, renamed
 from plane_cli.circuit import PlaneUnavailable, format_unavailable
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
@@ -41,6 +41,7 @@ COMMANDS = (
      (cmd_ops.register_focus_set, cmd_ops.register_focus_clear, cmd_ops.register_focus_status)),
     ("worklog", "Tiempos: propose | check", (cmd_comment_ops.register_worklog_propose, cmd_report.register_worklog_check)),
     ("report", "Reportes: time | flow", (cmd_report.register_report_time, cmd_report.register_report_flow)),
+    cmd_sync.register_sync,
     cmd_ops.register_handoff,
     cmd_read.register_labels,
     cmd_read.register_projects,

@@ -8,7 +8,7 @@ summary: "`sync` consulta solo proyectos fijados en el código, lee los comentar
 
 # 0017 · La sincronización de worklogs depende de una lista fija de proyectos y de una lectura de comentarios por ticket
 
-- **Área:** `scripts/plane_cli/sync.py` (consulta de tickets y de comentarios), `report`.
+- **Área:** `scripts/plane_cli/worklog_sync.py` (antes `sync.py`) (consulta de tickets y de comentarios), `report`.
 - **Relacionado:** [0010](./0010-reporte-no-sincroniza-periodos-con-registros-parciales.md), [0009](./0009-saneamiento-pendiente-de-datos-de-instancia.md) (la lista fija), [0022](./0022-sync-presenta-valores-por-defecto-como-medidos.md), RFC [0021](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) (prerrequisito de `report time`) y [`hechos-de-la-api.md`](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/hechos-de-la-api.md).
 
 ## Diagnóstico corregido

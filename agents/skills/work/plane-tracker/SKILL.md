@@ -53,6 +53,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Cola de salida (Plane caído) | `plane-tracker outbox list` · `plane-tracker outbox flush` · `plane-tracker outbox drop N` |
 | Marcar foco | `plane-tracker focus set T` · `plane-tracker focus clear` · `plane-tracker focus status` |
 | Medir duración / auditar | `plane-tracker worklog propose [T]` · `plane-tracker worklog check` |
+| Sincronizar (cuesta peticiones; solo GET) | `plane-tracker sync [-p P \| --all-projects] [--from D --to D \| --week]` (tickets y horas; sin periodo, los últimos 30 días) · `plane-tracker sync --history [--budget N]` (historial de asignación y transiciones; reanuda donde quedó) |
 | Reporte de horas / flujo | `plane-tracker report time [--week \| --from D [--to D]] [--offline]` · `plane-tracker report flow [--week \| --from D [--to D]] [--offline]` (la vista es obligatoria; sin `--from`, hoy) |
 | Catálogos y diagnóstico | `plane-tracker labels` `plane-tracker projects` `plane-tracker whoami` `plane-tracker health` `plane-tracker handoff` |
 

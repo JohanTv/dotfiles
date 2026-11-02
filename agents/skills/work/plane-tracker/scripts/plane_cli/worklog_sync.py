@@ -1,4 +1,4 @@
-"""Sincronización de los worklogs registrados en los comentarios de Plane hacia SQLite (defectos 0017, 0010 y 0022 del RFC 0021).
+"""Sincronización de los worklogs registrados en los comentarios de Plane hacia SQLite (defectos 0017, 0010 y 0022 del RFC 0021). No confundir con el comando `sync` (cmd_sync.py).
 
 Expone: sync_remote_worklogs(), SyncResult, SYNC_COOLDOWN.
 No hace: imprimir reportes. Cubre los proyectos ACCESIBLES (no una lista fija), pagina con `per_page` y `cursor` y corta localmente por fecha (la API ignora `limit` y los
@@ -6,7 +6,7 @@ filtros de fecha), lee los comentarios solo de los tickets con actividad en el p
 incompleta. La marca de sincronización es por proyecto y periodo (tabla `worklog_sync`). Nada se inventa: sin fecha u hora medidas el comentario no entra (se cuenta); balde, fase,
 rol, tipo de trabajador, pista y notas que no vengan en el comentario se guardan con su procedencia (`defaulted_json`). Dos sincronizaciones del mismo comentario dan filas idénticas.
 La lectura de comentarios es incremental por ticket (`worklog_issue_sync`): un ticket cuyo `updated_at` no cambió desde la última lectura completa de sus comentarios no se vuelve a pedir, así
-una sincronización cortada por el presupuesto de tasa AVANZA en la siguiente y converge; `force=True` (`report time --refresh`) relee todo. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Si Plane deja de responder a mitad del sync lo termina
+una sincronización cortada por el presupuesto de tasa AVANZA en la siguiente y converge; `force=True` (`report time --refresh`) relee todo. Una fila que coincide con un registro en cola se vincula si el comentario es el propio (mismo client_id) y se omite si es otro. Sin identidad conocida falla con `actor_unknown`. Si Plane deja de responder a mitad del sync lo termina
 con un aviso y sin marcarlo.
 """
 
@@ -197,8 +197,9 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
     targets = _targets(conn, base_url, api_key, workspace, filter_project)
     actor_uuid = get_actor_uuid(base_url, api_key, workspace, conn)  # solo mis comentarios alimentan mi reporte
-    if not actor_uuid:
-        sys.stderr.write("⚠ Sin PLANE_USERNAME/PLANE_ACTOR_UUID: el sync mezclará horas de compañeros en tickets compartidos.\n")
+    if not actor_uuid:  # decisión 6 del RFC 0021: sin identidad no se mezclan horas ajenas
+        raise CliError("actor_unknown", "No sé quién eres: sin identidad la sincronización mezclaría las horas de tus compañeros en los tickets compartidos.",
+                       "Define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).")
     try:
         cutoff = datetime.strptime(date_from_str, "%Y-%m-%d").date() - timedelta(days=1)
     except ValueError:

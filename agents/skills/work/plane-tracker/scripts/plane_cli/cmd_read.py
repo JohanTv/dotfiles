@@ -12,7 +12,6 @@ import sys
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.envelope import build
 from plane_cli.freshness import Env, catalogs, ensure, ensure_catalog, ensure_get, resolve_identity
-from plane_cli.history_sweep import sweep
 from plane_cli.output import emit
 from plane_cli.scope import PERSON_FLAGS, resolve_scope, single_project
 from plane_cli.scope_flags import add_scope_args
@@ -48,8 +47,6 @@ def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
     cats = catalogs(conn, env, need_actor=any(getattr(args, flag, False) for flag, _ in PERSON_FLAGS))
     scope = resolve_scope(args, cats, view)
     acquisition = ensure(conn, env, view.name, scope, cats)
-    if args.refresh_history:
-        sweep(conn, env, [p.uuid for p in scope.projects], args.budget)
     doc = build(view.name, scope.to_dict(view), view.query(conn, scope, cats, acquisition), verbose=args.verbose)
     emit(view, doc, getattr(args, "json", False))
 
@@ -106,9 +103,6 @@ def register_list(sub):
                             description="Tickets de la caché local, refrescada por TTL (30 min) con solo GET. Combina -p/--all-projects, --mine|--created|--involved, "
                                         "--open y --text (título y etiquetas, por relevancia). Con --json, sobre plane-tracker/1 con alcance, cobertura y notas.")
     add_scope_args(p_list, view.dims, view.controls, LIST_LIMIT)
-    p_list.add_argument("--refresh-history", action="store_true",
-                        help="Traer el historial de asignación de los tickets pendientes (una petición por ticket; reanuda donde quedó)")
-    p_list.add_argument("--budget", type=positive_int, default=25, metavar="N", help="Máximo de tickets por ejecución de --refresh-history (por defecto 25)")
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
 

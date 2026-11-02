@@ -83,7 +83,7 @@ def _day(text, flag):
         raise CliError("bad_date", f"Fecha inválida en {flag}: '{text}'.", "Usa YYYY-MM-DD.") from None
 
 
-def _period(args, catalogs):
+def _period(args, catalogs, view_days=None):
     """{from, to, tz} (fechas inclusivas del calendario local): `--week` es la semana ISO en curso; `--from` solo es ese día; `--to` sin `--from` es un error; sin nada, hoy."""
     first, last, week = getattr(args, "date_from", None), getattr(args, "date_to", None), getattr(args, "week", False)
     today = date.fromisoformat(catalogs.today)
@@ -94,6 +94,8 @@ def _period(args, catalogs):
     if week:
         start = today - timedelta(days=today.weekday())
         end = start + timedelta(days=6)
+    elif not first and view_days:
+        start, end = today - timedelta(days=view_days), today  # el mantenimiento (`sync`) cubre una ventana de días, no solo hoy
     else:
         start = _day(first, "--from") if first else today
         end = _day(last, "--to") if last else start
@@ -125,7 +127,7 @@ def resolve_scope(args, catalogs, view):
     return Scope(projects=_projects(args, catalogs, view) if "projects" in view.dims else (),
                  ticket_person={"relation": person, "actor": catalogs.actor} if person else None,
                  state="open" if getattr(args, "open", False) else view.defaults.get("state", "all"), text=text,
-                 period=_period(args, catalogs) if "period" in view.dims else None, hours_author=hours_author,
+                 period=_period(args, catalogs, view.defaults.get("period_days")) if "period" in view.dims else None, hours_author=hours_author,
                  track=getattr(args, "track", None), worker_type=getattr(args, "worker_type", None),
                  order=view.defaults["order"] if "order" in view.defaults else ORDER_TEXT if text else ORDER_RECENT, limit=limit, offline=bool(getattr(args, "offline", False)),
                  refresh=bool(getattr(args, "refresh", False)), brief=bool(getattr(args, "brief", False)))

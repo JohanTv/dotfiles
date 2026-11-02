@@ -29,11 +29,11 @@ class View:
 
 
 NONE = frozenset()
+SYNC_DAYS = 30  # ventana por defecto de `sync` (sin --from/--to/--week)
 VIEWS = {
     "list": View("list", frozenset({"projects", "person", "state", "text"}), frozenset({"limit", "refresh", "offline", "brief", "verbose"}),
                  query_issues.query, render_issues.render, {"limit": LIST_LIMIT, "state": "all"},
-                 "tickets de los proyectos accesibles del alcance (TTL 30 min; --refresh fuerza; --offline no toca la red)", ("list",),
-                 frozenset({"--refresh-history", "--budget"})),
+                 "tickets de los proyectos accesibles del alcance (TTL 30 min; --refresh fuerza; --offline no toca la red)", ("list",)),
     "get": View("get", NONE, NONE, query_get.query, render_get.render, {}, "el ticket por su etiqueta (1 GET) y sus comentarios; la instantánea guardada de respaldo",
                 ("get",), frozenset({"--no-comments", "--last", "--full", "--no-description", "--history", "--include", "--all"})),
     "labels": View("labels", NONE, frozenset({"refresh", "offline"}), query_catalogs.labels, render_catalogs.render_labels, {},
@@ -52,6 +52,9 @@ VIEWS = {
                         ("report", "flow")),
     "worklog check": View("worklog check", frozenset({"projects", "period"}), NONE, query_check.query, render_check.render, {"projects": "all", "order": "ticket,date,start_time"},
                           "siempre red: auditoría de los comentarios de cada ticket con registros locales", ("worklog", "check")),
+    # `sync` no es una vista de lectura (escribe en la base local), pero comparte alcance y flags con ellas: sin consulta ni render propios (la salida de las escrituras es de la fase 8)
+    "sync": View("sync", frozenset({"projects", "period"}), NONE, None, None, {"period_days": SYNC_DAYS}, "tickets del alcance y horas del periodo, o con --history el historial de asignación y las transiciones",
+                 ("sync",), frozenset({"--history", "--budget"})),
     "outbox list": View("outbox list", NONE, NONE, query_misc.outbox, render_misc.render_outbox, {"state": "open"}, "solo la cola local", ("outbox", "list"),
                         frozenset({"--all"})),
 }

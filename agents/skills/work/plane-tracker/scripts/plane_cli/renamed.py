@@ -78,6 +78,21 @@ def _search(prefix, rest):
     return _retired("search", [*prefix, "list", "--text", " ".join(positional) or "TEXTO", *flags])
 
 
+def _list_history(prefix, rest):
+    """`list --refresh-history [--budget N]` -> `sync --history [--budget N]`, conservando el proyecto."""
+    if "--refresh-history" not in rest and not any(t == "--budget" or t.startswith("--budget=") for t in rest):
+        return None
+    keep, i = [], 0
+    while i < len(rest):
+        if rest[i] in ("-p", "--project", "--budget"):
+            keep += rest[i:i + 2]
+            i += 2
+        else:
+            keep += [rest[i]] if rest[i] in ("--all-projects", "--json") or rest[i].startswith(("--project=", "--budget=")) else []
+            i += 1
+    return _retired("list --refresh-history", [*prefix, "sync", "--history", *keep])
+
+
 def _list(prefix, rest):
     """`list TEXTO` no existe: el texto va con --text (con `--text X` y posicionales, no se sabe cuál valía)."""
     positional, flags = _split(rest)
@@ -199,7 +214,7 @@ def suggestion(argv, tree):
             return _report(prefix, rest, tree[cmd])
         if tree[cmd]:
             return _group(prefix, cmd, tree[cmd], rest)
-        return _list(prefix, rest) if cmd == "list" else None
+        return (_list_history(prefix, rest) or _list(prefix, rest)) if cmd == "list" else None
     if cmd in ("attach", "attachments"):
         return _attachment(prefix, cmd, rest, tree.get("attachment", ()))
     if cmd in RETIRED:

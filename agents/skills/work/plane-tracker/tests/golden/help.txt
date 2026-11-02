@@ -19,6 +19,7 @@ positional arguments:
     focus       Foco de la sesión: set | clear | status
     worklog     Tiempos: propose | check
     report      Reportes: time | flow
+    sync        Sincronizar con Plane: --history
     handoff     Borrador del relevo con los hechos de git
     labels      Listar las etiquetas del proyecto
     projects    Listar los proyectos de Plane
@@ -63,8 +64,7 @@ $ plane.py list --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,
 --- stdout ---
 usage: plane.py list [-h] [-p PROJECT] [--all-projects] [--mine | --created |
                      --involved] [--open] [--text TEXTO] [--limit N]
-                     [--refresh] [--offline] [--brief] [--verbose]
-                     [--refresh-history] [--budget N] [--json]
+                     [--refresh] [--offline] [--brief] [--verbose] [--json]
 
 Tickets de la caché local, refrescada por TTL (30 min) con solo GET. Combina
 -p/--all-projects, --mine|--created|--involved, --open y --text (título y
@@ -89,11 +89,6 @@ options:
   --brief               Filas breves: ticket, title, state, state_group y
                         project
   --verbose             Incluir las notas informativas
-  --refresh-history     Traer el historial de asignación de los tickets
-                        pendientes (una petición por ticket; reanuda donde
-                        quedó)
-  --budget N            Máximo de tickets por ejecución de --refresh-history
-                        (por defecto 25)
   --json                Salida en JSON
 --- stderr ---
 
@@ -186,6 +181,35 @@ options:
   --yes               Confirma la eliminación
   --discard-worklogs  Acepta perder las horas propias registradas en el ticket
   --json              Salida en JSON
+--- stderr ---
+
+
+$ plane.py sync --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py sync [-h] [-p PROJECT] [--all-projects] [--from FECHA]
+                     [--to FECHA] [--week] [--history] [--budget N] [--json]
+
+Mantenimiento con coste en peticiones (solo GET; escribe solo la base local).
+Sin flags: tickets del proyecto por defecto y sus horas de los últimos 30 días
+(-p otro proyecto, --all-projects todos, --from/--to/--week otro periodo). Con
+--history: tickets y después el historial de asignación y las transiciones
+pendientes, con presupuesto y reanudable.
+
+options:
+  -h, --help            show this help message and exit
+  -p, --project PROJECT
+                        Identificador del proyecto (ej: OMNIFY, OPS)
+  --all-projects        Todos los proyectos accesibles del workspace
+  --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
+  --to FECHA            Último día del periodo (YYYY-MM-DD); requiere --from
+  --week                Semana en curso (lunes a domingo)
+  --history             Traer el historial de asignación y las transiciones de
+                        los tickets pendientes (1 petición por ticket; reanuda
+                        donde quedó)
+  --budget N            Máximo de tickets por ejecución de --history (por
+                        defecto 25)
+  --json                Salida en JSON
 --- stderr ---
 
 

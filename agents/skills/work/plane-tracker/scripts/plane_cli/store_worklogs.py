@@ -1,7 +1,7 @@
 """Almacén de solo lectura de la sincronización de horas: qué proyectos entran en el alcance y si el periodo está verificado contra Plane.
 
 Expone: HoursStatus, accessible_idents(), hours_status().
-No hace: red ni escribir (las marcas las escribe sync.py). La verificación es por proyecto y periodo (defecto 0010): un proyecto está verificado si hay una
+No hace: red ni escribir (las marcas las escribe worklog_sync.py). La verificación es por proyecto y periodo (defecto 0010): un proyecto está verificado si hay una
 sincronización completa cuyo periodo cubre el pedido; nunca sincronizado o incompleto => no verificado (`verified: False`).
 """
 

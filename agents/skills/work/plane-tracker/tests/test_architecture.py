@@ -37,10 +37,10 @@ DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
-    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary", "outbox", "worklog", "store_transitions", "store_worklogs"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox", "vocabulary", "timeutil", "clock", "flow"), 1),
+    "freshness": (("resolve", "cache", "worklog_sync", "assignments", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary", "outbox", "worklog", "store_transitions", "store_worklogs"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox", "vocabulary", "timeutil", "clock", "flow"), 1),
     "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
-    # los comandos solo registran y llaman: además de lo del modelo necesitan los flags comunes (config), el sobre y su salida (V44); `cmd_read` conserva history_sweep hasta la fase 6
-    "cmd_read": (COMMAND_DEPS + ("history_sweep",), 3), "cmd_report": (COMMAND_DEPS, 5), "cmd_sync": (COMMAND_DEPS, 6),
+    # los comandos solo registran y llaman: además de lo del modelo necesitan los flags comunes (config), el sobre y su salida (V44); con el retiro de `--refresh-history` (fase 6) `cmd_read` ya no necesita nada más
+    "cmd_read": (COMMAND_DEPS, 3), "cmd_report": (COMMAND_DEPS, 5), "cmd_sync": (COMMAND_DEPS, 6),
 }
 LAYER_ONE = {"config", "clock", "vocabulary", "errors"}
 RENDER_FORBIDDEN = {"sqlite3", "os", "clock", "db", "api", "cache", "resolve", "freshness"}
@@ -190,7 +190,7 @@ class Architecture(unittest.TestCase):
 
     @gate("F3-golden")
     def test_f3_every_golden_envelope_validates(self):
-        envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA]
+        envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA and "view" in d]  # los de escritura (`status`/`action`) son de la fase 8
         self.assertTrue(envelopes, "ningún golden emite el sobre plane-tracker/1")
         for filename, command, doc in envelopes:
             self.assertEqual(envelope.validate(doc), [], f"{filename}: {command}")
@@ -312,7 +312,7 @@ class Architecture(unittest.TestCase):
 
     @gate("F6")
     def test_f6_acquisition_only_issues_get_requests(self):
-        for path in glob.glob(os.path.join(ts.PACKAGE, "freshness.py")) + glob.glob(os.path.join(ts.PACKAGE, "store_*.py")):
+        for path in [os.path.join(ts.PACKAGE, n) for n in ("freshness.py", "worklog_sync.py", "cache.py")] + glob.glob(os.path.join(ts.PACKAGE, "store_*.py")):
             for node in ast.walk(ast.parse(read(path))):
                 if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "api_request":
                     methods = [k.value for k in node.keywords if k.arg == "method"] + node.args[2:3]
@@ -321,13 +321,17 @@ class Architecture(unittest.TestCase):
         for view, argv in VIEW_COMMANDS.items():
             sandbox = gs.Sandbox()
             self.addCleanup(sandbox.close)
-            variants = {"list": [argv, argv + ["--refresh"], argv + ["--all-projects", "--refresh"], argv + ["--involved", "--refresh-history", "--budget", "2"]],
+            variants = {"list": [argv, argv + ["--refresh"], argv + ["--all-projects", "--refresh"], argv + ["--involved"]],
                         "report time": [argv, argv + ["--refresh"], ["report", "time", "--week"]], "report flow": [argv, argv + ["--refresh"]]}.get(view, [argv])
             for variant in variants:
                 self.assertEqual(sandbox.run(variant)[0], 0, f"{view}: {variant}")
             methods = {method for method, _path, _body in sandbox.fake.requests}
             self.assertLessEqual(methods, {"GET"}, f"{view}: una lectura solo puede emitir GET (`whoami` con PLANE_ACTOR_UUID no emite nada)")
-        # `sync` y `attachment list` se suman a esta comprobación en las fases 6 y 3.
+        sandbox = gs.Sandbox()
+        self.addCleanup(sandbox.close)
+        for variant in (["sync"], ["sync", "--all-projects"], ["sync", "--history"], ["sync", "--history", "--budget", "2", "--all-projects"], ["sync", "--week"]):
+            self.assertEqual(sandbox.run(variant)[0], 0, f"sync: {variant}")
+        self.assertEqual({method for method, _path, _body in sandbox.fake.requests}, {"GET"}, "`sync` solo emite GET: escribe la base local, no Plane")
 
     @gate("F7")
     def test_f7_output_is_byte_identical_under_two_time_zones(self):

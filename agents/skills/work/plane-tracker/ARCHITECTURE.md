@@ -32,7 +32,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/outbox.py` | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
 | `plane_cli/outbox_flush.py` | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
 | `plane_cli/create_guard.py` | Guarda de `create` contra tickets duplicados: compara el título con la caché local y marca los envíos sin confirmar. |
-| `plane_cli/sync.py` | `sync_remote_worklogs()`: comentarios de Plane a SQLite sin pisar registros en cola, para los proyectos accesibles, paginando con `per_page`, deteniéndose antes de agotar el presupuesto de tasa y marcando la sincronización por proyecto y periodo (`worklog_sync`) y leyendo los comentarios de forma incremental por ticket (`worklog_issue_sync`), de modo que una sincronización cortada converge; nada se inventa y lo no medido consta en `defaulted_json`. |
+| `plane_cli/worklog_sync.py` | `sync_remote_worklogs()` (no confundir con el comando `sync`): comentarios de Plane a SQLite sin pisar registros en cola, para los proyectos accesibles, paginando con `per_page`, deteniéndose antes de agotar el presupuesto de tasa y marcando la sincronización por proyecto y periodo (`worklog_sync`) y leyendo los comentarios de forma incremental por ticket (`worklog_issue_sync`), de modo que una sincronización cortada converge; nada se inventa y lo no medido consta en `defaulted_json`. |
 | `plane_cli/store_worklogs.py` | Solo lectura: proyectos accesibles y `hours_status()` (si el periodo está verificado contra Plane, por proyecto). |
 | `plane_cli/proposal_store.py` | `last_proposal.json`: guardar, leer, consumir y bloquear entre procesos. |
 | `plane_cli/proposals.py` | Medición de la sesión del agente, ventanas, `build_proposal()`, `build_split()` y su impresión. |
@@ -46,7 +46,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cmd_read.py` | Comandos `get`, `list` (absorbe al retirado `search`), `labels`, `projects` y `whoami`: orquestan catálogos, alcance, frescura, consulta, sobre y salida. |
 | `plane_cli/scope.py` | `Scope`, `ProjectRef` y `resolve_scope()`: alcance validado, **puro** (sin red ni SQLite), contra catálogos ya cargados; lanza `CliError` (`unknown_project`, `actor_unknown`) con pista. |
 | `plane_cli/scope_flags.py` | `add_scope_args()` y `flags_for()`: cada vista solo declara los flags de sus dimensiones y controles. |
-| `plane_cli/freshness.py` | `Env`, `catalogs()`, `ensure()` (`list`), `ensure_get()` (1 GET por etiqueta, comentarios, instantánea y flujo), `ensure_catalog()`, `fetch_attachments()` y `resolve_identity()`: única vía a la red de las vistas, solo GET; cada proyecto por separado (403 y caídos pasan a la cobertura). |
+| `plane_cli/freshness.py` | `Env`, `catalogs()`, `ensure()` (`list`), `ensure_get()` (1 GET por etiqueta, comentarios, instantánea y flujo), `ensure_catalog()`, `fetch_attachments()` y `resolve_identity()`, `run_sync()`: única vía a la red de las vistas, solo GET; cada proyecto por separado (403 y caídos pasan a la cobertura). |
 | `plane_cli/store_issues.py` | Lecturas de solo lectura de `issues_cache` (con FTS), `issue_sync` y datos de personas. |
 | `plane_cli/query_issues.py` | Consulta de `list`: selección por persona y estado, orden total, filas del vocabulario `ticket` y `Result` con cobertura y `complete`. |
 | `plane_cli/query_get.py`, `query_catalogs.py`, `query_misc.py` | Consultas de `get` (fila `ticket_detail` con nombres locales; `complete` solo con API y comentarios completos), `labels`/`projects`, y `whoami`/`attachment list`/`outbox list`. |
@@ -55,8 +55,8 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/store_transitions.py` | Solo lectura para `report flow`: tickets del periodo (el cierre se compara en la zona declarada), estados, transiciones y recuento de las transiciones al día. |
 | `plane_cli/output.py` | `emit()`: el sobre en `--json` o su render en texto. |
 | `plane_cli/views.py` | `View` y `VIEWS`: registro de las siete vistas de lectura (`list`, `get`, `labels`, `projects`, `whoami`, `attachment list`, `outbox list`) con su comando y flags extra (F2). |
-| `plane_cli/history_sweep.py` | Barrido de `list --refresh-history` (se retira en la fase 6). |
-| `plane_cli/assignments.py` | Historial de asignación medido (`assignment_events`), su cobertura y el barrido con presupuesto (`--refresh-history`). |
+| `plane_cli/assignments.py` | Historial de asignación medido (`assignment_events`), su cobertura y el barrido con presupuesto (lo usa `sync --history`). |
+| `plane_cli/cmd_sync.py` | Comando `sync` (mantenimiento con coste en peticiones; solo GET, escribe solo la base local): tickets del alcance y horas del periodo (por defecto 30 días), o con `--history` el historial de asignación y las transiciones pendientes, con `--budget` y reanudable. |
 | `plane_cli/cmd_report.py` | Comandos `report time`, `report flow` (el grupo `report` exige la vista) y `worklog check`: orquestan alcance, frescura, consulta, sobre y salida. El periodo es `--from/--to/--week`. |
 | `plane_cli/cmd_outbox.py` | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
 | `plane_cli/cmd_ops.py` | Comandos `health`, `focus set\|clear\|status` y `handoff`, con sus ayudantes de git. |

@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "handoff", "labels", "projects", "whoami", "health"]
+ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "sync", "handoff", "labels", "projects", "whoami", "health"]
 GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
           "focus": ("set", "clear", "status"), "worklog": ("propose", "check"), "report": ("time", "flow")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
@@ -215,8 +215,9 @@ class Golden(unittest.TestCase):
     def test_list_filters(self):
         steps = [["list", "--mine"], ["list", "--mine", "--open", "--json"], ["list", "--created"], ["list", "--open"], ["list", "--all-projects", "--open"],
                  ["comment", "add", "OMNIFY-3", "-m", "horas locales", "--duration", "10", "--track", "t1"],
-                 ["list", "--involved"], ["list", "--involved", "--refresh-history", "--budget", "2"],
-                 ["list", "--involved", "--refresh-history", "--budget", "5", "--json"], ["list", "--mine", "--limit", "1"],
+                 ["list", "--involved"], ["sync", "--history", "--budget", "2"], ["list", "--involved"],
+                 ["sync", "--history", "--budget", "5", "--json"], ["list", "--involved", "--json"], ["list", "--involved", "--refresh-history", "--budget", "2"],
+                 ["list", "--mine", "--limit", "1"],
                  {"args": ["list", "--mine"], "env_drop": ("PLANE_ACTOR_UUID",)}, ["list", "--mine", "--created"],
                  {"args": ["list", "--mine", "--refresh"], "env_set": OFFLINE}, ["list", "-p", "NOPE", "--open"]]
         self.golden("list_filters", steps, scrub=RANDOM_FIELDS, db_queries=[ASSIGNMENTS])

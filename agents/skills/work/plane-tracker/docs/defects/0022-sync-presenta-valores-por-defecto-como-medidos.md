@@ -8,7 +8,7 @@ summary: "`sync` rellena balde, fase, rol y horas con valores por defecto cuando
 
 # 0022 · La sincronización presenta valores por defecto como si estuvieran medidos
 
-- **Área:** `scripts/plane_cli/sync.py` (construcción de la fila de `worklogs`), `worklog.upsert_worklog`, `cache.sync_issues_cache`.
+- **Área:** `scripts/plane_cli/worklog_sync.py` (antes `sync.py`) (construcción de la fila de `worklogs`), `worklog.upsert_worklog`, `cache.sync_issues_cache`.
 - **Relacionado:** principio "no afirmar lo que no se midió" ([`principles.md`](../principles.md)), [0017](./0017-sincronizacion-de-worklogs-incompleta.md), RFC [0021](../rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) (prerrequisito de `report time`).
 
 ## Síntoma (verificado en el código)
