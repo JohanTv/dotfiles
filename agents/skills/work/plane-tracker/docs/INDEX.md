@@ -17,6 +17,7 @@
 | 0016 | [El bloque oculto de telemetría se escapa y queda visible al publicar o editar comentarios](defects/0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md) | corregido | `markdown_to_html` escapa `<!-- PLANE_WORKLOG_METADATA ... -->`; `comment edit -m` pierde la telemetría y `comment add -m` publica el bloque visible además del real. |
 | 0017 | [La sincronización de worklogs consulta solo los 15 tickets más recientes por proyecto](defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md) | abierto | `sync` pide `limit=15` sin paginar; un periodo con más tickets tocados, o uno ya pasado, produce un reporte parcial presentado como completo. |
 | 0020 | [Las etiquetas de la caché de tickets se guardan siempre vacías](defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) | corregido | `sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco. |
+| 0022 | [La sincronización presenta valores por defecto como si estuvieran medidos](defects/0022-sync-presenta-valores-por-defecto-como-medidos.md) | abierto | `sync` rellena balde, fase, rol y horas con valores por defecto cuando el comentario no los trae, y la caché no distingue lo medido de lo supuesto; los estados desconocidos caen en 'Pendiente'. |
 
 ## RFC
 
@@ -27,7 +28,7 @@
 | 0006 | [Decidir la fuente de datos del "Standby externo"](rfcs/0006-standby-externo-fuente-de-datos.md) | borrador | Quitar la línea de bloqueos del reporte o alimentarla (flag, o tiempo en Pausado desde las transiciones). |
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
 | 0014 | [Contextos, perfiles y fuentes de tareas intercambiables](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Aplazado a propósito. Usar la herramienta en varios contextos (trabajos, personal) y con varios sistemas de tareas; la decisión abierta es dónde vive la verdad del tiempo. |
-| 0021 | [Arquitectura de lectura - modelo de consulta, vistas y contrato de salida](rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) | borrador | Un modelo común (alcance, cobertura, consultas, vistas y sobre JSON versionado) para listar, buscar y reportar, con los principios convertidos en pruebas de arquitectura; funde `search` en `list`. |
+| 0021 | [Arquitectura de lectura - modelo de consulta, vistas y contrato de salida](rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) | borrador | Un modelo común (alcance, cobertura, almacenes, consultas, vistas y sobre JSON versionado) para listar, buscar y reportar, con los principios convertidos en pruebas de arquitectura; funde `search` en `list`. Versión 2, tras la revisión adversarial. |
 
 ## Decisiones
 
