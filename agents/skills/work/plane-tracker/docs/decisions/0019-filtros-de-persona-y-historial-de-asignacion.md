@@ -3,7 +3,7 @@ id: "0019"
 title: Filtros de persona en list y historial de asignación medido
 status: aceptado
 created: 2026-11-02
-summary: "`list --mine|--created|--involved` sobre la caché; `--involved` une asignado, creador, horas registradas y asignado alguna vez, con razón y cobertura declaradas."
+summary: "`list --mine|--created|--involved` sobre la caché; `--involved` une asignado, creador, horas tuyas y asignado alguna vez, con razón y cobertura declaradas."
 ---
 
 # 0019 · Filtros de persona en `list` y historial de asignación medido
@@ -16,7 +16,7 @@ La herramienta no podía responder "¿qué tengo yo?": la caché de tickets no g
 
 ## Decisión
 
-- **`--mine` es "asignado ahora"**, `--created` es el creador y **`--involved` es una unión con razón por ticket**: asignado, creador, horas registradas (base local) y asignado alguna vez (historial medido). "Involucrado" no se guarda: se calcula en cada consulta.
+- **`--mine` es "asignado ahora"**, `--created` es el creador y **`--involved` es una unión con razón por ticket**: asignado, creador, horas tuyas (base local, por autor) y asignado alguna vez (historial medido). "Involucrado" no se guarda: se calcula en cada consulta.
 - **La carga y la agenda usan `--mine`**, no `--involved` (P4): un ticket reasignado a otro ya no es carga mía.
 - **Los filtros viven en `list`, no en `search`** (que es anti-duplicados: 5 resultados, un proyecto). Sin filtros, `list` sigue pidiendo a la API y su `--json` crudo no cambia; con filtro, lee la caché (local-first) y avisa su antigüedad.
 - **Identidad cacheada y fallo cerrado.** `PLANE_USERNAME` se resuelve una vez y se recuerda; sin identidad el filtro termina con error de uso y nunca devuelve todo.
@@ -28,7 +28,13 @@ La herramienta no podía responder "¿qué tengo yo?": la caché de tickets no g
 - Que no estuviste involucrado porque falte un evento: el aviso dice "verificado en X de Y tickets".
 - Quién tiene el ticket ahora si la caché está vencida: la asignación es la de la última sincronización y se muestra su edad.
 - Duraciones de asignación ni quién lo tuvo entre dos eventos: solo los cambios medidos, en orden.
-- Que quien registró horas fuera el asignado, ni que no hay horas: salen solo de la base local de esta máquina (defecto 0017) y esa tabla no guarda autor.
+- Que quien registró horas fuera el asignado, ni que no hay horas: salen solo de la base local de esta máquina (defecto 0017).
+
+## Autoría de las horas
+
+- `worklogs.author_id` guarda el UUID de quien registró las horas. `comment add` y `comment edit` lo toman de la identidad conocida **sin red** (`PLANE_ACTOR_UUID` o el UUID ya resuelto de `PLANE_USERNAME`), así que no añaden peticiones; `sync` lo toma del autor del comentario en Plane.
+- **NULL significa "sin autor registrado"** (filas anteriores o escritas sin identidad) y nunca se supone propio: `--involved` lo muestra como "horas sin autor registrado" y avisa cuántas hay. `report --refresh` las completa cuando el comentario está en Plane. Un autor conocido nunca se borra con un valor desconocido.
+- `delete` trata las horas locales sin autor como propias (se crearon en esta máquina) y las de otro autor conocido como ajenas, que bloquean el borrado.
 
 ## Por verificar contra una instancia real
 

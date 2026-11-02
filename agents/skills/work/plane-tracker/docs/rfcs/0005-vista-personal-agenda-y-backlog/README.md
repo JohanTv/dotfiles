@@ -34,7 +34,7 @@ La herramienta registra y reporta tiempo, pero no responde a "¿cuál es mi trab
 
 ### Fase 0 · datos y filtros
 - Guardar `assignees` y `created_by` en `issues_cache`; mostrar el asignado en `list`.
-- `list --mine`, `--open`, `--created`, `--involved`, `--all-projects`. "Involucrado" = asignado, creador, con horas registradas o asignado alguna vez.
+- `list --mine`, `--open`, `--created`, `--involved`, `--all-projects`. "Involucrado" = asignado, creador, con horas tuyas o asignado alguna vez.
 - **Implementada** (la definición de "involucrado" y sus límites están en la decisión [0019](../../decisions/0019-filtros-de-persona-y-historial-de-asignacion.md)); el resto de las fases sigue sin implementar.
 
 ### Fase 1 · `agenda`
