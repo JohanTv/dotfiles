@@ -1,11 +1,12 @@
 """Cliente HTTP de la API de Plane: clasificación de fallos, reintentos acotados, circuito y registro de latencia.
 
-Expone: api_request(), probe_plane(), classify(), log_request(), http_detail(), fail_http(), PlaneUnavailable.
+Expone: api_request(), probe_plane(), classify(), log_request(), http_detail(), fail_http(), rate_limit(), PlaneUnavailable.
 No hace: interpretar los datos de la API ni tocar SQLite.
 Un fallo transitorio (502/503/504, timeouts, conexión rechazada o cortada, DNS, fallo de handshake TLS, respuesta ilegible)
 lanza PlaneUnavailable y cuenta para el circuito; los errores definitivos (4xx, 500, certificado TLS no verificable) se
 imprimen y terminan con código 1 sin contar para el circuito, o se relanzan como HTTPError con raise_on_error. Solo los GET se reintentan ante un fallo transitorio, y los timeouts nunca; el 429 se
 reintenta con cualquier método porque la petición no se procesó. PLANE_OFFLINE=1 impide cualquier acceso a la red.
+Las cabeceras X-RateLimit-Remaining y X-RateLimit-Reset de la última respuesta quedan disponibles en rate_limit(); solo se observan, no cambian reintentos ni circuito.
 """
 
 import http.client
@@ -32,6 +33,7 @@ RETRY_MAX_ELAPSED = 5
 RATE_LIMIT_MAX_WAIT = 30
 TRANSIENT_HTTP = (502, 503, 504)
 TIMEOUT_KINDS = ("timeout", "read_timeout")
+_rate_limit = {}
 
 
 def log_request(method, url, status, elapsed_ms, attempt, error=None):
@@ -49,6 +51,26 @@ def log_request(method, url, status, elapsed_ms, attempt, error=None):
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+def _int_header(headers, name):
+    try:
+        return int(float(headers.get(name)))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _note_rate_limit(headers):
+    """Recuerda el presupuesto de tasa que anuncia una respuesta; sin cabeceras no toca el último valor conocido."""
+    remaining, reset = _int_header(headers, "X-RateLimit-Remaining"), _int_header(headers, "X-RateLimit-Reset")
+    if remaining is not None or reset is not None:
+        _rate_limit.clear()
+        _rate_limit.update(remaining=remaining, reset=reset)
+
+
+def rate_limit():
+    """{'remaining': int|None, 'reset': época|None} de la última respuesta que trajo las cabeceras; None si ninguna las trajo."""
+    return dict(_rate_limit) if _rate_limit else None
 
 
 def _classify_tls(exc, handshake):
@@ -102,8 +124,10 @@ def _send(url, method, payload, headers, timeout, attempt):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             status = resp.status
+            _note_rate_limit(resp.headers)
             raw = b"" if status == 204 else resp.read()
     except urllib.error.HTTPError as exc:
+        _note_rate_limit(exc.headers)
         log_request(method, url, exc.code, elapsed(), attempt)
         exc.elapsed = elapsed() / 1000
         raise

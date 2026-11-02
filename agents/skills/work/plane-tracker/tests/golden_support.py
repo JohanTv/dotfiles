@@ -188,6 +188,7 @@ class FakePlane:
         self.requests = []
         self.fail = []  # [(método, regex de ruta, estado, cuerpo)]
         self.faults = []
+        self.extra_headers = {}  # cabeceras añadidas a toda respuesta normal (p. ej. X-RateLimit-*); vacío por defecto
         self.store_comments = False
         self.ext_id = True
         self.committed = []
@@ -245,6 +246,8 @@ class FakePlane:
         handler.send_response(status)
         handler.send_header("Content-Type", "application/json")
         handler.send_header("Content-Length", str(len(body)))
+        for name, value in self.extra_headers.items():
+            handler.send_header(name, value)
         handler.end_headers()
         if body:
             handler.wfile.write(body)

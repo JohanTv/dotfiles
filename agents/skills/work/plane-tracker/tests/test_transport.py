@@ -71,6 +71,8 @@ class Transport(unittest.TestCase):
             self.addCleanup(patcher.stop)
         self.addCleanup(self.tmp.cleanup)
         self.addCleanup(self.fake.close)
+        api._rate_limit.clear()
+        self.addCleanup(api._rate_limit.clear)
         self.url = self.fake.base_url + PROJECTS
 
     def call(self, method="GET", **kwargs):
@@ -232,6 +234,36 @@ class Transport(unittest.TestCase):
         self.assertIn("results", self.call())
         self.assertEqual([p for _, p, _ in self.hits()], ["/api/v1/users/me/", "/api/v1/users/me/", PROJECTS])
         self.assertEqual(circuit.describe()["state"], "closed")
+
+    def test_none_until_a_response_announces_the_budget(self):
+        self.call()
+        self.assertIsNone(api.rate_limit())
+
+    def test_last_response_budget_is_exposed(self):
+        self.fake.extra_headers = {"X-RateLimit-Remaining": "58", "X-RateLimit-Reset": "1793620800"}
+        self.call()
+        self.assertEqual(api.rate_limit(), {"remaining": 58, "reset": 1793620800})
+        self.fake.extra_headers = {"X-RateLimit-Remaining": "57", "X-RateLimit-Reset": "1793620800"}
+        self.call()
+        self.assertEqual(api.rate_limit()["remaining"], 57)
+
+    def test_response_without_headers_keeps_the_last_known_budget(self):
+        self.fake.extra_headers = {"X-RateLimit-Remaining": "10"}
+        self.call()
+        self.fake.extra_headers = {}
+        self.call()
+        self.assertEqual(api.rate_limit(), {"remaining": 10, "reset": None})
+
+    def test_malformed_values_are_ignored(self):
+        self.fake.extra_headers = {"X-RateLimit-Remaining": "muchas", "X-RateLimit-Reset": ""}
+        self.call()
+        self.assertIsNone(api.rate_limit())
+
+    def test_rate_limit_is_a_copy(self):
+        self.fake.extra_headers = {"X-RateLimit-Remaining": "5"}
+        self.call()
+        api.rate_limit()["remaining"] = 0
+        self.assertEqual(api.rate_limit()["remaining"], 5)
 
 
 ISSUE = "10000000-0000-4000-8000-000000000001"
