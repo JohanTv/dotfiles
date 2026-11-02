@@ -203,7 +203,7 @@ class Architecture(unittest.TestCase):
         self.assertEqual(set(ticks(views[2])), set(voc.VIEWS))
         for label, expected in (("Dimensiones", voc.DIMENSIONS), ("Controles", voc.CONTROLS), ("Claves de `scope`", voc.SCOPE_KEYS),
                                 ("Relaciones de persona", voc.PERSON_RELATIONS), ("Estados", voc.STATES), ("Claves de `coverage`", voc.COVERAGE_KEYS),
-                                ("Valores de `coverage.source`", voc.COVERAGE_SOURCES), ("Claves de `coverage.detail`", voc.DETAIL_KEYS)):
+                                ("Valores de `coverage.source`", voc.COVERAGE_SOURCES), ("Notas siempre visibles", voc.ALWAYS_SHOWN), ("Claves de `coverage.detail`", voc.DETAIL_KEYS)):
             self.assertEqual(set(bullet(top, label)), set(expected), label)
 
     @gate("F4")
@@ -356,12 +356,14 @@ class Architecture(unittest.TestCase):
     # F12 -----------------------------------------------------------------------------------------------------------------------------
     @gate("F12")
     def test_f12_count_respects_limit_and_total_is_always_present(self):
-        # Pendiente de la decisión V20 (revisión adversarial): `truncated` es info y solo sale con --verbose; no se exige aquí su presencia.
+        # V20 (resuelto con la opción B): `truncated` es informativa pero siempre visible, así que también se exige sin --verbose.
         for filename, command, doc in golden_json_outputs():
             if isinstance(doc, dict) and doc.get("schema") == voc.SCHEMA and "view" in doc:
                 self.assertIn("total", doc, f"{filename}: {command}")
                 limit = (doc.get("scope") or {}).get("limit")
                 self.assertTrue(limit is None or doc["count"] <= limit, f"{filename}: {command}")
+                if doc["count"] < doc["total"]:
+                    self.assertIn("truncated", [n["code"] for n in doc["notes"]], f"{filename}: {command}")
 
     # F13 -----------------------------------------------------------------------------------------------------------------------------
     @gate("F13")
@@ -393,6 +395,15 @@ class Architecture(unittest.TestCase):
         self.assertEqual([n["code"] for n in cov_mod.build_notes(cov, None, result)], ["cache_stale", "source_forbidden"])
         self.assertEqual([n["code"] for n in cov_mod.build_notes(cov, None, result, verbose=True)], ["cache_stale", "source_forbidden", "assignment_snapshot"])
 
+    def test_f13_always_shown_notes_survive_without_verbose_and_truncated_has_no_hint(self):
+        cov = cov_mod.Coverage(source="cache")
+        cut = cov_mod.Result(rows=[{}], total=3, coverage=cov, extra_notes=({"code": "text_looks_like_id", "text": "x", "hint": "plane-tracker get PRJ-1"},))
+        notes = cov_mod.build_notes(cov, {"projects": ["PRJ", "OPS"]}, cut)
+        self.assertEqual([n["code"] for n in notes], ["text_looks_like_id", "truncated"])
+        self.assertNotIn("hint", [k for n in notes if n["code"] == "truncated" for k in n])
+        self.assertEqual(voc.ALWAYS_SHOWN, {"truncated", "text_looks_like_id"})
+        self.assertTrue(all(voc.NOTES[c][0] == "info" for c in voc.ALWAYS_SHOWN), "las siempre visibles son informativas; un aviso ya sale siempre")
+
     # F14 -----------------------------------------------------------------------------------------------------------------------------
     @gate("F14")
     def test_f14_complete_true_is_impossible_with_a_warn_note(self):
@@ -419,6 +430,8 @@ class Architecture(unittest.TestCase):
         c = lambda **kw: cov_mod.Coverage(source=kw.pop("source", "cache"), **kw)
         self.assertIs(cov_mod.complete_list(c()), True)
         self.assertIs(cov_mod.complete_list(c(unavailable=("A",))), False)
+        cut = cov_mod.Result(rows=[{}], total=37, coverage=c())  # recortada pero con la fuente completa: complete no depende del límite
+        self.assertIs(cov_mod.complete_list(cut.coverage), True)
         self.assertIs(cov_mod.complete_list(c(stale=True)), None)
         self.assertIs(cov_mod.complete_list(c(detail={"count_mismatch": ["A"], "legacy": True})), False)
         self.assertIs(cov_mod.complete_time(c(source="local")), None)  # marca global: no se puede saber

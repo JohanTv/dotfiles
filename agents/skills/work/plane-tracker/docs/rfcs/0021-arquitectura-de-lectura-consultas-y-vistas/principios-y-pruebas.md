@@ -34,7 +34,7 @@ Redacción vigente: "las lecturas responden con lo local y avisan su antigüedad
 | F9 | Los `render_*` consumen **solo** el sobre: no importan `sqlite3`, `os`, `clock`, `db`, `api`, `cache`, `resolve`, `store_*` ni `freshness`, y ninguna función recibe `conn`. | AST. |
 | F10 | `report time --json` incluye `summary.by_capacity` (con `undeclared`) y `by_project`; los valores `provenance: default` **no** se suman a un balde declarado. | golden con comentarios de telemetría parcial (requiere el defecto 0022 corregido). |
 | F11 | Las vistas personales sin flag tienen `scope.ticket_person` o `scope.hours_author` = el actor; no existe flag para ver a otros. | golden y prueba de la matriz. |
-| F12 | `count <= limit` cuando hay límite; `total` siempre presente; `count < total` ⇒ nota `truncated`. | propiedad sobre los golden. |
+| F12 | `count <= limit` cuando hay límite; `total` siempre presente; `count < total` ⇒ nota `truncated` (siempre visible, incluso sin `--verbose`). | propiedad sobre los golden. |
 | F13 | **No hay dos fuentes del mismo hecho**: las notas de origen "cobertura" solo existen si la cobertura las implica, y `extra_notes` no puede usar códigos derivados. | prueba unitaria de `notes_from` y del registro (sustituye al AST de `notes.append`). |
 | F14 | `complete: true` ⇒ ninguna nota `warn`. | propiedad sobre los golden y unitaria. |
 | F15 | **Trinquete**: una constante `CURRENT_PHASE` en la prueba lista qué F debe estar activa en cada fase; fallar si una F de una fase ≤ `CURRENT_PHASE` está saltada. | prueba meta. |

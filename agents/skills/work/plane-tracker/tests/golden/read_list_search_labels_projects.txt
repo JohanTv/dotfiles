@@ -73,6 +73,7 @@ $ plane.py list --text 3
 --- stdout ---
 
 📋 Tickets en OMNIFY con «3» (0) · caché de hace 1 min:
+  ℹ El texto '3' parece un ticket: se buscó como texto. → plane-tracker get 3
 --- stderr ---
 
 
@@ -81,6 +82,7 @@ $ plane.py list --text OMNIFY-2
 --- stdout ---
 
 📋 Tickets en OMNIFY con «OMNIFY-2» (0) · caché de hace 1 min:
+  ℹ El texto 'OMNIFY-2' parece un ticket: se buscó como texto. → plane-tracker get OMNIFY-2
 --- stderr ---
 
 
@@ -155,14 +157,14 @@ $ plane.py list --text sms --open --brief --json
 $ plane.py list --brief --json --limit 2
 [exit 0]
 --- stdout ---
-{"count":2,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"project":"OMNIFY","state":"Progreso","state_group":"started","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"project":"OMNIFY","state":"Completado","state_group":"completed","ticket":"OMNIFY-2","title":"Acortador de enlaces"}],"schema":"plane-tracker/1","scope":{"limit":2,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
+{"count":2,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[{"code":"truncated","text":"Se muestran 2 de 3 resultados."}],"results":[{"project":"OMNIFY","state":"Progreso","state_group":"started","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"project":"OMNIFY","state":"Completado","state_group":"completed","ticket":"OMNIFY-2","title":"Acortador de enlaces"}],"schema":"plane-tracker/1","scope":{"limit":2,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
 --- stderr ---
 
 
 $ plane.py list --json --verbose --limit 1
 [exit 0]
 --- stdout ---
-{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[{"code":"single_project","hint":"Usa --all-projects.","text":"Alcance de un solo proyecto: OMNIFY."},{"code":"truncated","hint":"Sube --limit o acota el alcance.","text":"Se muestran 1 de 3 resultados."}],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"}],"schema":"plane-tracker/1","scope":{"limit":1,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[{"code":"single_project","hint":"Usa --all-projects.","text":"Alcance de un solo proyecto: OMNIFY."},{"code":"truncated","text":"Se muestran 1 de 3 resultados."}],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"}],"schema":"plane-tracker/1","scope":{"limit":1,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
 --- stderr ---
 
 

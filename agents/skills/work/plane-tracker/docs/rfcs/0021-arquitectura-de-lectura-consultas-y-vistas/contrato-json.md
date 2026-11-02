@@ -106,7 +106,7 @@ Severidad (`info`, `warn`), origen y remedio. Agregar uno exige añadirlo aquí 
 
 | Código | Sev. | Origen | Cuándo | Remedio (`hint`) |
 | :--- | :---: | :--- | :--- | :--- |
-| `truncated` | info | resultado | `count < total` | subir `--limit` o acotar el alcance |
+| `truncated` | info | resultado | `count < total` (siempre visible, sin hint; ver V20) | — |
 | `cache_stale` | warn | cobertura | se sirvió vencido porque Plane no respondió | reintentar con red o `--refresh` |
 | `source_unavailable` | warn | cobertura | proyectos sin datos ni caché | conectar y `--refresh` |
 | `source_forbidden` | warn | cobertura | proyectos a los que el usuario no tiene acceso (403) | revisar la membresía; se omiten |

@@ -1,7 +1,7 @@
 """Vocabulario cerrado del contrato de lectura `plane-tracker/1` (decisión 0025): una sola fuente de nombres.
 
 Expone: SCHEMA, DIMENSIONS, CONTROLS, PERSON_RELATIONS, SCOPE_KEYS, ENVELOPE_KEYS, COVERAGE_SOURCES, COVERAGE_KEYS, DETAIL_KEYS,
-VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
+VIEWS, FAMILIES, NESTED, BRIEF_FIELDS, SUMMARIES, REPLACES, DROPPED, NOTES, ALWAYS_SHOWN, DERIVED_ORIGINS, ERRORS, CHECK_CODES, field_spec().
 No hace: importar nada del paquete, validar sobres (eso es envelope) ni calcular cobertura (coverage). Son datos puros.
 Un campo se declara como "tipo" con sufijos: `?` admite null y `!` es obligatorio (ej. "str?!"); tipos: str, int, num, bool, list, dict.
 La especificación legible es docs/decisions/0025-contrato-json-de-lectura; una prueba (F4) comprueba que no se desincronizan.
@@ -84,7 +84,7 @@ DROPPED = {
 # (coverage.notes_from); vista las añade la consulta (extra_notes); envelope solo lo escribe el sobre. Un aviso (warn) siempre lleva remedio.
 DERIVED_ORIGINS = frozenset({"cobertura", "resultado", "alcance"})
 NOTES = {
-    "truncated": ("info", "resultado", "Se muestran {count} de {total} resultados.", "Sube --limit o acota el alcance."),
+    "truncated": ("info", "resultado", "Se muestran {count} de {total} resultados.", None),
     "cache_stale": ("warn", "cobertura", "Datos locales de hace {age}; Plane no respondió.", "Reintenta con red o usa --refresh."),
     "source_unavailable": ("warn", "cobertura", "Sin datos ni caché de: {projects}.", "Conéctate y usa --refresh."),
     "source_forbidden": ("warn", "cobertura", "Sin acceso a: {projects}.", "Revisa la membresía; se omiten."),
@@ -103,6 +103,8 @@ NOTES = {
     "internal": ("warn", "envelope", None, "Informa el defecto."),
 }
 SEVERITY_ORDER = ("warn", "info")  # al ordenar notas, los avisos van antes que las informativas
+# Notas informativas que salen siempre, sin --verbose: lo que el agente necesita para no concluir de más (hay más resultados que los mostrados; el texto era un ticket).
+ALWAYS_SHOWN = frozenset({"truncated", "text_looks_like_id"})
 
 # --- Errores -----------------------------------------------------------------------------------------------------------------------------
 # código -> código de salida. Tabla fija de salida: 0 éxito, 1 error definitivo o de validación, 2 uso, 3 Plane no disponible.

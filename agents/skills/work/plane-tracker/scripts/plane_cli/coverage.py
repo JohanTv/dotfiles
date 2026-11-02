@@ -3,6 +3,7 @@
 Expone: Coverage (con merge() y to_dict()), Result, combine(), complete_list(), complete_time(), complete_flow(), complete_agenda(),
 complete_get(), completeness_label(), notes_from(), build_notes().
 No hace: leer SQLite, tocar la red ni imprimir. `complete` tiene tres valores: True, False y None (no verificado, nunca equivale a completo).
+`complete` describe la cobertura de la FUENTE (la caché frente al servidor), no si la página muestra todo: eso lo dicen `total`, `count` y la nota `truncated`.
 Las notas no se escriben a mano: se derivan de la cobertura, del resultado y del alcance (una sola fuente por hecho); la consulta solo
 aporta las propias de su vista (Result.extra_notes), que deben estar registradas con origen `vista`.
 Los hechos de coverage.detail que alimentan notas y la regla de `complete`: forbidden, capped, count_mismatch (listas de proyectos), legacy,
@@ -172,5 +173,5 @@ def build_notes(cov, scope, result, verbose=False):
             note["hint"] = extra.get("hint") or entry[3]
         notes.append(note)
     if not verbose:
-        notes = [n for n in notes if vocabulary.NOTES[n["code"]][0] == "warn"]
+        notes = [n for n in notes if vocabulary.NOTES[n["code"]][0] == "warn" or n["code"] in vocabulary.ALWAYS_SHOWN]
     return sorted(notes, key=lambda n: (vocabulary.SEVERITY_ORDER.index(vocabulary.NOTES[n["code"]][0]), n["code"]))

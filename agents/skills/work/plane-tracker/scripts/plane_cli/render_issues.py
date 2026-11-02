@@ -39,6 +39,8 @@ def render(doc):
     for row in doc["results"]:
         lines += _line(row)
     for note in doc["notes"]:
+        if note["code"] == "truncated":
+            continue  # la cabecera ya dice "N de M"
         mark = "⚠" if vocabulary.NOTES[note["code"]][0] == "warn" else "ℹ"
         lines.append(f"  {mark} {note['text']}" + (f" → {note['hint']}" if note.get("hint") else ""))
     return "\n".join(lines) + "\n"

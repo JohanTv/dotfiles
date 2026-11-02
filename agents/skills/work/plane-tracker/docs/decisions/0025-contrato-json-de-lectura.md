@@ -38,7 +38,7 @@ Promueve [`contrato-json.md`](../rfcs/0021-arquitectura-de-lectura-consultas-y-v
 | `count` | entero | `len(results)`; nunca mayor que `total` ni que `scope.limit`; sin límite (reportes) `count == total`. |
 | `results` | lista | filas con **solo** campos del vocabulario de su familia. |
 | `summary` | objeto o null | agregados que no son filas; solo las vistas con familia de resumen. |
-| `coverage` | objeto | obligatorio. `complete` es `true`, `false` o `null` (**no verificado**: nunca equivale a completo). `complete: true` es incompatible con una nota `warn`. |
+| `coverage` | objeto | obligatorio. `complete` es `true`, `false` o `null` (**no verificado**: nunca equivale a completo) y describe la **fuente** (la caché frente al servidor), no si la página muestra todo: para eso están `total`, `count` y la nota `truncated`. `complete: true` es incompatible con una nota `warn`. |
 | `notes` | lista | `{code, text, hint?}`; el agente ramifica por `code`. Se derivan de la cobertura, el resultado y el alcance, más las propias de la vista. Orden: avisos (`warn`) antes que informativas (`info`) y luego por código. |
 
 Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara con `vocabulary.py`):
@@ -50,13 +50,14 @@ Vocabulario del alcance y la cobertura (una línea por conjunto; F4 las compara 
 - Estados: `open`, `all`
 - Claves de `coverage`: `source`, `as_of`, `age_s`, `stale`, `complete`, `unavailable`, `detail`
 - Valores de `coverage.source`: `cache`, `api`, `snapshot`, `local`, `mixed`
+- Notas siempre visibles: `truncated`, `text_looks_like_id`
 - Claves de `coverage.detail`: `history`, `text_fields`, `hours_scope`, `hours_verified`, `capped`, `legacy`, `forbidden`, `rate_budget_exhausted`, `assignment_snapshot`, `count_mismatch`
 
 `person` se reparte en `ticket_person` (qué tickets) y `hours_author` (de quién son las horas). Los controles no van en el sobre, salvo `limit`, que se repite en `scope`.
 
 Serialización: `ensure_ascii=False`, claves ordenadas, separadores compactos. Mismo estado, reloj y zona horaria dan bytes idénticos.
 
-Las notas informativas (`info`) solo salen con `--verbose`; los avisos (`warn`) siempre y llevan `hint` (el remedio, como comando cuando existe). Lo que ya va en `notes` o `coverage` no se repite por stderr en modo `--json`.
+Las notas informativas (`info`) solo salen con `--verbose`, salvo las siempre visibles (`truncated`, `text_looks_like_id`: sin ellas un agente concluiría de más); los avisos (`warn`) siempre y llevan `hint` (el remedio, como comando cuando existe). Lo que ya va en `notes` o `coverage` no se repite por stderr en modo `--json`.
 
 ## Vocabulario por familia
 
@@ -241,7 +242,7 @@ Severidad (`info`, `warn`) y origen. Agregar uno exige añadirlo aquí y en `voc
 
 | Código | Sev. | Origen | Cuándo | Remedio (`hint`) |
 | :--- | :---: | :--- | :--- | :--- |
-| `truncated` | info | resultado | `count < total` | subir `--limit` o acotar el alcance |
+| `truncated` | info | resultado | `count < total` (siempre visible) | — |
 | `cache_stale` | warn | cobertura | se sirvió vencido porque Plane no respondió | reintentar con red o `--refresh` |
 | `source_unavailable` | warn | cobertura | proyectos sin datos ni caché | conectar y `--refresh` |
 | `source_forbidden` | warn | cobertura | proyectos sin acceso (403) | revisar la membresía; se omiten |
@@ -255,7 +256,7 @@ Severidad (`info`, `warn`) y origen. Agregar uno exige añadirlo aquí y en `voc
 | `single_project` | info | alcance | alcance de un solo proyecto | `--all-projects` |
 | `cache_capped` | warn | cobertura | el proyecto supera el máximo sincronizable | acotar el alcance |
 | `pending_unpublished` | warn | vista | comentarios en cola sin publicar que afectan el resultado | `outbox flush` |
-| `text_looks_like_id` | info | vista | el texto parece un ticket (`PRJ-12`) | `get PRJ-12` |
+| `text_looks_like_id` | info | vista | el texto parece un ticket (`PRJ-12`); siempre visible | `get PRJ-12` |
 | `internal` | warn | envelope | deriva del sobre detectada en producción | informar el defecto |
 
 ## Sobre de error
