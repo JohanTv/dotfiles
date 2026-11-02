@@ -81,9 +81,9 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | 1 | cerrada | Commit `a9b4150` «feat(plane-tracker): rebuild list on the query model (phase 1)»; hallazgos V23-V28 en la [revisión](./revision-adversarial.md) |
 | 2 | cerrada | Commits `6319c27` «feat(plane-tracker)!: retire search in favor of list --text (phase 2)» y `b76f42e` «docs(rules): point the Momento Cero rule to list --text»; el dueño verificó la regla nueva en una sesión limpia (2026-11-02). Hallazgos V29-V30 |
 | 3 | cerrada | Commits `c1a255b` «feat(plane-tracker): move the remaining reads onto the envelope (phase 3)» y `87e9880` (`get --include`, refresco de etiquetas); validado por el dueño (2026-11-02). Pendiente declarado: `--include relations\|children` (ver abajo). Hallazgos V31-V38 |
-| 4 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker): fix the worklog sync defects 0017, 0010 and 0022 (phase 4)»); 0017 y 0010 `corregidos`; 0022 sigue `abierto` (le falta el reporte por balde, F10, de la fase 5). No se marca `cerrada` porque F15 exige cerrar las fases en orden. Hallazgos V39-V43 y V45 (convergencia verificada con la API real) |
-| 5 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker)!: make report a group with time and flow views (phase 5)»); `0022` queda `corregido`. No se marca `cerrada` porque F15 exige cerrar las fases en orden y la 4 espera tu validación. Verificada con la API real (solo lectura): `report time` converge en 2 rondas y `report flow` en 3. Hallazgos V46-V54 |
-| 6 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker): add the sync command and retire the list history flags (phase 6)»); `sync.py` pasa a `worklog_sync.py` y el barrido de historial a `freshness`. No se marca `cerrada` por el orden de F15. Hallazgos V56-V60 |
+| 4 | cerrada | Commit `7504b9b` «feat(plane-tracker): fix the worklog sync defects 0017, 0010 and 0022 (phase 4)» y `1682efb` (convergencia incremental); 0017, 0010 y 0022 `corregidos`; validado por el dueño (2026-11-02). Hallazgos V39-V43 y V45 |
+| 5 | cerrada | Commits `57089e2` «feat(plane-tracker)!: make report a group with time and flow views (phase 5)», `f00ad1b` y `c3a7c21`; validado por el dueño (2026-11-02). Hallazgos V46-V55 |
+| 6 | cerrada | Commit `276d0e9` «feat(plane-tracker): add the sync command and retire the list history flags (phase 6)»; validado por el dueño (2026-11-02). Hallazgos V56-V61 |
 | 7 | pendiente | |
 | 8 | pendiente | |
 

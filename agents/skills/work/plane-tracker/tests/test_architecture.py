@@ -27,7 +27,7 @@ DECISION = os.path.join(SKILL, "docs", "decisions", "0025-contrato-json-de-lectu
 PLAN = os.path.join(SKILL, "docs", "rfcs", "0021-arquitectura-de-lectura-consultas-y-vistas", "plan-de-migracion.md")
 GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
-CURRENT_PHASE = 3
+CURRENT_PHASE = 6
 # Fase del plan en que cada función de aptitud pasa a estar activa. F3-golden es la mitad de F3 que necesita sobres reales (fase 1).
 PHASES = {"F1": 0, "F2": 1, "F3": 0, "F3-golden": 1, "F4": 0, "F5": 1, "F6": 1, "F7": 1, "F8": 0, "F9": 1, "F10": 5, "F11": 5, "F12": 1, "F13": 0,
           "F14": 0, "F15": 0}
