@@ -323,6 +323,8 @@ class FakePlane:
             if not sub:
                 if issue is None:
                     return self.reply(handler, 404, {"detail": "not found"})
+                if method == "DELETE":
+                    return self.reply(handler, 204, None)
                 return self.reply(handler, 200, {**issue, **body} if method == "PATCH" else issue)
             return self.issue_child(handler, method, iid, sub, body)
         return self.reply(handler, 404, {"detail": "no"})

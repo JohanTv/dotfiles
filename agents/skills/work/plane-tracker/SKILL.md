@@ -45,6 +45,7 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--attach ARCH...]` |
 | Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`) |
 | Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N]` |
+| Eliminar ticket (irreversible; solo si el usuario lo pide) | `plane-tracker delete T` muestra el alcance; `--yes` lo ejecuta. Para conservarlo: `update T --state Cancelado` |
 | Borrar comentario | `plane-tracker comment delete T [--comment-id UUID]` |
 | Adjuntos | `plane-tracker attachment add\|list\|delete\|replace` |
 | Enlace (PRs, documentos) | `plane-tracker link add T URL --title "PR #23"` |

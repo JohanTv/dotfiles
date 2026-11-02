@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-ROOT_COMMANDS = ["search", "get", "list", "create", "update", "report", "handoff", "labels", "projects", "whoami", "health"]
+ROOT_COMMANDS = ["search", "get", "list", "create", "update", "delete", "report", "handoff", "labels", "projects", "whoami", "health"]
 GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
           "focus": ("set", "clear", "status"), "worklog": ("propose", "check")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
@@ -203,6 +203,13 @@ class Golden(unittest.TestCase):
                  ["comment", "edit", "OMNIFY-1", "--duration", "10"],
                  ["comment", "delete", "OMNIFY-1", "--comment-id", CID4]]
         self.golden("comment_edit_delete", steps, db_queries=[WORKLOGS])
+
+    def test_delete(self):
+        steps = [["comment", "add", "OMNIFY-1", "-m", "con horas", "--duration", "15", "--track", "t1"],
+                 ["delete", "OMNIFY-1"], ["delete", "OMNIFY-1", "--json"], ["delete"],
+                 ["delete", "OMNIFY-1", "--yes"], ["delete", "OMNIFY-1", "--yes", "--json"],
+                 ["delete", "OMNIFY-999", "--yes"]]
+        self.golden("delete", steps, db_queries=[WORKLOGS])
 
     def test_update_create_link(self):
         steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-10-27"],

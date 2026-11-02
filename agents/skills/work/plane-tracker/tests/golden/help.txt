@@ -12,6 +12,7 @@ positional arguments:
     list        Listar los tickets del proyecto
     create      Crear un ticket
     update      Editar título, descripción, estado y demás campos
+    delete      Eliminar ticket (irreversible)
     comment     Comentarios: add | edit | delete
     attachment  Adjuntos: add | list | delete | replace
     link        Enlaces: add
@@ -156,6 +157,26 @@ options:
                         Fecha de inicio YYYY-MM-DD
   --due-date DUE_DATE   Fecha de vencimiento YYYY-MM-DD
   --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py delete [-h] [--yes] [--json] issue
+
+Elimina un work item de Plane con sus comentarios, adjuntos y enlaces, y borra
+sus datos locales. Sin --yes solo muestra el alcance. Para conservarlo,
+`update --state Cancelado`.
+
+positional arguments:
+  issue       Ticket (ej: OPS-13); siempre explícito, no se deduce de la rama
+              de Git
+
+options:
+  -h, --help  show this help message and exit
+  --yes       Confirma la eliminación
+  --json      Salida en JSON
 --- stderr ---
 
 

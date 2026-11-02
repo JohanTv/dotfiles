@@ -37,6 +37,7 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cmd_comment.py` | Comando `comment add`. |
 | `plane_cli/cmd_comment_ops.py` | Comandos `comment edit`, `comment delete` y `worklog propose`. |
 | `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
+| `plane_cli/cmd_delete.py` | Comando `delete`: elimina el ticket en Plane y su rastro local; sin `--yes` solo informa. |
 | `plane_cli/cmd_read.py` | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
 | `plane_cli/cmd_report.py` | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
 | `plane_cli/cmd_outbox.py` | Comandos `outbox list`, `outbox flush` y `outbox drop`. |

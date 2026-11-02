@@ -210,6 +210,7 @@ plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --embed-metadata      
 plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
 plane-tracker comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
 plane-tracker comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
+plane-tracker delete OMNIFY-205 [--yes]                                                              # elimina el ticket (irreversible): sin --yes solo muestra qué se pierde; borra también sus worklogs locales
 ```
 *Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
 

@@ -15,7 +15,7 @@ import os
 import sqlite3
 import sys
 
-from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_ops, cmd_outbox, cmd_read, cmd_report, cmd_tickets_write, renamed
+from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_delete, cmd_ops, cmd_outbox, cmd_read, cmd_report, cmd_tickets_write, renamed
 from plane_cli.circuit import PlaneUnavailable, format_unavailable
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
@@ -27,6 +27,7 @@ COMMANDS = (
     cmd_read.register_list,
     cmd_tickets_write.register_create,
     cmd_tickets_write.register_update,
+    cmd_delete.register_delete,
     ("comment", "Comentarios: add | edit | delete",
      (cmd_comment.register_comment_add, cmd_comment_ops.register_comment_edit, cmd_comment_ops.register_comment_delete)),
     ("attachment", "Adjuntos: add | list | delete | replace",
