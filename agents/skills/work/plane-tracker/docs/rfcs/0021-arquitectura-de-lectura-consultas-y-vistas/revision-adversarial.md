@@ -136,3 +136,9 @@ Notas de alcance: el endpoint de 1 GET por etiqueta (`workspaces/{ws}/issues/{PR
 | V41 | MEDIO | El criterio 3 del 0022 ("un reporte por balde separa lo no declarado") presupone un reporte por balde que hoy no existe. | Aplazado | Fase 5 (F10, `summary.by_capacity` con `undeclared`); el 0022 queda `abierto` hasta entonces. |
 | V42 | MEDIO | Sincronizar por antigüedad (0010) y todos los proyectos accesibles (0017) hace que cada `report` pasados 5 minutos cueste unas `N + tickets activos` peticiones; con muchos proyectos el presupuesto de tasa (60 por ventana) se agota. | Propuesta | La sincronización se detiene antes de agotarlo y queda marcada incompleta con aviso; el enfriamiento es 5 minutos (`SYNC_COOLDOWN`). Se revisará con `sync --history`/`sync` en la fase 6. |
 | V43 | BAJO | Un bloque de telemetría solo se reconoce con `date` y (`start_time` o `notes`): uno con duración pero sin fecha se ignora en silencio y no se cuenta como "sin medir". Además `report --json` (filas crudas, hasta la fase 5) ahora incluye `defaulted_json`, y `sync` sin identidad sigue solo avisando (decisión 6 pide `actor_unknown`). | Propuesta | Se cuentan solo los comentarios reconocibles como telemetría; `defaulted_json` es transitorio hasta `provenance` (fase 5); `actor_unknown` queda para la fase 5/6 (cambiaría el golden `report_noactor`). |
+
+## Hallazgo al cerrar las fases 2 y 3 (2026-11-02)
+
+| Id | Sev. | Hallazgo | Estado | Dónde se atiende |
+| :--- | :---: | :--- | :--- | :--- |
+| V44 | BAJO | La fila de `cmd_read`, `cmd_report` y `cmd_sync` de la tabla de capas (modelo de consulta) solo permite `views`, `scope`, `scope_flags`, `freshness` y `errors`, pero un comando necesita además `config` (flags comunes), `envelope` y `output` (construir y emitir el sobre) y `vocabulary` (valores de `--include`). | Corregido | `COMMAND_DEPS` en la tabla `DEPENDENCIES` de `tests/test_architecture.py` (con `history_sweep` solo en `cmd_read`, hasta la fase 6). |

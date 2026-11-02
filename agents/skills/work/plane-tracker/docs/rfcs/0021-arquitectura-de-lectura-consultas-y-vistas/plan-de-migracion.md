@@ -79,8 +79,8 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | :---: | :--- | :--- |
 | 0 | cerrada | Decisión [0025](../../decisions/0025-contrato-json-de-lectura.md); commits `daf88ef`, `84f96bc`, `82a360c`, `f0add02`, `c5b3187`, `6d0f7d8`, `609f839`. Hallazgos V15-V22 en la [revisión](./revision-adversarial.md) (V20 abierto) |
 | 1 | cerrada | Commit `a9b4150` «feat(plane-tracker): rebuild list on the query model (phase 1)»; hallazgos V23-V28 en la [revisión](./revision-adversarial.md) |
-| 2 | en curso | Código, pruebas, documentos y regla externa hechos (commits «feat(plane-tracker)!: retire search in favor of list --text (phase 2)» y «docs(rules): point the Momento Cero rule to list --text»). **Falta** verificar en una sesión limpia que el agente ejecuta la regla nueva; se cierra con tu confirmación. Hallazgos V29-V30 |
-| 3 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker): move the remaining reads onto the envelope (phase 3)»); no se marca `cerrada` porque las fases se cierran en orden y la 2 sigue abierta. Hallazgos V31-V36 |
+| 2 | cerrada | Commits `6319c27` «feat(plane-tracker)!: retire search in favor of list --text (phase 2)» y `b76f42e` «docs(rules): point the Momento Cero rule to list --text»; el dueño verificó la regla nueva en una sesión limpia (2026-11-02). Hallazgos V29-V30 |
+| 3 | cerrada | Commits `c1a255b` «feat(plane-tracker): move the remaining reads onto the envelope (phase 3)» y `87e9880` (`get --include`, refresco de etiquetas); validado por el dueño (2026-11-02). Pendiente declarado: `--include relations\|children` (ver abajo). Hallazgos V31-V38 |
 | 4 | en curso | Hecha en código y pruebas (commit «feat(plane-tracker): fix the worklog sync defects 0017, 0010 and 0022 (phase 4)»); 0017 y 0010 `corregidos`; 0022 sigue `abierto` (le falta el reporte por balde, F10, de la fase 5). No se marca `cerrada` porque F15 exige cerrar las fases en orden. Hallazgos V39-V43 |
 | 5 | pendiente | |
 | 6 | pendiente | |

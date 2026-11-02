@@ -27,19 +27,20 @@ DECISION = os.path.join(SKILL, "docs", "decisions", "0025-contrato-json-de-lectu
 PLAN = os.path.join(SKILL, "docs", "rfcs", "0021-arquitectura-de-lectura-consultas-y-vistas", "plan-de-migracion.md")
 GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
-CURRENT_PHASE = 1
+CURRENT_PHASE = 3
 # Fase del plan en que cada función de aptitud pasa a estar activa. F3-golden es la mitad de F3 que necesita sobres reales (fase 1).
 PHASES = {"F1": 0, "F2": 1, "F3": 0, "F3-golden": 1, "F4": 0, "F5": 1, "F6": 1, "F7": 1, "F8": 0, "F9": 1, "F10": 5, "F11": 5, "F12": 1, "F13": 0,
           "F14": 0, "F15": 0}
 # F1: módulo (o patrón) -> módulos de plane_cli que puede importar (modelo de consulta §Dónde viven), desde la fase indicada.
+COMMAND_DEPS = ("views", "scope", "scope_flags", "freshness", "errors", "config", "envelope", "output", "vocabulary")
 DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
     "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil", "flow", "vocabulary"), 1), "query_*": (("store_*", "scope", "coverage", "assignments", "outbox"), 1),
     "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
-    "cmd_read": (("views", "scope", "scope_flags", "freshness", "errors"), 3), "cmd_report": (("views", "scope", "scope_flags", "freshness", "errors"), 5),
-    "cmd_sync": (("views", "scope", "scope_flags", "freshness", "errors"), 6),
+    # los comandos solo registran y llaman: además de lo del modelo necesitan los flags comunes (config), el sobre y su salida (V44); `cmd_read` conserva history_sweep hasta la fase 6
+    "cmd_read": (COMMAND_DEPS + ("history_sweep",), 3), "cmd_report": (COMMAND_DEPS, 5), "cmd_sync": (COMMAND_DEPS, 6),
 }
 LAYER_ONE = {"config", "clock", "vocabulary", "errors"}
 RENDER_FORBIDDEN = {"sqlite3", "os", "clock", "db", "api", "cache", "resolve", "freshness"}
