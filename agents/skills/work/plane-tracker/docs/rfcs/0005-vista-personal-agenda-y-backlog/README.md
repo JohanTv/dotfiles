@@ -38,6 +38,8 @@ La herramienta registra y reporta tiempo, pero no responde a "¿cuál es mi trab
 - **Implementada** (la definición de "involucrado" y sus límites están en la decisión [0019](../../decisions/0019-filtros-de-persona-y-historial-de-asignacion.md)); el resto de las fases sigue sin implementar.
 
 ### Fase 1 · `agenda`
+Se construye como la vista `report agenda` del modelo de [0021](../0021-arquitectura-de-lectura-consultas-y-vistas/README.md) (fase 4 de su plan), sobre la misma selección de tickets que `list`; no se implementa como un comando aparte.
+
 Vista personal de lectura rápida, sin enviar nada. Secciones:
 
 1. **Carga:** tickets en curso (frente a un límite sugerido), en revisión, vencidos y sin movimiento hace más de N días.
