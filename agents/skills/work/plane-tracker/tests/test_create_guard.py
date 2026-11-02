@@ -176,5 +176,28 @@ class SubmitIssue(Base):
         self.assertFalse(cg._has_open_mark(self.conn, PROJECT, "Crear algo"))
 
 
+class BranchSlugTests(unittest.TestCase):
+    def test_explicit_valid_slug(self):
+        slug = ctw.build_branch_slug("Ignored Title", "campaign-form-validations")
+        self.assertEqual(slug, "campaign-form-validations")
+
+    def test_explicit_invalid_slug_raises(self):
+        for bad in ("con acento-ó", "con espacios", "-leading", "trailing-", "con_underscore"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(CliError) as ctx:
+                    ctw.build_branch_slug("Title", bad)
+                self.assertEqual(ctx.exception.code, "invalid_input")
+
+    def test_fallback_nfkd_normalization(self):
+        # Mantiene letras acentuadas convertidas a ASCII sin mutilarlas como guiones
+        slug = ctw.build_branch_slug("Filtro módulo teléfono")
+        self.assertEqual(slug, "filtro-modulo-telefono")
+
+    def test_fallback_truncation(self):
+        slug = ctw.build_branch_slug("Este es un título extremadamente largo que supera el límite de longitud")
+        self.assertLessEqual(len(slug), 35)
+        self.assertFalse(slug.endswith("-"))
+
+
 if __name__ == "__main__":
     unittest.main()

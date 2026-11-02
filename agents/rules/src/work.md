@@ -29,7 +29,7 @@
 
 ### Detección y Momento Cero (Zero-Moment Discovery):
 - **Búsqueda Instantánea:** Al iniciar una sesión o recibir una intención de trabajo (ej. *"arreglemos las validaciones del formulario"*), el agente debe ejecutar `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` para comprobar si ya existe un ticket (también cerrado o cancelado) o si se debe proponer uno nuevo. Solo concluye "no hay duplicado" si `coverage.complete` es `true`; si no, el resultado no prueba ausencia y debe decirlo.
-- **Acción Rápida:** Si hay un ticket coincidente, preguntar brevemente para confirmar y cambiar a la rama respectiva (`git checkout -b feat/OMNIFY-XXX-...`). Si no existe, proponer el work item con título, prioridad y etiquetas.
+- **Acción Rápida:** Si hay un ticket coincidente, preguntar brevemente para confirmar y cambiar a la rama respectiva (`git checkout -b feat/OMNIFY-XXX-...`). Si no existe, proponer el work item con título, prioridad, etiquetas y slug en inglés (`--branch-slug`).
 - **Lectura Escalonada y Economía de Tokens:**
   - *Descubrimiento:* Usa `plane-tracker list --text "..." --brief --json` (mínimo consumo de tokens).
   - *Inspección inicial:* Usa `plane-tracker get <TICKET>` (sin `--full`). El truncado por defecto a 300 caracteres es suficiente para confirmar contexto gracias a la primera línea de resumen.

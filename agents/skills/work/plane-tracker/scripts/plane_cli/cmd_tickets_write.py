@@ -7,6 +7,7 @@ No hace: comentarios ni adjuntos sueltos.
 import json
 import re
 import sys
+import unicodedata
 import urllib.error
 from datetime import datetime
 
@@ -182,6 +183,21 @@ def _submit_issue(args, conn, base_url, api_key, workspace, project_id, project_
     return res
 
 
+def build_branch_slug(title, branch_slug=None):
+    """Fragmento descriptivo de la rama: `--branch-slug` si se dio (en inglés), si no el título normalizado a kebab ASCII."""
+    if branch_slug and isinstance(branch_slug, str):
+        slug = branch_slug.strip().lower()
+        if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", slug):
+            raise CliError("invalid_input", f"--branch-slug inválido '{branch_slug}': usa kebab-case en minúsculas y sin acentos (ej: sms-operator-recovery).")
+        return slug
+    nfkd = unicodedata.normalize("NFKD", str(title))
+    ascii_title = nfkd.encode("ascii", "ignore").decode("ascii")
+    clean_desc = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_title.lower()).strip("-")
+    if len(clean_desc) > 35:
+        clean_desc = clean_desc[:35].rstrip("-")
+    return clean_desc
+
+
 def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
     """Crea un nuevo ticket en Plane y devuelve su identificador para ramas Git."""
     project_id = default_project_id
@@ -282,10 +298,8 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         }
         branch_type = type_map.get(f_prefix, "feat")
 
-    clean_desc = re.sub(r"[^a-zA-Z0-9]+", "-", clean_title.lower()).strip("-")
-    if len(clean_desc) > 35:
-        clean_desc = clean_desc[:35].rstrip("-")
-    branch_sugg = f"{branch_type}/{ticket_ref}-{clean_desc}"
+    clean_desc = build_branch_slug(clean_title, getattr(args, "branch_slug", None))
+    branch_sugg = f"{branch_type}/{ticket_ref}-{clean_desc}" if clean_desc else f"{branch_type}/{ticket_ref}"
 
     if getattr(args, "json", False):
         doc = {
@@ -350,6 +364,7 @@ def register_create(sub):
     p_create.add_argument("--start-date", help="Fecha de inicio YYYY-MM-DD")
     p_create.add_argument("--due-date", help="Fecha de vencimiento YYYY-MM-DD")
     p_create.add_argument("--allow-duplicate", action="store_true", help="Crear aunque haya un ticket reciente con el mismo título")
+    p_create.add_argument("--branch-slug", metavar="SLUG", help="Slug de la rama en inglés (kebab-case, ej: campaign-form-validations)")
     p_create.add_argument("--attach", nargs="+", metavar="FILE", help="Archivo(s) a adjuntar al crear el ticket (máx. 50 MB cada uno)")
     add_json_flag(p_create)
     p_create.set_defaults(handler=cmd_create)

@@ -283,6 +283,7 @@ class Golden(unittest.TestCase):
                  ["create", "[FIX] Corregir validación del campo teléfono en formularios de campaña", "-d", "Texto **md**\n\n1. uno\n2. dos",
                   "-p", "OPS", "--priority", "urgent", "--state", "Pendiente", "--labels", "backend,bug,zzz", "--start-date", "2026-10-26", "--due-date", "2026-10-27"],
                  ["create", "[QA] Probar flujo", "--json", "--attach", "adj.txt"],
+                 ["create", "[FEAT] Flujo con slug", "--branch-slug", "custom-flow-slug"],
                  ["create", "Sin fase", "-d", "<p>ya html</p>"],
                  ["create", "[RFC] Algo", "-p", "nope"], ["create", "[FEAT] Algo", "--state", "nope"], ["create", "[FEAT] Algo", "--attach", "no-existe.txt"],
                  ["link", "add", "OMNIFY-1", "https://example.com/pr/1", "--title", "PR 1"], ["link", "add", "OMNIFY-1", "https://example.com/pr/1"],
