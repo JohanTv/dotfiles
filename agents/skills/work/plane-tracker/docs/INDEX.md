@@ -16,7 +16,7 @@
 | 0013 | [La cola de salida no registra a qué instancia pertenece cada comentario](defects/0013-cola-de-salida-sin-instancia-de-destino.md) | abierto | `outbox flush` publica con las credenciales del entorno actual; con dos instancias y una sola base local, un comentario podría publicarse en la instancia equivocada. |
 | 0016 | [El bloque oculto de telemetría se escapa y queda visible al publicar o editar comentarios](defects/0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md) | corregido | `markdown_to_html` escapa `<!-- PLANE_WORKLOG_METADATA ... -->`; `comment edit -m` pierde la telemetría y `comment add -m` publica el bloque visible además del real. |
 | 0017 | [La sincronización de worklogs consulta solo los 15 tickets más recientes por proyecto](defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md) | abierto | `sync` pide `limit=15` sin paginar; un periodo con más tickets tocados, o uno ya pasado, produce un reporte parcial presentado como completo. |
-| 0020 | [Las etiquetas de la caché de tickets se guardan siempre vacías](defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) | abierto | `sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco. |
+| 0020 | [Las etiquetas de la caché de tickets se guardan siempre vacías](defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) | corregido | `sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco. |
 
 ## RFC
 

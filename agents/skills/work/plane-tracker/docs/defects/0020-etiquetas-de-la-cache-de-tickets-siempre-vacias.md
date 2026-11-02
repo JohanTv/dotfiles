@@ -1,7 +1,7 @@
 ---
 id: "0020"
 title: Las etiquetas de la caché de tickets se guardan siempre vacías
-status: abierto
+status: corregido
 created: 2026-11-02
 summary: "`sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco."
 ---
@@ -26,6 +26,10 @@ El payload de `/issues/` trae `labels` como lista de UUID; el nombre vive en otr
 
 1. Resolver los UUID a nombres con las etiquetas ya cacheadas del proyecto (sin petición extra si el TTL no venció), rompiendo el ciclo de importación (función auxiliar en un módulo neutro o importación diferida).
 2. Regenerar los golden de `search` y de las sincronizaciones, que añadirán la petición a `/labels/`.
+
+## Corrección
+
+`resolve.sync_issues` puebla antes la tabla `labels` (con `get_labels_map`, que ahora puede devolver el error HTTP en vez de terminar el programa) y `cache.sync_issues_cache` resuelve los UUID a nombres leyendo esa tabla, sin importar `resolve.py`: el grafo de imports sigue siendo acíclico. Si las etiquetas no se pueden obtener, el ticket se sincroniza igual, con `labels_csv` vacío. Los tres consumidores (`search`, `list` y la guarda de duplicados de `create`) llaman a `sync_issues`.
 
 ## Criterio de cierre
 

@@ -8,7 +8,7 @@ summary: "`list --mine|--created|--involved` sobre la caché; `--involved` une a
 
 # 0019 · Filtros de persona en `list` y historial de asignación medido
 
-Relacionado: [principles.md](../principles.md) (P3, P4, P5, local-first), RFC [0005](../rfcs/0005-vista-personal-agenda-y-backlog/README.md) (fase 0), defectos [0017](../defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md) y [0020](../defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md).
+Relacionado: [principles.md](../principles.md) (P3, P4, P5, local-first), RFC [0005](../rfcs/0005-vista-personal-agenda-y-backlog/README.md) (fase 0), defecto [0017](../defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md); el defecto [0020](../defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) (etiquetas vacías) se corrigió aparte.
 
 ## Contexto
 
@@ -32,7 +32,7 @@ La herramienta no podía responder "¿qué tengo yo?": la caché de tickets no g
 
 ## Por verificar contra una instancia real
 
-- Que `assignees` llegue como lista de UUID cuando no está vacía (con la lista vacía se comprobó) y que `created_by` sea siempre el creador (una automatización con clave de servicio lo cambia).
+- Verificado en una instancia real (2026-11-02): `assignees` llega como lista de UUID (cadenas) y `created_by` como UUID. Sigue por verificar que `created_by` sea siempre el creador (una automatización con clave de servicio lo cambia).
 - La forma del evento de asignación en las actividades (`field == "assignees"`, UUID en `new_identifier` al añadir y en `old_identifier` al quitar). El parser es tolerante, pero el golden usa esa forma supuesta.
 - Que reasignar cambie el `updated_at` del ticket (la incrementalidad del barrido lo asume) y que la asignación al crear el ticket genere actividad.
 
