@@ -77,7 +77,7 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 
 | Fase | Estado | Commit o decisión |
 | :---: | :--- | :--- |
-| 0 | pendiente | |
+| 0 | cerrada | Decisión [0025](../../decisions/0025-contrato-json-de-lectura.md); commits `daf88ef`, `84f96bc`, `82a360c`, `f0add02`, `c5b3187`, `6d0f7d8`, `609f839`. Hallazgos V15-V22 en la [revisión](./revision-adversarial.md) (V20 abierto) |
 | 1 | pendiente | |
 | 2 | pendiente | |
 | 3 | pendiente | |
@@ -86,5 +86,9 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | 6 | pendiente | |
 | 7 | pendiente | |
 | 8 | pendiente | |
+
+Estados válidos: `pendiente`, `en curso`, `cerrada` (F15 los lee: `CURRENT_PHASE` debe ser la última fase `cerrada`). Al cerrar una fase se avanza esa constante en `tests/test_architecture.py`.
+
+**Fase 0, lo que queda para las siguientes:** F5, F7, F10, F11 y las mitades de F2 (parser por vista) y F6 (servidor falso) dependen de código que aún no existe: están escritas como `pending()` y **fallan** en cuanto `CURRENT_PHASE` alcanza su fase, para obligar a escribirlas entonces. F2 (vocabulario de las vistas), F3 con golden, F6 (AST), F9 y F12 ya tienen cuerpo real.
 
 Este RFC pasa a `implementado` solo cuando las nueve fases estén cerradas; hasta entonces ningún documento cita el modelo como existente.

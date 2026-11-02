@@ -1,9 +1,11 @@
 """Paquete de la CLI plane-tracker (punto de entrada: scripts/plane.py -> cli.main).
 
 Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre sí):
-  1. config, clock rutas de caché y variables de entorno; reloj central (única fuente de la hora real)
+  1. config, clock, vocabulary, errors
+                   rutas de caché y variables de entorno; reloj central (única fuente de la hora real); vocabulario cerrado y error de comando
+                   (datos y excepciones puros: vocabulary no importa nada del paquete y errors solo importa vocabulary)
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
-  3. mdhtml, cache, resolve, timeutil, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
+  3. mdhtml, cache, resolve, timeutil, coverage, envelope, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -11,13 +13,17 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
 Módulos:
   config          CACHE_DIR, db_file(), request_log(), proposal_file(), get_env_or_fail()
   clock           timestamp(), now(), local_now(), local_today(): toda lectura de la hora real pasa por aquí
+  vocabulary      contrato `plane-tracker/1` como datos: familias de campos, registros de notas, errores y códigos de comprobación
+  errors          CliError(code, message, hint, exit_code, detail): error con código registrado (aún no sustituye a los sys.exit)
   db              conexión SQLite (WAL) y esquema
   circuit         circuito de fallo rápido entre procesos y PlaneUnavailable
-  api             api_request(): clasificación de fallos, reintentos acotados, circuito y registro de latencia
+  api             api_request(): clasificación de fallos, reintentos acotados, circuito y registro de latencia; rate_limit() con el presupuesto de tasa
   mdhtml          Markdown -> HTML de Plane
   cache           stale-while-error: aviso de antigüedad, sync de tickets, snapshots de `get` y lecturas locales
   resolve         proyectos, tickets, estados, etiquetas y usuario activo (con caché)
-  timeutil        horarios y fusión de intervalos (Klee) para los reportes
+  timeutil        horarios y fusión de intervalos (Klee) para los reportes; age_text() e iso_utc()
+  coverage        Coverage, Result y la regla de `complete` por vista; las notas se derivan de la cobertura (aún sin consumidores)
+  envelope        sobre `plane-tracker/1`: build(), validate(), dumps() (aún sin consumidores)
   worklog         metadata oculta de los comentarios, upsert local y check_worklogs()
   outbox          cola de salida de `comment add`: guardado previo, reclamo atómico, entrega idempotente, list y drop
   outbox_flush    publicación de la cola (`outbox flush`)

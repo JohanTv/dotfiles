@@ -17,13 +17,17 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/__init__.py` | Docstring con el mapa de capas y módulos. |
 | `plane_cli/config.py` | `CACHE_DIR`, rutas derivadas (`db_file()`, `request_log()`, `proposal_file()`), `local_midnight_utc()`, `positive_int()`, `add_json_flag()`, carga de `~/.zshrc.local` y `get_env_or_fail()`. |
 | `plane_cli/clock.py` | Reloj central, única fuente de la hora real: `timestamp()` (la primitiva) y, derivadas de ella, `now()` (UTC con zona), `local_now()` (local sin zona) y `local_today()`. |
-| `plane_cli/db.py` | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, tablas de la cola (`init_outbox_tables()`) y esquema (`init_db()`). |
+| `plane_cli/vocabulary.py` | Contrato `plane-tracker/1` como datos puros ([decisión 0025](docs/decisions/0025-contrato-json-de-lectura.md)): familias de campos, resúmenes, registro de notas, errores y códigos de comprobación; `field_spec()`. |
+| `plane_cli/errors.py` | `CliError(code, message, hint, exit_code, detail)`: error de comando con código registrado (`to_dict()`, `render()`); todavía no sustituye a los `sys.exit`. |
+| `plane_cli/db.py` | Conexión SQLite (WAL, directorio de caché 0700 y base 0600), `ensure_columns()`, esquema por partes (`init_core_tables()`, `init_catalog_tables()`, `init_issue_tables()`, `init_search_index()`, `init_outbox_tables()`...) y `init_db()` que las orquesta. |
 | `plane_cli/circuit.py` | Circuito de fallo rápido entre procesos (`circuit.json` con flock), excepción `PlaneUnavailable` y su mensaje (`format_unavailable()`). |
-| `plane_cli/api.py` | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`) y `log_request()` (JSONL de latencias). |
+| `plane_cli/api.py` | `api_request()`: clasificación de fallos, reintentos acotados, circuito, `PLANE_OFFLINE`, sondeo (`probe_plane()`), `log_request()` (JSONL de latencias) y `rate_limit()` (cabeceras `X-RateLimit-*` de la última respuesta, solo observadas). |
 | `plane_cli/mdhtml.py` | `markdown_to_html()`: subconjunto de Markdown que renderiza Plane CE. |
 | `plane_cli/cache.py` | Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets, snapshots de `get` y `issue_stub()`. |
 | `plane_cli/resolve.py` | Proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite; `detect_ticket_from_git()` y `local_ticket_label()`. |
-| `plane_cli/timeutil.py` | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs y `render_day_block()`. |
+| `plane_cli/timeutil.py` | Aritmética de horarios, unión de intervalos (medida de Klee), fusión diaria de worklogs, `render_day_block()`, `age_text()` e `iso_utc()`. |
+| `plane_cli/coverage.py` | `Coverage`, `Result` (no existe sin cobertura), regla de `complete` por vista (`complete_list()`...) y notas derivadas (`notes_from()`, `build_notes()`); aún sin consumidores. |
+| `plane_cli/envelope.py` | Sobre `plane-tracker/1`: `build()`, `validate()`, `validate_error()` y `dumps()`; en producción una deriva degrada con la nota `internal`; aún sin consumidores. |
 | `plane_cli/worklog.py` | Bloque oculto `PLANE_WORKLOG_METADATA`, `upsert_worklog()`, `check_worklogs()`, `reject_placeholders()` y `PLACEHOLDER`. |
 | `plane_cli/outbox.py` | Cola de salida de `comment add`: `publish_comment()` (guardado previo), reclamo atómico, entrega idempotente (`deliver()`), `list_items()`, `drop_item()` y conteos. |
 | `plane_cli/outbox_flush.py` | `flush_items()`: orden, límites, resolución memoizada del ticket y reglas de parada. |
@@ -48,9 +52,9 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 
 ## Capas y regla de dependencias
 
-1. `config`: no importa nada del paquete.
+1. `config`, `clock`, `vocabulary`, `errors`: la capa 1 solo importa de la capa 1 (`vocabulary` no importa nada; `errors` solo `vocabulary`).
 2. `db`, `circuit`, `api`: dependen de `config` (`api` también de `circuit`).
-3. Lógica reutilizable (`mdhtml`, `cache`, `resolve`, `timeutil`, `worklog`, `outbox`, `outbox_flush`, `create_guard`, `sync`,
+3. Lógica reutilizable (`mdhtml`, `cache`, `resolve`, `timeutil`, `coverage`, `envelope`, `worklog`, `outbox`, `outbox_flush`, `create_guard`, `sync`,
    `proposal_store`, `proposals`, `flow`, `attachments`, `renamed`): importan de capas 1 y 2 y entre sí en una sola dirección. Salvo `attachments` (grupo
    `attachment`) y `flow` (`report flow`), que además contienen el comando que los usa, no definen parsers.
 4. `cmd_*`: importan de las capas 1 a 3; **nunca** se importan entre sí ni importan `cli`.
@@ -208,7 +212,10 @@ python3 tests/run_parallel.py           # en paralelo, cada trabajo con su HOME 
 - **Estructura y contrato:** `test_structure.py` guarda las reglas estructurales descritas arriba; `test_cli_tree.py` fija
   el árbol exacto (y su orden), que cada hoja tenga `handler` y los grupos no, y el tamaño de la ayuda global;
   `test_renamed.py`, las pistas de nombres retirados; `test_json_flag.py`, las posiciones válidas de `--json`; y
-  `test_docs.py`, los documentos de `docs/`.
+  `test_docs.py`, los documentos de `docs/`; `test_architecture.py`, las funciones de aptitud F1-F15 del RFC 0021
+  (capas y dependencias permitidas, vocabulario frente a la [decisión 0025](docs/decisions/0025-contrato-json-de-lectura.md), cobertura y notas derivadas,
+  `complete` frente a los avisos) con un trinquete: `CURRENT_PHASE` avanza al cerrar cada fase del plan y una función de una fase cerrada no puede seguir saltada.
+  `fake.extra_headers` añade cabeceras (`X-RateLimit-*`) a las respuestas normales del servidor falso.
 - Los demás archivos prueban unidades (propuestas, sesiones, flujo, relevo, Markdown) importando `plane_cli` y
   sustituyendo `config.CACHE_DIR` y `clock.timestamp`.
 
