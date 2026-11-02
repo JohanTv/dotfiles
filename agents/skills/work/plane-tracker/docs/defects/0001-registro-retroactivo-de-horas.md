@@ -1,7 +1,7 @@
 ---
 id: "0001"
 title: No se puede fijar inicio y fin reales al registrar tiempo declarado
-status: abierto
+status: corregido
 created: 2026-10-30
 summary: "`comment add --duration` usa la hora de publicación como fin; el registro retroactivo distorsiona la fusión de intervalos."
 ---
@@ -44,6 +44,16 @@ Script de un solo uso que importa `plane_cli` y, por comentario: lee el worklog 
 3. Permitir corregir un worklog existente sin publicar otro (`comment edit --since/--until`) y hacer que `worklog check` compare también las horas del comentario con las del worklog local.
 4. ~~Corregir el escape del bloque oculto en `comment edit -m`~~: separado y corregido en [0016](./0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md).
 5. Documentar el caso retroactivo en `SKILL.md`, con tests de regresión (golden).
+
+## Corrección (2026-11-02)
+
+1. **Ventana explícita en `comment add` y `comment edit`:** `--since HH:MM` y `--until HH:MM` fijan inicio y fin. Con los dos extremos la ventana manda y la duración es su delta (si además se pasa `--duration`, debe coincidir); con uno solo se completa con `--duration` o con la duración ya registrada. `--date YYYY-MM-DD` lleva el trabajo a otro día (nunca futuro). La ventana no cruza la medianoche ni termina en el futuro: vive en `worklog.resolve_window` / `worklog.requested_date` y lee el reloj solo por `clock`.
+2. **Corrección sin publicar otro comentario:** `comment edit --since/--until [--date]` parte del bloque existente, marca `measured_by.kind="corrected"` y actualiza bloque oculto y fila local a la vez (mismo camino que `--duration`).
+3. **`worklog check` ya cubre el criterio:** `CHECK_FIELDS` compara `date`, `start_time`, `end_time` y `duration_minutes` entre el comentario y la fila local, así que una ventana mal registrada sale como `mismatch`.
+4. **Pruebas:** `tests/test_window.py` (unidad, reloj congelado) y los golden `comment` y `comment_edit_delete`, que incluyen el caso del criterio (`--date 2026-10-30 --since 14:40 --until 18:20` → 220 min), la corrección de una ventana existente y los rechazos (intervalo contradictorio, un extremo sin duración, ventana futura, orden invertido).
+5. **Documentación:** `SKILL.md` §3 y §4 (reglas 3 y 6), `references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md` §E y §C.3, `references/ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md` y `references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md` §3.3.
+
+**Fuera de este defecto:** el aviso de solape entre worklogs del mismo ejecutor (solución propuesta 2) no está implementado; el registro honesto de la ventana es lo que evita hoy los solapes artificiales.
 
 ## Criterios de aceptación
 - Registrar una reunión de 14:40 a 18:20 publicada a las 20:07 guarda `14:40`–`18:20` y el reporte no la solapa con otros tickets.

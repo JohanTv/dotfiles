@@ -233,7 +233,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`create`** | `plane-tracker create "[FIX] Titulo" -p OMNIFY -d "..."` | Crea issue en Plane y autogenera rama Git según la fase. |
 | **`get`** | `plane-tracker get OMNIFY-197` | Muestra metadata, descripción y **contexto de comentarios / handoff**. |
 | **`update`** | `plane-tracker update OMNIFY-162 --state "Progreso"` | Actualiza estado, prioridad o etiquetas en Plane. |
-| **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` | Publica la bitácora corta (`SKILL.md` §4); la CLI agrega la telemetría. |
+| **`comment add`**| `plane-tracker comment add OMNIFY-162 -f worklog.md --track "main" --duration 95` (o la ventana real `--since 14:40 --until 18:20` con `--date` si no es hoy) | Publica la bitácora corta (`SKILL.md` §4); la CLI agrega la telemetría. |
 | **`labels`** | `plane-tracker labels [-p OMNIFY] [--refresh]` | Lista etiquetas indexadas desde caché local (**< 2ms**). |
 | **`projects`**| `plane-tracker projects [--refresh]` | Lista proyectos dinámicos del workspace (`mi-workspace`). |
 | **`report`** | `plane-tracker report time [--week] [--refresh] [--json]` | Genera reporte híbrido para jefatura con Klee's Merging (**< 0.1s**). |
@@ -241,7 +241,7 @@ La base de datos local en `~/.cache/plane/worklogs.db` opera con `PRAGMA journal
 | **`get --history`** | `plane-tracker get OMNIFY-197 --history [--no-comments] [--last N] [--full]` | Ciclo de vida, estado, flujo y transiciones; flags para ahorrar tokens. |
 | **`worklog propose`** | `plane-tracker worklog propose OMNIFY-197 [--split A=60%,B=rest] [--since H --until H] [--date D]` | Mide la sesión del agente y propone la duración (solo lectura). `comment add --accept-proposal` la registra. |
 | **`focus set` / `focus clear` / `focus status`** | `plane-tracker focus set OMNIFY-197` · `plane-tracker focus clear` · `plane-tracker focus status` | Marca en qué ticket trabaja la sesión para atribuir el tiempo medido por ticket. |
-| **`comment edit` / `comment delete`** | `plane-tracker comment edit T --comment-id ID [--duration N] [--embed-metadata]` · `plane-tracker comment delete T --comment-id ID` | Edita/vincula un comentario con su worklog, o lo elimina junto con su worklog local. |
+| **`comment edit` / `comment delete`** | `plane-tracker comment edit T --comment-id ID [--duration N] [--since HH:MM --until HH:MM] [--embed-metadata]` · `plane-tracker comment delete T --comment-id ID` | Edita/vincula un comentario con su worklog (o corrige su ventana real), o lo elimina junto con su worklog local. |
 | **`link add`** | `plane-tracker link add OMNIFY-197 https://github.com/org/repo/pull/7 --title "PR #7"` | Adjunta un enlace al work item (idempotente). |
 | **`attachment add` / `list` / `delete` / `replace`** | `plane-tracker attachment add T archivo...` · `plane-tracker attachment list T` · `plane-tracker attachment delete T ID` · `plane-tracker attachment replace T ID archivo` · `create ... --attach F` | Sube, lista, reemplaza y elimina adjuntos (50 MB máx.). |
 | **`outbox list` / `flush` / `drop`** | `plane-tracker outbox list` · `plane-tracker outbox flush [--limit N]` · `plane-tracker outbox drop ID [--force]` | Cola de salida de `comment add` cuando Plane no responde: lista, publica en orden y descarta registros pendientes. |

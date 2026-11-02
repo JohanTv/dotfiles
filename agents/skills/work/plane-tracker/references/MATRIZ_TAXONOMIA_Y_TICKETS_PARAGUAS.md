@@ -95,7 +95,7 @@ Ambos viven en el proyecto **`OPS` (Operaciones)**, no en OMNIFY. El identifier 
      plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 12 -m "..."
      plane-tracker comment add OPS-45 --track "daily-pierre" --capacity "coordination" --duration 25 -m "..."
      ```
-   - `--duration` (minutos netos) es obligatorio. Si el hecho ocurrió **fuera de la conversación** del agente, el agente **pregunta** cuánto demoró antes de comentar; nunca estima.
+   - `--duration` (minutos netos) es obligatorio, salvo que se fije la ventana real `--since HH:MM --until HH:MM` (con `--date YYYY-MM-DD` si el hecho fue otro día): entonces la duración sale del intervalo. Si el hecho ocurrió **fuera de la conversación** del agente, el agente **pregunta** cuánto demoró o a qué hora fue antes de comentar; nunca estima.
 3. **Viernes 06:30 pm (Cierre):**
    - Se ejecuta el balance con `plane-tracker report time --week`.
    - Los dos paraguas se transicionan a `Completado`:

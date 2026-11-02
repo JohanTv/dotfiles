@@ -44,8 +44,8 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Mis tickets | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` (caché local; necesita `PLANE_ACTOR_UUID` o `PLANE_USERNAME`) |
 | Cambiar título/descripción/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` (la descripción reemplaza la actual) |
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--attach ARCH...]` |
-| Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`) |
-| Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N]` |
+| Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`, o la ventana real `--since HH:MM --until HH:MM` con `--date YYYY-MM-DD` si no es hoy) |
+| Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N \| --since HH:MM --until HH:MM]` |
 | Retirar un ticket | Por defecto `update T --state Cancelado` (conserva las horas). `plane-tracker delete T` solo si el usuario lo pide: muestra el alcance, `--yes` elimina; con horas propias exige `--discard-worklogs` y con horas de otros se niega |
 | Borrar comentario | `plane-tracker comment delete T [--comment-id UUID]` |
 | Adjuntos | `plane-tracker attachment add\|list\|delete\|replace` |
@@ -74,11 +74,11 @@ Reglas:
 
 1. Nunca escribas el bloque `PLANE_WORKLOG_METADATA`: la CLI lo agrega sola (escrito en Markdown saldría escapado y visible). La telemetría viaja solo por flags: `--track`, `--capacity`, `--worker-type`, `--duration`.
 2. Duración medida: `plane-tracker worklog propose T --capacity <balde>` mide la sesión leyendo timestamps y no registra nada. Muestra el valor al usuario y, con su OK, `plane-tracker comment add T -m "..." --capacity <balde> --worker-type agent:<agente> --accept-proposal`. Vale 30 min y una sola vez; si caduca, repite `propose`.
-3. `toil_support`, `coordination` o trabajo hecho fuera de la conversación: pregunta los minutos y usa `--duration N`. Nunca estimes un tiempo que no mediste; si el usuario no lo sabe, no publiques todavía.
+3. `toil_support`, `coordination` o trabajo hecho fuera de la conversación: pregunta los minutos y usa `--duration N`. Nunca estimes un tiempo que no mediste; si el usuario no lo sabe, no publiques todavía. Si conoces el horario real, fija la ventana con `--since HH:MM --until HH:MM` (y `--date YYYY-MM-DD` cuando no es hoy): la duración sale del intervalo y la hora de publicación deja de mandar.
 4. Pide un solo OK ("¿Publico en Plane? 45 min, deep_work") y no muestres un borrador aparte salvo que lo pidan.
 5. Más de 700 caracteres visibles exige `--long` (la CLI rechaza antes de publicar): solo para relevos (`plane-tracker handoff`) o informes que el usuario pidió.
-6. Para corregir tiempo o texto ya publicado usa `plane-tracker comment edit`; nunca publiques otro comentario solo para registrar tiempo.
-7. Si la sesión tocó varios tickets, atribúyelos con `plane-tracker focus set T` al cambiar de uno a otro, o repártela con `plane-tracker worklog propose --split A=60%,B=rest`. `--since/--until HH:MM` fijan la ventana y `--date YYYY-MM-DD` mide un día anterior (con `--session <id>`). Lo ya registrado de la misma sesión se resta.
+6. Para corregir tiempo o texto ya publicado usa `plane-tracker comment edit` (con `--since/--until` se corrige la ventana sin publicar otro comentario); nunca publiques otro comentario solo para registrar tiempo.
+7. Si la sesión tocó varios tickets, atribúyelos con `plane-tracker focus set T` al cambiar de uno a otro, o repártela con `plane-tracker worklog propose --split A=60%,B=rest`. En `propose`, `--since/--until HH:MM` fijan la ventana medida y `--date YYYY-MM-DD` mide un día anterior (con `--session <id>`). Lo ya registrado de la misma sesión se resta.
 
 Baldes (`--capacity`): `deep_work` (por defecto), `tooling_dx`, `research_rd`, `tech_debt_paydown`, `toil_support`, `coordination`.
 

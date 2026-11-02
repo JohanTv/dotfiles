@@ -222,11 +222,12 @@ plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo
 plane-tracker link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
 plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
 plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
+plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --since 14:40 --until 18:20 [--date D]   # CORRIGE la ventana real: la duración pasa a ser la del intervalo
 plane-tracker comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
 plane-tracker comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
 plane-tracker delete OMNIFY-205 [--yes] [--discard-worklogs]                                         # elimina el ticket (irreversible); sin --yes solo muestra el alcance; con horas propias exige --discard-worklogs; con horas de otros se niega (ver docs 0018)
 ```
-*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report time --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
+*Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report time --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. **Para cambiar inicio y fin usa `--since/--until`** (con `--date` si el trabajo fue otro día): con los dos extremos la duración es la del intervalo; con uno solo se completa con `--duration` o con la duración ya registrada. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
 
 Prefiere `link add` para PRs y documentos (queda estructurado y no notifica como comentario); el comentario de relevo sigue siendo para contexto y tiempo.
 
@@ -295,6 +296,8 @@ Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite
 
 > ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale al usuario cuánto demoró antes de comentar.
 
+> ⏱️ **Ventana real (registro retroactivo):** `--since HH:MM --until HH:MM` fija inicio y fin y la duración sale del intervalo (`--duration`, si se pasa, debe coincidir); con un solo extremo hace falta `--duration`. `--date YYYY-MM-DD` pone el trabajo en otro día (nunca futuro). La ventana no puede terminar en el futuro: el tiempo se registra después de trabajarlo. Sin ventana, la hora de publicación sigue siendo el fin (así se registró antes del defecto 0001).
+
 ```bash
 # Publicar archivo de bitácora
 plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --duration 95
@@ -304,6 +307,12 @@ plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --track "form-validation
 
 # Comentario rápido con mensaje en línea (ticket paraguas de OPS)
 plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 35 -m "Atención a comercial sobre campaña #842."
+
+# Reunión retroactiva con su horario real: manda la ventana, no la publicación (defecto 0001)
+plane-tracker comment add OPS-23 --track "reuniones" --capacity "coordination" --since 09:00 --until 10:00 -m "Reunión con el área comercial sobre el TDR."
+
+# Trabajo de otro día con su intervalo completo
+plane-tracker comment add OMNIFY-162 --date 2026-10-30 --since 14:40 --until 18:20 --capacity "deep_work" -m "Reconciliación de reportería SMS."
 ```
 
 ---
