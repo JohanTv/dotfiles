@@ -14,6 +14,8 @@
 | 0009 | [Saneamiento pendiente de datos de instancia y de personas en el repositorio](defects/0009-saneamiento-pendiente-de-datos-de-instancia.md) | abierto | El historial publicado ya se reescribió; quedan valores por defecto en el código, claves de proyecto como ejemplos y la purga de copias fuera del repositorio. |
 | 0010 | [El reporte no sincroniza con Plane los periodos que tienen registros locales parciales](defects/0010-reporte-no-sincroniza-periodos-con-registros-parciales.md) | abierto | `report` solo sincroniza si el periodo no tiene ningún registro local; con uno solo muestra un resultado parcial como completo y sin aviso. |
 | 0013 | [La cola de salida no registra a qué instancia pertenece cada comentario](defects/0013-cola-de-salida-sin-instancia-de-destino.md) | abierto | `outbox flush` publica con las credenciales del entorno actual; con dos instancias y una sola base local, un comentario podría publicarse en la instancia equivocada. |
+| 0016 | [El bloque oculto de telemetría se escapa y queda visible al publicar o editar comentarios](defects/0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md) | abierto | `markdown_to_html` escapa `<!-- PLANE_WORKLOG_METADATA ... -->`; `comment edit -m` pierde la telemetría y `comment add -m` publica el bloque visible además del real. |
+| 0017 | [La sincronización de worklogs consulta solo los 15 tickets más recientes por proyecto](defects/0017-sincronizacion-de-worklogs-truncada-a-15-tickets.md) | abierto | `sync` pide `limit=15` sin paginar; un periodo con más tickets tocados, o uno ya pasado, produce un reporte parcial presentado como completo. |
 
 ## RFC
 
