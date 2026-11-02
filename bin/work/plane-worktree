@@ -1,0 +1,916 @@
+#!/usr/bin/env python3
+"""plane-worktree - Gestión de worktrees multi-repo por ticket (RFC 0002).
+
+Crea, por ticket, un contenedor y un worktree en cada repositorio implicado
+con rama y base verificadas de forma transaccional (pre-flight check en Fase 1,
+mutaciones atómicas en Fase 2).
+"""
+
+import argparse
+import datetime
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tarfile
+
+
+VALID_TYPES = ["feat", "fix", "spike", "refactor", "test", "infra"]
+PROTECTED_BRANCHES = {"main", "master", "dev", "staging"}
+DEFAULT_BACKUP_DIR = os.path.expanduser("~/.cache/plane/worktree-backups")
+DEFAULT_DB_FILE = os.path.expanduser("~/.cache/plane/worklogs.db")
+
+
+def run_git(cmd, cwd=None, check=False):
+    """Ejecuta un comando git y devuelve (returncode, stdout, stderr)."""
+    full_cmd = ["git"]
+    if cwd:
+        full_cmd += ["-C", cwd]
+    full_cmd += cmd
+    res = subprocess.run(full_cmd, capture_output=True, text=True)
+    if check and res.returncode != 0:
+        raise RuntimeError(f"Fallo ejecutando git {' '.join(cmd)}: {res.stderr.strip()}")
+    return res.returncode, res.stdout.strip(), res.stderr.strip()
+
+
+def resolve_repo(token):
+    """Resuelve un token (ruta absoluta/relativa o nombre de carpeta) a la ruta raíz del repo git."""
+    # 1. Si es ruta directa existente
+    if os.path.exists(token) and os.path.isdir(token):
+        code, out, _ = run_git(["rev-parse", "--show-toplevel"], cwd=token)
+        if code == 0:
+            return os.path.abspath(out), None
+        return None, f"'{token}' existe pero no es un repositorio Git válido."
+
+    # 2. Si es nombre suelto sin separadores de directorio, buscar en ./{token} y ../{token}
+    if os.path.basename(token) == token:
+        candidates = []
+        for cand in [os.path.abspath(token), os.path.abspath(os.path.join("..", token))]:
+            if os.path.isdir(cand):
+                code, out, _ = run_git(["rev-parse", "--show-toplevel"], cwd=cand)
+                if code == 0:
+                    candidates.append(os.path.abspath(out))
+        candidates = list(dict.fromkeys(candidates))
+        if len(candidates) == 1:
+            return candidates[0], None
+        if len(candidates) > 1:
+            cands_str = ", ".join(candidates)
+            return None, f"Ambigüedad: múltiples repositorios encontrados para '{token}': {cands_str}. Especifica la ruta completa."
+        return None, f"Repositorio '{token}' no encontrado (buscado en ./{token} y ../{token})."
+
+    return None, f"Directorio o repositorio '{token}' no encontrado."
+
+
+def parse_worktrees(repo_path):
+    """Parsea la salida de `git worktree list --porcelain` para un repo."""
+    code, out, err = run_git(["worktree", "list", "--porcelain"], cwd=repo_path)
+    if code != 0:
+        return []
+    worktrees = []
+    curr = {}
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            if curr:
+                worktrees.append(curr)
+                curr = {}
+            continue
+        if line.startswith("worktree "):
+            curr["worktree"] = os.path.abspath(line[len("worktree "):].strip())
+        elif line.startswith("HEAD "):
+            curr["head"] = line[len("HEAD "):].strip()
+        elif line.startswith("branch "):
+            curr["branch"] = line[len("branch "):].strip()
+        elif line == "detached":
+            curr["detached"] = True
+    if curr:
+        worktrees.append(curr)
+    return worktrees
+
+
+def cmd_add(args):
+    ticket = args.ticket.strip().upper()
+    description = args.description.strip().lower()
+    base_dir = os.path.abspath(args.dir)
+
+    # Validar existencia previa del contenedor base
+    if not os.path.isdir(base_dir):
+        if os.path.exists(base_dir):
+            sys.stderr.write(f"Error: El contenedor base '{base_dir}' existe pero no es un directorio.\n")
+            return 1
+        parent_candidate = os.path.abspath(os.path.join("..", args.dir))
+        msg = f"El contenedor base '{base_dir}' no existe."
+        if os.path.isdir(parent_candidate):
+            msg += (
+                f"\nSugerencia: se detectó '{parent_candidate}'. "
+                f"¿Estás ejecutando el comando dentro de un subdirectorio? "
+                f"Ejecútalo desde la raíz del workspace o pasa --dir '{parent_candidate}'."
+            )
+        else:
+            msg += f"\nSugerencia: créalo con 'mkdir -p {base_dir}' o indica la ruta con --dir."
+        sys.stderr.write(f"Error: {msg}\n")
+        return 1
+
+    parent_dir = os.path.abspath(os.path.join(base_dir, f"{ticket}-{description}"))
+
+    # =========================================================================
+    # Fase 1: Pre-flight check (Solo lectura, detección temprana de errores)
+    # =========================================================================
+    errors = []
+    actions = []
+    seen_dest_paths = set()
+
+    for spec in args.repos:
+        if "=" in spec:
+            repo_token, slug = spec.split("=", 1)
+            slug = slug.strip().lower()
+        else:
+            repo_token, slug = spec, description
+
+        repo_path, err = resolve_repo(repo_token)
+        if err:
+            errors.append(err)
+            continue
+
+        repo_basename = os.path.basename(repo_path)
+        dest_path = os.path.abspath(os.path.join(parent_dir, repo_basename))
+        branch_name = f"{args.type}/{ticket}-{slug}"
+        target_ref = f"refs/heads/{branch_name}"
+
+        if dest_path in seen_dest_paths:
+            errors.append(f"En '{repo_basename}': repositorio o destino duplicado ('{dest_path}').")
+            continue
+        seen_dest_paths.add(dest_path)
+
+        # Fetch preventivo (best-effort)
+        if not args.no_fetch:
+            code, _, _ = run_git(["fetch", "origin"], cwd=repo_path)
+            if code != 0:
+                sys.stderr.write(f"Aviso: no se pudo actualizar origin en '{repo_basename}', continuando con refs locales.\n")
+
+        # Comprobar si existe la base remota origin/<base>
+        code, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{args.base}"], cwd=repo_path)
+        if code != 0:
+            _, r_out, _ = run_git(["branch", "-r"], cwd=repo_path)
+            remotes = [b.strip() for b in r_out.splitlines() if b.strip() and not b.strip().startswith("origin/HEAD")]
+            r_str = ", ".join(remotes) if remotes else "(ninguna)"
+            errors.append(f"En '{repo_basename}': la rama remota 'origin/{args.base}' no existe.\nRamas remotas disponibles: {r_str}")
+            continue
+
+        # Inspeccionar worktrees existentes del repo
+        wts = parse_worktrees(repo_path)
+
+        # 1. ¿El destino ya es un worktree del repo?
+        dest_wt = next((w for w in wts if w.get("worktree") == dest_path), None)
+        if dest_wt:
+            if dest_wt.get("branch") == target_ref:
+                actions.append(("IDEMPOTENT", repo_path, repo_basename, dest_path, branch_name, None))
+                continue
+            errors.append(f"En '{repo_basename}': el destino '{dest_path}' ya es un worktree pero tiene la rama '{dest_wt.get('branch', 'detached')}' en vez de '{branch_name}'.")
+            continue
+
+        # 2. Si el destino no es worktree, verificar si existe en disco y si no está vacío
+        if os.path.exists(dest_path):
+            if os.path.isdir(dest_path):
+                if os.listdir(dest_path):
+                    errors.append(f"En '{repo_basename}': el destino '{dest_path}' ya existe, no está vacío y no es un worktree.")
+                    continue
+            else:
+                errors.append(f"En '{repo_basename}': el destino '{dest_path}' ya existe y no es un directorio.")
+                continue
+
+        # 3. ¿La rama ya está checkouteada en otro worktree del repo?
+        other_wt = next((w for w in wts if w.get("branch") == target_ref), None)
+        if other_wt:
+            errors.append(f"En '{repo_basename}': la rama '{branch_name}' ya está activa en otro worktree: '{other_wt['worktree']}'.")
+            continue
+
+        # 4. ¿La rama existe localmente?
+        code_local, local_sha, _ = run_git(["rev-parse", "--verify", "--quiet", target_ref], cwd=repo_path)
+        if code_local == 0:
+            code_base, base_sha, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{args.base}"], cwd=repo_path)
+            if code_base == 0 and local_sha == base_sha:
+                actions.append(("ATTACH", repo_path, repo_basename, dest_path, branch_name, None))
+            elif args.reuse_branch:
+                _, counts, _ = run_git(["rev-list", "--left-right", "--count", f"{target_ref}...refs/remotes/origin/{args.base}"], cwd=repo_path)
+                parts = counts.split() if counts else ["?", "?"]
+                ahead, behind = parts[0], parts[1] if len(parts) > 1 else "?"
+                _, log_summary, _ = run_git(["log", "-1", "--format=%h '%s' (%cr)", target_ref], cwd=repo_path)
+                warn_msg = f"Aviso en '{repo_basename}': reutilizando rama '{branch_name}' divergente de 'origin/{args.base}' ({ahead} adelante, {behind} atrás; {log_summary})."
+                actions.append(("ATTACH_REUSE", repo_path, repo_basename, dest_path, branch_name, warn_msg))
+            else:
+                _, counts, _ = run_git(["rev-list", "--left-right", "--count", f"{target_ref}...refs/remotes/origin/{args.base}"], cwd=repo_path)
+                parts = counts.split() if counts else ["?", "?"]
+                ahead, behind = parts[0], parts[1] if len(parts) > 1 else "?"
+                _, log_summary, _ = run_git(["log", "-1", "--format=%h '%s' (%cr)", target_ref], cwd=repo_path)
+                errors.append(
+                    f"En '{repo_basename}': la rama local '{branch_name}' ya existe y diverge de 'origin/{args.base}' ({ahead} commit(s) adelante, {behind} commit(s) atrás).\n"
+                    f"  Último commit: {log_summary}\n"
+                    f"  Sugerencia: para reutilizarla pasa --reuse-branch, o elimínala con 'git -C {repo_path} branch -D {branch_name}'."
+                )
+                continue
+        else:
+            base_ref = f"origin/{args.base}"
+            actions.append(("CREATE", repo_path, repo_basename, dest_path, branch_name, base_ref))
+
+    if errors:
+        for e in errors:
+            sys.stderr.write(f"Error: {e}\n")
+        return 1
+
+    # =========================================================================
+    # Fase 2: Ejecución atómica (Mutaciones seguras)
+    # =========================================================================
+    os.makedirs(parent_dir, exist_ok=True)
+
+    for action, repo_path, repo_basename, dest_path, branch_name, base_ref in actions:
+        if action == "IDEMPOTENT":
+            print(f"✓ '{repo_basename}': el worktree ya existe en '{dest_path}' ({branch_name})")
+        elif action in ("ATTACH", "ATTACH_REUSE"):
+            if action == "ATTACH_REUSE" and base_ref:
+                sys.stderr.write(f"⚠️  {base_ref}\n")
+            code, out, err = run_git(["worktree", "add", dest_path, branch_name], cwd=repo_path)
+            if code != 0:
+                sys.stderr.write(f"Error agregando worktree a rama existente en '{repo_basename}': {err}\n")
+                return 1
+            print(f"✓ '{repo_basename}': conectado a rama existente '{branch_name}' en '{dest_path}'")
+        elif action == "CREATE":
+            code, out, err = run_git(["worktree", "add", "-b", branch_name, dest_path, base_ref], cwd=repo_path)
+            if code != 0:
+                sys.stderr.write(f"Error creando worktree en '{repo_basename}': {err}\n")
+                return 1
+            print(f"✓ '{repo_basename}': worktree creado con rama '{branch_name}' (base {base_ref}) en '{dest_path}'")
+
+    print(f"\nContenedor listo: {parent_dir}")
+    print(f"Para comenzar a trabajar:\n  cd {parent_dir}")
+    return 0
+
+
+def inspect_repo_state(repo_dir):
+    """Inspecciona una carpeta para determinar si es un worktree/repo Git y extraer su estado."""
+    code, root, _ = run_git(["rev-parse", "--show-toplevel"], cwd=repo_dir)
+    if code != 0:
+        return None
+    if os.path.abspath(root) != os.path.abspath(repo_dir):
+        return None
+
+    code_b, branch, _ = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir)
+    if code_b != 0 or not branch:
+        branch = "unknown"
+    elif branch == "HEAD":
+        code_d, tag, _ = run_git(["describe", "--tags", "--always"], cwd=repo_dir)
+        branch = f"detached:{tag}" if code_d == 0 else "detached"
+
+    code_l, commit_line, _ = run_git(["log", "-1", "--format=%h '%s'"], cwd=repo_dir)
+    if code_l != 0 or not commit_line:
+        commit_line = "(sin commits)"
+
+    code_s, status_out, _ = run_git(["status", "--porcelain"], cwd=repo_dir)
+    dirty_lines = [l for l in status_out.splitlines() if l.strip()]
+
+    return {
+        "name": os.path.basename(repo_dir),
+        "path": os.path.abspath(repo_dir),
+        "branch": branch,
+        "commit": commit_line,
+        "dirty": len(dirty_lines) > 0,
+        "dirty_count": len(dirty_lines),
+    }
+
+
+def cmd_list(args):
+    base_dir = os.path.abspath(args.dir)
+    if not os.path.isdir(base_dir):
+        if getattr(args, "json", False):
+            print(json.dumps([]))
+        else:
+            print(f"Directorio de worktrees '{base_dir}' no existe.")
+        return 0
+
+    entries = sorted(os.listdir(base_dir))
+    containers = []
+
+    for entry in entries:
+        container_path = os.path.abspath(os.path.join(base_dir, entry))
+        if not os.path.isdir(container_path):
+            continue
+
+        # Caso 1: El contenedor es en sí mismo un worktree único
+        direct_state = inspect_repo_state(container_path)
+        if direct_state:
+            containers.append({
+                "container": entry,
+                "path": container_path,
+                "multi_repo": False,
+                "repos": [direct_state],
+            })
+            continue
+
+        # Caso 2: Es un contenedor multi-repo (busca repositorios en sus hijos inmediatos)
+        child_entries = sorted(os.listdir(container_path))
+        repos = []
+        for child in child_entries:
+            cpath = os.path.abspath(os.path.join(container_path, child))
+            if os.path.isdir(cpath):
+                child_state = inspect_repo_state(cpath)
+                if child_state:
+                    repos.append(child_state)
+
+        if repos:
+            containers.append({
+                "container": entry,
+                "path": container_path,
+                "multi_repo": True,
+                "repos": repos,
+            })
+
+    if getattr(args, "json", False):
+        print(json.dumps(containers, indent=2))
+        return 0
+
+    if not containers:
+        print(f"Sin worktrees activos en '{base_dir}'.")
+        return 0
+
+    print(f"Worktrees en '{base_dir}':")
+    for c in containers:
+        print(f"\n  📁 {c['container']}/")
+        total = len(c["repos"])
+        for idx, r in enumerate(c["repos"]):
+            conn = "└──" if idx == total - 1 else "├──"
+            status_desc = f"(dirty: {r['dirty_count']} archivos)" if r["dirty"] else "(clean)"
+            label = r["name"] if c["multi_repo"] else ""
+            prefix = f"{label} " if label else ""
+            print(f"     {conn} {prefix}[{r['branch']}] {r['commit']} {status_desc}")
+
+    return 0
+
+
+def get_plane_ticket_status(ticket_id, db_path=None):
+    """Consulta el estado del ticket en la base SQLite local issues_cache."""
+    db_file = db_path or DEFAULT_DB_FILE
+    if not os.path.exists(db_file):
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True, timeout=2.0)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT state_group, state_name, title FROM issues_cache WHERE UPPER(ticket_id) = UPPER(?)",
+            (ticket_id.strip(),)
+        )
+        row = cur.fetchone()
+        conn.close()
+        if row:
+            return {"state_group": row[0], "state_name": row[1], "title": row[2]}
+    except Exception:
+        pass
+    return None
+
+
+def extract_ticket_id(text):
+    """Extrae el primer identificador tipo PROJ-123 de un texto."""
+    match = re.search(r"\b([A-Za-z]+-\d+)\b", text)
+    return match.group(1).upper() if match else None
+
+
+def resolve_base_branch(repo_path, preferred_base=None):
+    """Detecta la mejor rama base remota para un repo en orden dev -> staging -> main -> master."""
+    if preferred_base:
+        code, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{preferred_base}"], cwd=repo_path)
+        if code == 0:
+            return preferred_base
+
+    candidates = ["dev", "staging", "main", "master"]
+    for cand in candidates:
+        code, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{cand}"], cwd=repo_path)
+        if code == 0:
+            return cand
+
+    for cand in candidates:
+        code, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/heads/{cand}"], cwd=repo_path)
+        if code == 0:
+            return cand
+
+    return None
+
+
+def check_git_merged(repo_path, branch, base_branch):
+    """
+    Verifica si una rama está mergeada en la rama base:
+    1. Direct ancestry: git merge-base --is-ancestor
+    2. Squash/Rebase equivalence: git merge-tree --write-tree
+    """
+    if not base_branch:
+        return False, "no_base", None
+
+    base_ref = f"origin/{base_branch}"
+    code_ref, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/remotes/{base_ref}"], cwd=repo_path)
+    if code_ref != 0:
+        base_ref = base_branch
+        code_ref, _, _ = run_git(["rev-parse", "--verify", "--quiet", f"refs/heads/{base_ref}"], cwd=repo_path)
+        if code_ref != 0:
+            return False, "base_not_found", None
+
+    # 1. Ancestro directo
+    code, _, _ = run_git(["merge-base", "--is-ancestor", "HEAD", base_ref], cwd=repo_path)
+    if code == 0:
+        return True, "direct", base_ref
+
+    # 2. Equivalencia Squash / Rebase mediante merge-tree trifásico en memoria
+    code_mt, mt_out, _ = run_git(["merge-tree", "--write-tree", base_ref, "HEAD"], cwd=repo_path)
+    if code_mt == 0 and mt_out:
+        merge_tree = mt_out.strip()
+        code_bt, bt_out, _ = run_git(["rev-parse", f"{base_ref}^{{tree}}"], cwd=repo_path)
+        if code_bt == 0 and bt_out and merge_tree == bt_out.strip():
+            return True, "squash", base_ref
+
+    return False, "unmerged", base_ref
+
+
+def audit_repo_state(repo_dir, preferred_base=None):
+    """Auditoría profunda de un worktree: filesystem, git integration y metadatos."""
+    code, root, _ = run_git(["rev-parse", "--show-toplevel"], cwd=repo_dir)
+    if code != 0 or os.path.abspath(root) != os.path.abspath(repo_dir):
+        return None
+
+    code_b, branch, _ = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_dir)
+    if code_b != 0 or not branch:
+        branch = "unknown"
+
+    code_l, commit_line, _ = run_git(["log", "-1", "--format=%h '%s'"], cwd=repo_dir)
+    if code_l != 0 or not commit_line:
+        commit_line = "(sin commits)"
+
+    code_s, status_out, _ = run_git(["status", "--porcelain"], cwd=repo_dir)
+    dirty_lines = [l for l in status_out.splitlines() if l.strip()]
+    is_clean = len(dirty_lines) == 0
+
+    base_branch = resolve_base_branch(repo_dir, preferred_base)
+    is_merged, merge_method, base_ref = check_git_merged(repo_dir, branch, base_branch)
+
+    commits_ahead = 0
+    if base_ref:
+        code_c, count_out, _ = run_git(["rev-list", "--count", f"{base_ref}..HEAD"], cwd=repo_dir)
+        if code_c == 0 and count_out.isdigit():
+            commits_ahead = int(count_out)
+
+    is_protected = branch in PROTECTED_BRANCHES
+
+    if is_protected:
+        status_category = "PROTECTED"
+    elif is_clean and is_merged:
+        status_category = "SAFE_TO_PRUNE"
+    elif not is_clean and is_merged:
+        status_category = "MERGED_DIRTY"
+    elif is_clean and not is_merged:
+        status_category = "UNMERGED_CLEAN"
+    else:
+        status_category = "UNMERGED_DIRTY"
+
+    return {
+        "name": os.path.basename(repo_dir),
+        "path": os.path.abspath(repo_dir),
+        "branch": branch,
+        "commit": commit_line,
+        "base_branch": base_branch,
+        "base_ref": base_ref,
+        "is_clean": is_clean,
+        "dirty_count": len(dirty_lines),
+        "is_merged": is_merged,
+        "merge_method": merge_method,
+        "commits_ahead": commits_ahead,
+        "is_protected": is_protected,
+        "status_category": status_category,
+    }
+
+
+def audit_container(container_path, preferred_base=None, db_path=None):
+    """Audita un contenedor (multi-repo o single-repo) y determina su salud y podabilidad."""
+    cname = os.path.basename(container_path)
+    ticket_id = extract_ticket_id(cname)
+
+    direct_repo = audit_repo_state(container_path, preferred_base)
+    multi_repo = False
+    repos = []
+
+    if direct_repo:
+        repos.append(direct_repo)
+        if not ticket_id:
+            ticket_id = extract_ticket_id(direct_repo["branch"])
+    else:
+        multi_repo = True
+        for child in sorted(os.listdir(container_path)):
+            cpath = os.path.abspath(os.path.join(container_path, child))
+            if os.path.isdir(cpath):
+                rstate = audit_repo_state(cpath, preferred_base)
+                if rstate:
+                    repos.append(rstate)
+                    if not ticket_id:
+                        ticket_id = extract_ticket_id(rstate["branch"])
+
+    if not repos:
+        return None
+
+    ticket_info = get_plane_ticket_status(ticket_id, db_path) if ticket_id else None
+    plane_state_group = ticket_info["state_group"] if ticket_info else "unknown"
+    plane_state_name = ticket_info["state_name"] if ticket_info else None
+    ticket_is_cancelled = plane_state_group == "cancelled"
+
+    if any(r["is_protected"] for r in repos):
+        category = "PROTEGIDO"
+        reason = "Contiene rama principal protegida (main/staging/dev)"
+    elif all(r["status_category"] == "SAFE_TO_PRUNE" for r in repos):
+        category = "SEGURO_PARA_PODAR"
+        reason = "Todos los repositorios están limpios y mergeados"
+    elif ticket_is_cancelled:
+        if all(r["is_clean"] for r in repos):
+            category = "ABANDONADO_LIMPIO"
+            reason = "Ticket cancelado en Plane, repositorios limpios"
+        else:
+            category = "ABANDONADO_CON_CAMBIOS"
+            reason = "Ticket cancelado en Plane pero con cambios locales sin commitear"
+    elif all(r["is_merged"] for r in repos) and any(not r["is_clean"] for r in repos):
+        category = "MERGEADO_CON_DIRTY"
+        reason = "Ramas mergeadas pero con archivos locales no commiteados"
+    elif any(r["is_merged"] for r in repos) and any(not r["is_merged"] for r in repos):
+        category = "PARCIALMENTE_MERGEADO"
+        reason = "Algunos repositorios mergeados y otros en curso"
+    elif any(not r["is_clean"] for r in repos):
+        category = "BLOQUEADO_POR_CAMBIOS"
+        reason = "Ramas no integradas con archivos sin commitear"
+    else:
+        category = "EN_CURSO"
+        reason = "Ramas activas en desarrollo"
+
+    return {
+        "container": cname,
+        "path": container_path,
+        "multi_repo": multi_repo,
+        "ticket_id": ticket_id,
+        "plane_info": ticket_info,
+        "plane_state_group": plane_state_group,
+        "plane_state_name": plane_state_name,
+        "ticket_is_cancelled": ticket_is_cancelled,
+        "category": category,
+        "reason": reason,
+        "repos": repos,
+    }
+
+
+def create_container_backup(container_path, backup_dir=None):
+    """Crea un archivo .tar.gz comprimido con todo el contenido del contenedor antes de podar."""
+    target_backup_dir = os.path.abspath(backup_dir or DEFAULT_BACKUP_DIR)
+    os.makedirs(target_backup_dir, exist_ok=True)
+    cname = os.path.basename(container_path)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tar_filename = f"{cname}-{timestamp}.tar.gz"
+    tar_path = os.path.join(target_backup_dir, tar_filename)
+
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for item in sorted(os.listdir(container_path)):
+            ipath = os.path.join(container_path, item)
+            tar.add(ipath, arcname=item)
+
+    if os.path.exists(tar_path) and os.path.getsize(tar_path) > 0:
+        return tar_path
+    raise RuntimeError(f"Fallo al generar archivo de respaldo en '{tar_path}'.")
+
+
+def cmd_audit(args):
+    base_dir = os.path.abspath(args.dir)
+    if not os.path.isdir(base_dir):
+        if getattr(args, "json", False):
+            print(json.dumps([]))
+        else:
+            print(f"Directorio de worktrees '{base_dir}' no existe.")
+        return 0
+
+    entries = sorted(os.listdir(base_dir))
+    containers = []
+    target = args.target.strip() if getattr(args, "target", None) else None
+
+    for entry in entries:
+        container_path = os.path.abspath(os.path.join(base_dir, entry))
+        if not os.path.isdir(container_path):
+            continue
+
+        c_audit = audit_container(container_path)
+        if not c_audit:
+            continue
+
+        if target:
+            if c_audit["container"] != target and (not c_audit["ticket_id"] or c_audit["ticket_id"] != target.upper()):
+                continue
+
+        containers.append(c_audit)
+
+    if getattr(args, "json", False):
+        print(json.dumps(containers, indent=2))
+        return 0
+
+    if not containers:
+        if target:
+            print(f"No se encontró el worktree o ticket '{target}' en '{base_dir}'.")
+        else:
+            print(f"Sin worktrees activos para auditar en '{base_dir}'.")
+        return 0
+
+    print(f"Auditoría de worktrees en '{base_dir}':\n")
+
+    groups = {
+        "SEGURO_PARA_PODAR": ("✔ [SEGURO PARA PODAR] (100% integrados y limpios):", []),
+        "ABANDONADO_CON_CAMBIOS": ("⚠ [ABANDONADOS CON CAMBIOS] (Cancelados/stale con cambios locales; exigen --include-stale para respaldo y poda):", []),
+        "ABANDONADO_LIMPIO": ("⚠ [ABANDONADOS LIMPIOS] (Cancelados/stale limpios; exigen --include-stale para podar):", []),
+        "MERGEADO_CON_DIRTY": ("✖ [MERGEADOS CON CAMBIOS] (Integrados en Git pero con cambios locales sin commitear):", []),
+        "EN_CURSO": ("○ [EN CURSO / ACTIVOS] (Ramas vivas en desarrollo):", []),
+        "PARCIALMENTE_MERGEADO": ("◐ [PARCIALMENTE MERGEADO] (Algunos repositorios mergeados y otros en curso):", []),
+        "BLOQUEADO_POR_CAMBIOS": ("✖ [BLOQUEADOS POR CAMBIOS] (Ramas no integradas con cambios sin commitear):", []),
+        "PROTEGIDO": ("🛡 [RAMA PRINCIPAL PROTEGIDA] (Inmune a poda):", []),
+    }
+
+    for c in containers:
+        cat = c["category"]
+        if cat in groups:
+            groups[cat][1].append(c)
+        else:
+            groups.setdefault("EN_CURSO", ("", []))[1].append(c)
+
+    for cat_key, (header, items) in groups.items():
+        if not items:
+            continue
+        print(f"  {header}")
+        for c in items:
+            ticket_suffix = f" [{c['ticket_id']}: {c['plane_state_name'] or c['plane_state_group']}]" if c['ticket_id'] else ""
+            print(f"  • {c['container']}/{ticket_suffix}")
+            for idx, r in enumerate(c["repos"]):
+                conn = "└──" if idx == len(c["repos"]) - 1 else "├──"
+                status_parts = []
+                if r["is_protected"]:
+                    status_parts.append("protegido")
+                elif r["is_merged"]:
+                    status_parts.append(f"mergeado a {r['base_ref']} ({r['merge_method']})")
+                else:
+                    ahead_str = f", {r['commits_ahead']} commit(s) adelante" if r['commits_ahead'] else ""
+                    status_parts.append(f"no mergeado a {r['base_ref'] or 'base'}{ahead_str}")
+
+                if r["is_clean"]:
+                    status_parts.append("clean")
+                else:
+                    status_parts.append(f"dirty: {r['dirty_count']} archivo(s)")
+
+                st_desc = "; ".join(status_parts)
+                rlabel = f"{r['name']} " if c["multi_repo"] else ""
+                print(f"     {conn} {rlabel}[{r['branch']}] ({st_desc})")
+        print()
+
+    safe_cnt = len(groups["SEGURO_PARA_PODAR"][1])
+    stale_cnt = len(groups["ABANDONADO_CON_CAMBIOS"][1]) + len(groups["ABANDONADO_LIMPIO"][1])
+    print(f"Resumen: {safe_cnt} contenedor(es) podable(s) de inmediato.")
+    if stale_cnt:
+        print(f"         {stale_cnt} contenedor(es) cancelado(s)/abandonado(s) podable(s) con --include-stale.")
+    print("Para simular la poda ejecuta: plane-worktree prune\n")
+
+    return 0
+
+
+def cmd_prune(args):
+    base_dir = os.path.abspath(args.dir)
+    if not os.path.isdir(base_dir):
+        if getattr(args, "json", False):
+            print(json.dumps([]))
+        else:
+            print(f"Directorio de worktrees '{base_dir}' no existe.")
+        return 0
+
+    execute = getattr(args, "execute", False)
+    include_stale = getattr(args, "include_stale", False)
+    backup_dir = getattr(args, "backup_dir", None)
+    target = args.target.strip() if getattr(args, "target", None) else None
+
+    entries = sorted(os.listdir(base_dir))
+    containers = []
+
+    for entry in entries:
+        container_path = os.path.abspath(os.path.join(base_dir, entry))
+        if not os.path.isdir(container_path):
+            continue
+
+        c_audit = audit_container(container_path)
+        if not c_audit:
+            continue
+
+        if target:
+            if c_audit["container"] != target and (not c_audit["ticket_id"] or c_audit["ticket_id"] != target.upper()):
+                continue
+
+        containers.append(c_audit)
+
+    if not containers:
+        if target:
+            sys.stderr.write(f"No se encontró el worktree o ticket '{target}' en '{base_dir}'.\n")
+            return 1
+        print(f"Sin worktrees para evaluar en '{base_dir}'.")
+        return 0
+
+    to_prune_safe = []
+    to_prune_stale = []
+    skipped_stale = []
+    blocked = []
+
+    for c in containers:
+        cat = c["category"]
+        if cat == "SEGURO_PARA_PODAR":
+            to_prune_safe.append(c)
+        elif cat in ("ABANDONADO_CON_CAMBIOS", "ABANDONADO_LIMPIO", "MERGEADO_CON_DIRTY"):
+            if include_stale:
+                to_prune_stale.append(c)
+            else:
+                skipped_stale.append(c)
+        else:
+            blocked.append(c)
+
+    if getattr(args, "json", False):
+        res_json = {
+            "mode": "execute" if execute else "dry-run",
+            "pruned_safe": [c["container"] for c in to_prune_safe],
+            "pruned_stale": [c["container"] for c in to_prune_stale],
+            "skipped_stale": [c["container"] for c in skipped_stale],
+            "blocked": [{"container": c["container"], "category": c["category"], "reason": c["reason"]} for c in blocked],
+        }
+        if not execute:
+            print(json.dumps(res_json, indent=2))
+            return 0
+
+    if not execute:
+        print(f"Simulación de poda de worktrees (DRY-RUN) en '{base_dir}':\n")
+        if to_prune_safe:
+            print("  ✔ Candidatos seguros para podar (100% integrados y limpios):")
+            for c in to_prune_safe:
+                repo_names = ", ".join(r["name"] for r in c["repos"])
+                print(f"    • {c['container']}/ ({len(c['repos'])} repo(s): {repo_names})")
+            print()
+
+        if to_prune_stale:
+            print("  ⚠ Candidatos abandonados/cancelados (se creará respaldo .tar.gz antes de eliminar):")
+            for c in to_prune_stale:
+                tinfo = f" [{c['ticket_id']}: {c['plane_state_name'] or c['plane_state_group']}]" if c['ticket_id'] else ""
+                print(f"    • {c['container']}/{tinfo} -> Respaldo en {backup_dir or DEFAULT_BACKUP_DIR}")
+            print()
+
+        if skipped_stale:
+            print("  ○ Omitidos (Cancelados/abandonados; requieren flag --include-stale para podar con respaldo):")
+            for c in skipped_stale:
+                tinfo = f" [{c['ticket_id']}: {c['plane_state_name'] or c['plane_state_group']}]" if c['ticket_id'] else ""
+                dirty_info = " (con cambios locales)" if any(not r["is_clean"] for r in c["repos"]) else " (limpio)"
+                print(f"    • {c['container']}/{tinfo}{dirty_info}")
+            print()
+
+        if blocked:
+            print("  ⛔ Omitidos / Bloqueados (En curso, ramas protegidas o cambios no integrados):")
+            for c in blocked:
+                print(f"    • {c['container']}/ -> {c['category']}: {c['reason']}")
+            print()
+
+        total_candidates = len(to_prune_safe) + len(to_prune_stale)
+        if total_candidates == 0:
+            print("No hay worktrees listos para podar.")
+            if skipped_stale:
+                print("Nota: hay worktrees cancelados/abandonados. Usa --include-stale para habilitar su poda con respaldo.")
+        else:
+            print(f"Para ejecutar la eliminación definitiva de estos {total_candidates} worktree(s), ejecuta:")
+            flags = ["prune", "--execute"]
+            if target:
+                flags.insert(1, target)
+            if include_stale:
+                flags.append("--include-stale")
+            if args.dir != ".worktrees":
+                flags.extend(["--dir", args.dir])
+            print(f"  plane-worktree {' '.join(flags)}")
+        return 0
+
+    # Modo EXECUTE
+    print(f"Ejecutando poda segura en '{base_dir}'...\n")
+    all_to_prune = []
+    for c in to_prune_safe:
+        all_to_prune.append((c, False))
+    for c in to_prune_stale:
+        all_to_prune.append((c, True))
+
+    if not all_to_prune:
+        print("No hay worktrees elegibles para podar.")
+        if skipped_stale:
+            print("Nota: se detectaron worktrees cancelados/abandonados. Pasa --include-stale para generar respaldo y podarlos.")
+        return 0
+
+    pruned_count = 0
+    backups_created = []
+
+    for c, is_stale in all_to_prune:
+        cpath = c["path"]
+        cname = c["container"]
+        print(f"Procesando '{cname}'...")
+
+        if is_stale:
+            try:
+                tar_backup = create_container_backup(cpath, backup_dir)
+                backups_created.append(tar_backup)
+                print(f"  📦 Respaldo .tar.gz generado: {tar_backup}")
+            except Exception as e:
+                sys.stderr.write(f"  Error generando respaldo para '{cname}': {e}. Se aborta la poda de este contenedor.\n")
+                continue
+
+        for r in c["repos"]:
+            rpath = r["path"]
+            rbranch = r["branch"]
+            rname = r["name"]
+
+            code_c, cdir, _ = run_git(["rev-parse", "--git-common-dir"], cwd=rpath)
+            main_repo_root = os.path.dirname(os.path.abspath(cdir)) if code_c == 0 else None
+
+            rm_cmd = ["worktree", "remove", rpath]
+            if is_stale or not r["is_clean"]:
+                rm_cmd.append("--force")
+
+            code_rm, _, err_rm = run_git(rm_cmd, cwd=rpath if os.path.exists(rpath) else main_repo_root)
+            if code_rm != 0 and main_repo_root:
+                code_rm, _, err_rm = run_git(rm_cmd, cwd=main_repo_root)
+
+            if code_rm != 0:
+                sys.stderr.write(f"  Aviso en '{rname}': git worktree remove falló: {err_rm}\n")
+            else:
+                print(f"  ✓ Worktree '{rname}' desregistrado.")
+
+            if main_repo_root and rbranch not in PROTECTED_BRANCHES:
+                b_del_flag = "-d" if (r["merge_method"] == "direct" and not is_stale) else "-D"
+                code_bdel, _, _ = run_git(["branch", b_del_flag, rbranch], cwd=main_repo_root)
+                if code_bdel == 0:
+                    print(f"  ✓ Rama local '{rbranch}' eliminada ({b_del_flag}).")
+
+            if main_repo_root:
+                run_git(["worktree", "prune"], cwd=main_repo_root)
+
+        if os.path.exists(cpath):
+            shutil.rmtree(cpath, ignore_errors=True)
+            print(f"  ✓ Directorio contenedor '{cname}' eliminado.")
+
+        pruned_count += 1
+        print()
+
+    print(f"Poda completada: {pruned_count} contenedor(es) podado(s).")
+    if backups_created:
+        print(f"Respaldos guardados en: {os.path.dirname(backups_created[0])}")
+
+    return 0
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="plane-worktree",
+        description="Gestión de worktrees multi-repo por ticket (RFC 0002).",
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=True)
+    p_add = sub.add_parser("add", help="Crear un worktree por repo para un ticket")
+    p_add.add_argument("ticket", metavar="TICKET", help="ID del ticket (ej: OMNIFY-238)")
+    p_add.add_argument("description", metavar="DESCRIPTION", help="Descripción base de la rama/carpeta (kebab-case)")
+    p_add.add_argument("repos", metavar="REPO[=SLUG]", nargs="+", help="Uno o más repositorios (rutas o nombres)")
+    p_add.add_argument("--type", choices=VALID_TYPES, default="feat", help="Tipo de rama (default: feat)")
+    p_add.add_argument("--base", default="dev", help="Rama base en origin (default: dev)")
+    p_add.add_argument("--dir", default=".worktrees", help="Directorio contenedor (default: .worktrees)")
+    p_add.add_argument("--reuse-branch", action="store_true", help="Reutilizar rama local preexistente aunque diverja de origin/<base>")
+    p_add.add_argument("--no-fetch", action="store_true", help="Omitir fetch de origin")
+    p_add.set_defaults(handler=cmd_add)
+
+    p_list = sub.add_parser("list", aliases=["ls"], help="Listar contenedores de worktrees y estado de sus repos")
+    p_list.add_argument("--dir", default=".worktrees", help="Directorio contenedor (default: .worktrees)")
+    p_list.add_argument("--json", action="store_true", help="Salida en formato JSON")
+    p_list.set_defaults(handler=cmd_list)
+
+    p_audit = sub.add_parser("audit", help="Auditar estado de integración, salud y podabilidad de worktrees")
+    p_audit.add_argument("target", nargs="?", default=None, help="Contenedor o ticket específico a auditar (opcional)")
+    p_audit.add_argument("--dir", default=".worktrees", help="Directorio contenedor (default: .worktrees)")
+    p_audit.add_argument("--json", action="store_true", help="Salida en formato JSON")
+    p_audit.set_defaults(handler=cmd_audit)
+
+    p_prune = sub.add_parser("prune", help="Podar worktrees mergeados o abandonados con salvaguardas")
+    p_prune.add_argument("target", nargs="?", default=None, help="Contenedor o ticket específico a podar (opcional)")
+    p_prune.add_argument("--dir", default=".worktrees", help="Directorio contenedor (default: .worktrees)")
+    p_prune.add_argument("--execute", action="store_true", help="Ejecutar eliminación real (por defecto es simulación dry-run)")
+    p_prune.add_argument("--include-stale", action="store_true", help="Habilitar poda de worktrees cancelados/abandonados generando respaldo previo .tar.gz")
+    p_prune.add_argument("--backup-dir", default=None, help=f"Directorio de respaldos (default: {DEFAULT_BACKUP_DIR})")
+    p_prune.add_argument("--json", action="store_true", help="Salida en formato JSON")
+    p_prune.set_defaults(handler=cmd_prune)
+
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.handler(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
