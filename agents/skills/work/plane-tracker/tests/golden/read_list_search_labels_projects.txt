@@ -54,9 +54,9 @@ plane-tracker: error: 'search' ya no existe; usa: plane-tracker list --text form
 $ plane.py search validaciones --json -p OMNIFY
 [exit 2]
 --- stdout ---
-
+{"code":"usage","exit":2,"message":"'search' ya no existe; usa: plane-tracker list --text validaciones --json -p OMNIFY","schema":"plane-tracker/1","status":"error"}
 --- stderr ---
-plane-tracker: error: 'search' ya no existe; usa: plane-tracker list --text validaciones --json -p OMNIFY
+
 
 $ plane.py list --text formulario
 [exit 0]

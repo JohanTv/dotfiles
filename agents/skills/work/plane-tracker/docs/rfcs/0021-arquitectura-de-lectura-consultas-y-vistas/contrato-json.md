@@ -143,6 +143,7 @@ En `--json` los errores salen por **stdout** como objeto y con el código de sal
 | `queue_full` | 1 | límite de la cola de salida |
 | `env_missing` | 1 | falta una variable de entorno obligatoria |
 | `refused` | 1 | operación destructiva rechazada por seguridad (`delete`) |
+| `invalid_input` | 1 | valor o parámetro de entrada inválido en operaciones de escritura |
 | `http_error` | 1 | error HTTP definitivo (`detail.status`) |
 | `plane_unavailable` | 3 | Plane no responde y no hay alternativa local |
 | `no_cache` | 3 | sin Plane y sin caché local |

@@ -16,6 +16,7 @@ import urllib.parse
 from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
 from plane_cli.cache import serve_stale, sync_issues_cache
 from plane_cli import clock
+from plane_cli.errors import CliError
 
 
 PROJECTS_TTL = 86400  # 24 horas
@@ -116,9 +117,8 @@ def _ref_or_git(issue_ref):
             sys.stderr.write(f"ℹ Ticket auto-detectado desde la rama actual de Git: {git_ticket}\n")
             issue_ref = git_ticket
         else:
-            sys.stderr.write("Error: No se especificó ticket y no se detectó identificador en la rama actual de Git.\n")
-            sys.stderr.write("Usa: 'plane-tracker comment add OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.\n")
-            sys.exit(1)
+            raise CliError("not_found", "No se especificó ticket y no se detectó identificador en la rama actual de Git.",
+                           hint="Usa: 'plane-tracker comment add OMNIFY-162' o cámbiate a una rama como 'feature/OMNIFY-162'.")
     return issue_ref
 
 
@@ -132,8 +132,7 @@ def local_ticket_label(issue_ref):
         return f"{match.group(1).upper()}-{int(match.group(2))}"
     if re.match(r"^\d+$", issue_ref.strip()):
         return f"OMNIFY-{issue_ref.strip()}"
-    sys.stderr.write(f"Error: Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.\n")
-    sys.exit(1)
+    raise CliError("invalid_input", f"Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.")
 
 
 def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, issue_ref=None):
@@ -157,15 +156,13 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
         if prefix in projects_map:
             return projects_map[prefix]["id"], seq_id, None, f"{prefix}-{seq_id}"
 
-        sys.stderr.write(f"Error: Prefijo de proyecto '{prefix}' no encontrado en el workspace '{workspace}'.\n")
-        sys.stderr.write(f"Proyectos disponibles: {', '.join(projects_map.keys())}\n")
-        sys.exit(1)
+        raise CliError("unknown_project", f"Prefijo de proyecto '{prefix}' no encontrado en el workspace '{workspace}'.",
+                       hint=f"Proyectos disponibles: {', '.join(projects_map.keys())}")
 
     if re.match(r"^\d+$", issue_ref.strip()):
         return default_project_id, int(issue_ref.strip()), None, f"OMNIFY-{issue_ref.strip()}"
 
-    sys.stderr.write(f"Error: Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.\n")
-    sys.exit(1)
+    raise CliError("invalid_input", f"Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.")
 
 
 def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None, missing_ok=False):
@@ -198,8 +195,7 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
 
     if missing_ok:
         return None
-    sys.stderr.write(f"Error: Ticket #{seq_id} no encontrado en el proyecto.\n")
-    sys.exit(1)
+    raise CliError("not_found", f"Ticket #{seq_id} no encontrado en el proyecto.")
 
 
 def resolve_issue_by_label(base_url, api_key, workspace, issue_ref, fallback):
@@ -356,8 +352,7 @@ def require_actor(conn, base_url, api_key, workspace):
     """UUID de quien usa la herramienta, o error de uso (código 1): un filtro "mío" sin identidad no devuelve todo en silencio."""
     actor = get_actor_uuid(base_url, api_key, workspace, conn)
     if not actor:
-        sys.stderr.write("Error: no sé quién eres: define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).\n")
-        sys.exit(1)
+        raise CliError("actor_unknown", "no sé quién eres: define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).")
     return actor
 
 

@@ -18,6 +18,7 @@ import session_clock
 
 from plane_cli import circuit, config
 from plane_cli.config import add_json_flag, positive_int
+from plane_cli.errors import CliError
 from plane_cli.outbox import pending_counts
 from plane_cli.proposals import FOCUS_KEEP_DAYS, focus_intervals
 from plane_cli.resolve import detect_ticket_from_git, local_ticket_label
@@ -81,14 +82,16 @@ def _focus_context(args, conn):
     """(agente, sesión, ahora, marcas abiertas) de esta sesión; purga las marcas antiguas y termina si no resuelve la sesión."""
     agent = getattr(args, "agent", None) or session_clock.detect_agent()
     if not agent:
-        sys.stderr.write("Error: no se pudo determinar el agente (usa --agent claude|opencode|agy).\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "no se pudo determinar el agente (usa --agent claude|opencode|agy).")
     session_id, origin, cands = session_clock.resolve_session(agent, os.getcwd(), getattr(args, "session", None))
     if not session_id:
-        sys.stderr.write(f"Error: no se pudo determinar la sesión de {agent}: {origin}. Indica --session <id>.\n")
-        for sid, ts in cands:
-            sys.stderr.write(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})\n")
-        sys.exit(1)
+        msg = f"no se pudo determinar la sesión de {agent}: {origin}. Indica --session <id>."
+        if cands:
+            lines = [msg]
+            for sid, ts in cands:
+                lines.append(f"   • {sid}  (última actividad {ts.astimezone().strftime('%Y-%m-%d %H:%M')})")
+            msg = "\n".join(lines)
+        raise CliError("not_found", msg)
     now = clock.now()
     with conn:  # las marcas son útiles solo el día en curso: se purgan las antiguas
         conn.execute("DELETE FROM session_marks WHERE COALESCE(ended_at, started_at) < ?", ((now - timedelta(days=FOCUS_KEEP_DAYS)).isoformat(timespec="seconds"),))
@@ -213,8 +216,7 @@ def cmd_handoff(args, conn, base_url, api_key, workspace, default_project_id):
     try:
         facts = handoff_facts(getattr(args, "base", None))
     except HandoffError as exc:
-        sys.stderr.write(f"ERROR: {exc}\n")
-        sys.exit(1)
+        raise CliError("invalid_input", str(exc))
     print(format_handoff(facts))
     ticket = args.issue or detect_ticket_from_git() or "<TICKET>"
     sys.stderr.write(f"\nCompleta los {PLACEHOLDER}, guarda el texto en un archivo y publícalo con:\n"

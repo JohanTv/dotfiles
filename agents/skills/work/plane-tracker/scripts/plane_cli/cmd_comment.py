@@ -14,6 +14,7 @@ import session_clock
 from plane_cli.cache import issue_stub
 from plane_cli.circuit import PlaneUnavailable
 from plane_cli.config import add_json_flag
+from plane_cli.errors import CliError
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
@@ -40,12 +41,11 @@ def _resolve_duration(args, conn, meta, issue_ref):
         proposal_key = issue_ref.upper()
         if getattr(args, "accept_proposal", False):
             if capacity_hint in NO_PROPOSAL_BUCKETS:
-                sys.stderr.write(f"Error: el balde '{capacity_hint}' (soporte/reuniones) no admite propuesta medida; usa --duration.\n")
-                sys.exit(1)
+                raise CliError("invalid_input", f"el balde '{capacity_hint}' (soporte/reuniones) no admite propuesta medida; usa --duration.")
             proposal = load_recent_proposal(proposal_key, current_session_id(args, worker_hint))
             if not proposal:
-                sys.stderr.write(f"Error: no hay una propuesta reciente (<30 min) de esta sesión para {proposal_key}. Repite sin --accept-proposal para generarla.\n")
-                sys.exit(1)
+                raise CliError("not_found", f"no hay una propuesta reciente (<30 min) de esta sesión para {proposal_key}.",
+                               hint="Repite sin --accept-proposal para generarla.")
             duration = proposal["minutes"]
         else:
             pending = load_recent_proposal(proposal_key, current_session_id(args, worker_hint))
@@ -59,17 +59,15 @@ def _resolve_duration(args, conn, meta, issue_ref):
                 sys.stderr.write("   Para registrarla tal cual: repite el comando con --accept-proposal; para ajustarla usa --duration N.\n")
             else:
                 sys.stderr.write("Usa --duration <minutos> o incluye el bloque PLANE_WORKLOG_METADATA con 'duration_minutes'.\n")
-            sys.exit(1)
+            return None, None
 
     try:
         duration = int(duration)
     except (TypeError, ValueError):
-        sys.stderr.write("Error: la duración debe ser un entero de minutos (ej: --duration 5).\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "la duración debe ser un entero de minutos (ej: --duration 5).")
 
     if duration < 1 or duration > 24 * 60:
-        sys.stderr.write(f"Error: duración fuera de rango ({duration} min). Debe estar entre 1 y 1440 minutos.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", f"duración fuera de rango ({duration} min). Debe estar entre 1 y 1440 minutos.")
     return duration, proposal
 
 
@@ -136,8 +134,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         content = sys.stdin.read()
 
     if not content.strip():
-        sys.stderr.write("Error: El comentario está vacío.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "El comentario está vacío.")
     reject_placeholders(content)
     reject_long_comment(content, getattr(args, "long", False))
 
@@ -151,6 +148,8 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
 
     meta = extract_metadata_from_comment(content)
     duration, proposal = _resolve_duration(args, conn, meta, issue_ref)
+    if duration is None:
+        return 1
 
     # Convertir Markdown → HTML si el contenido no viene ya como HTML. El bloque oculto se quita antes: el conversor
     # lo escaparía y quedaría visible; publish_comment inserta el real.

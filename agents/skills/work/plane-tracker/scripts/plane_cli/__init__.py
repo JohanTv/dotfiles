@@ -14,7 +14,7 @@ Módulos:
   config          CACHE_DIR, db_file(), request_log(), proposal_file(), get_env_or_fail()
   clock           timestamp(), now(), local_now(), local_today(): toda lectura de la hora real pasa por aquí
   vocabulary      contrato `plane-tracker/1` como datos: familias de campos, registros de notas, errores y códigos de comprobación
-  errors          CliError(code, message, hint, exit_code, detail): error con código registrado (aún no sustituye a los sys.exit)
+  errors          CliError(code, message, hint, exit_code, detail): error con código registrado
   db              conexión SQLite (WAL) y esquema
   circuit         circuito de fallo rápido entre procesos y PlaneUnavailable
   api             api_request(): clasificación de fallos, reintentos acotados, circuito y registro de latencia; rate_limit() con el presupuesto de tasa

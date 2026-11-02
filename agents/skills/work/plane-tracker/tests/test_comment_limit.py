@@ -7,6 +7,7 @@ from contextlib import redirect_stderr
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
 
+from plane_cli.errors import CliError  # noqa: E402
 from plane_cli.worklog import MAX_COMMENT_CHARS, note_from, reject_long_comment, visible_text  # noqa: E402
 
 
@@ -15,8 +16,10 @@ def rejected(text, allow_long=False):
     try:
         with redirect_stderr(err):
             reject_long_comment(text, allow_long)
-    except SystemExit as exc:
-        return exc.code, err.getvalue()
+    except (SystemExit, CliError) as exc:
+        code = exc.exit_code if isinstance(exc, CliError) else exc.code
+        msg = exc.render() if isinstance(exc, CliError) else err.getvalue()
+        return code, msg
     return None, err.getvalue()
 
 

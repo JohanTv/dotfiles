@@ -67,10 +67,6 @@ def load_zshrc_local_if_needed():
 
 
 def get_env_or_fail(var_name, description):
+    """Carga .zshrc.local si hace falta y devuelve el valor o None si no está definida."""
     load_zshrc_local_if_needed()
-    val = os.environ.get(var_name)
-    if not val:
-        sys.stderr.write(f"Error: Variable de entorno '{var_name}' ({description}) no configurada.\n")
-        sys.stderr.write("Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.\n")
-        sys.exit(1)
-    return val
+    return os.environ.get(var_name)

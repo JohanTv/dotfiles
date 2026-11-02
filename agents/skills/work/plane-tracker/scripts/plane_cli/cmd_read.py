@@ -79,7 +79,7 @@ def cmd_whoami(args, conn, base_url, api_key, workspace, default_project_id):
     identity, coverage = resolve_identity(conn, Env(base_url, api_key, workspace, default_project_id))
     emit(view, build(view.name, None, view.query(identity, coverage)), getattr(args, "json", False))
     if identity["status"] == "unresolved":
-        sys.exit(1)
+        return 1
 
 
 def register_get(sub):

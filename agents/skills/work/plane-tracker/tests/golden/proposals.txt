@@ -127,7 +127,8 @@ $ plane.py comment add OMNIFY-1 -m Otra vez --accept-proposal --agent claude --s
 --- stdout ---
 
 --- stderr ---
-Error: no hay una propuesta reciente (<30 min) de esta sesión para OMNIFY-1. Repite sin --accept-proposal para generarla.
+Error: no hay una propuesta reciente (<30 min) de esta sesión para OMNIFY-1.
+Repite sin --accept-proposal para generarla.
 
 $ plane.py comment add OMNIFY-1 -m Se propone --agent claude --session sess-golden-0001
 [exit 1]

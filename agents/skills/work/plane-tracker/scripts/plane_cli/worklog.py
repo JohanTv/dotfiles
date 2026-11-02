@@ -11,6 +11,7 @@ import re
 import sys
 from datetime import datetime, timedelta
 from plane_cli import clock
+from plane_cli.errors import CliError
 
 
 def extract_metadata_from_comment(comment_html):
@@ -179,8 +180,7 @@ PLACEHOLDER = "[COMPLETAR]"
 def reject_placeholders(text):
     """Un texto con marcadores sin completar (fuera del bloque oculto) nunca se publica."""
     if PLACEHOLDER in re.sub(r"<!--[\s\S]*?-->", "", text or ""):
-        sys.stderr.write(f"Error: el texto aún tiene marcadores {PLACEHOLDER}; complétalos antes de publicar.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", f"el texto aún tiene marcadores {PLACEHOLDER}; complétalos antes de publicar.")
 
 
 MAX_COMMENT_CHARS = 700
@@ -195,9 +195,8 @@ def reject_long_comment(text, allow_long):
     """Una bitácora de cierre es corta: sobre MAX_COMMENT_CHARS visibles solo se publica con --long (relevos, informes pedidos)."""
     size = len(visible_text(text))
     if size > MAX_COMMENT_CHARS and not allow_long:
-        sys.stderr.write(f"Error: el comentario tiene {size} caracteres visibles (máximo {MAX_COMMENT_CHARS}). "
-                         "Acórtalo o usa --long solo para un relevo o un informe que el usuario pidió.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", f"el comentario tiene {size} caracteres visibles (máximo {MAX_COMMENT_CHARS}). "
+                       "Acórtalo o usa --long solo para un relevo o un informe que el usuario pidió.")
 
 
 def note_from(text, fallback=""):

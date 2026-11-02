@@ -17,7 +17,8 @@ $ plane.py comment delete OMNIFY-3
 --- stdout ---
 
 --- stderr ---
-Error: No hay comentarios propios en el ticket. Indica el ID con --comment-id.
+Error: No hay comentarios propios en el ticket.
+Indica el ID con --comment-id.
 
 $ plane.py comment edit OMNIFY-1 --comment-id c1000000-0000-4000-8000-000000000001 -m Texto **nuevo**
 [exit 0]

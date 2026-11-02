@@ -123,7 +123,7 @@ ALWAYS_SHOWN = frozenset({"truncated", "text_looks_like_id"})
 # --- Errores -----------------------------------------------------------------------------------------------------------------------------
 # código -> código de salida. Tabla fija de salida: 0 éxito, 1 error definitivo o de validación, 2 uso, 3 Plane no disponible.
 ERRORS = {"usage": 2, "unknown_project": 1, "unknown_state": 1, "unknown_label": 1, "actor_unknown": 1, "bad_period": 1, "bad_date": 1,
-          "not_found": 1, "duplicate": 1, "queue_full": 1, "env_missing": 1, "refused": 1, "http_error": 1, "plane_unavailable": 3, "no_cache": 3}
+          "not_found": 1, "duplicate": 1, "queue_full": 1, "env_missing": 1, "refused": 1, "http_error": 1, "invalid_input": 1, "plane_unavailable": 3, "no_cache": 3}
 EXIT_OK, EXIT_ERROR, EXIT_USAGE, EXIT_UNAVAILABLE = 0, 1, 2, 3
 # Espacio propio de `worklog check` (no se confunde con códigos de nota ni de error).
 CHECK_CODES = ("duplicate", "orphan", "mismatch", "missing_local", "pending", "unlinked", "no_block", "unreachable")

@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
 from plane_cli.worklog import extract_metadata_from_comment, replace_metadata_block, strip_metadata_block, upsert_worklog
 from plane_cli import clock
+from plane_cli.errors import CliError
 
 EXTERNAL_SOURCE = "plane-tracker"
 LEASE_SECONDS = 180
@@ -63,9 +64,8 @@ class Published:
     extra: dict = field(default_factory=dict)
 
 
-def fail(message, prefix="Error: "):
-    sys.stderr.write(f"{prefix}{message}\n")
-    sys.exit(1)
+def fail(code, message, hint=None):
+    raise CliError(code, message, hint=hint)
 
 
 def stamp():
@@ -228,12 +228,12 @@ def _enqueue(conn, draft, client_id):
     key = (entry["ticket_id"], entry["track"], entry["date"], entry["start_time"])
     payload = json.dumps({"comment_html": draft.html, "external_source": EXTERNAL_SOURCE, "external_id": client_id}, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_TEXT_BYTES:
-        fail(f"el comentario supera el máximo de {MAX_TEXT_BYTES // 1024} KB.")
+        fail("queue_full", f"el comentario supera el máximo de {MAX_TEXT_BYTES // 1024} KB.")
     owner = conn.execute(f"SELECT id FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL}", key).fetchone()
     if owner:
-        fail(f"Ya hay un registro en cola con ese ticket/track/fecha/inicio (#{owner['id']}). Publícalo con 'outbox flush' o descártalo con 'outbox drop {owner['id']}'.", prefix="")
+        fail("duplicate", f"Ya hay un registro en cola con ese ticket/track/fecha/inicio (#{owner['id']}). Publícalo con 'outbox flush' o descártalo con 'outbox drop {owner['id']}'.")
     if conn.execute(f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL}").fetchone()[0] >= MAX_OPEN_ITEMS:
-        fail(f"la cola ya tiene {MAX_OPEN_ITEMS} registros abiertos; publícalos con 'outbox flush' antes de añadir más.")
+        fail("queue_full", f"la cola ya tiene {MAX_OPEN_ITEMS} registros abiertos; publícalos con 'outbox flush' antes de añadir más.")
     previous = conn.execute(f"SELECT * FROM worklogs WHERE {_WORKLOG_KEY}", key).fetchone()
     if previous:
         sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
@@ -349,11 +349,11 @@ def drop_item(conn, item_id, force=False, keep_worklog=False):
     """Descarta un item abierto y borra su fila provisional de worklogs (salvo keep_worklog); termina con código 1 si no procede."""
     item = conn.execute("SELECT * FROM outbox WHERE id = ?", (item_id,)).fetchone()
     if item is None:
-        fail(f"no existe el registro #{item_id} en la cola.")
+        fail("not_found", f"no existe el registro #{item_id} en la cola.")
     if item["state"] not in OPEN_STATES:
-        fail(f"el registro #{item_id} está en estado {item['state']}; solo se descartan los pendientes, en envío o fallidos.")
+        fail("refused", f"el registro #{item_id} está en estado {item['state']}; solo se descartan los pendientes, en envío o fallidos.")
     if item["maybe_delivered"] and not force:
-        fail(f"el registro #{item_id} pudo haberse enviado. Puede que ya esté publicado en Plane; revisa el ticket {item['ticket_ref']} o descártalo igualmente con --force.")
+        fail("refused", f"el registro #{item_id} pudo haberse enviado. Puede que ya esté publicado en Plane; revisa el ticket {item['ticket_ref']} o descártalo igualmente con --force.")
     with conn:
         conn.execute("UPDATE outbox SET state = 'dropped', lease_until = NULL, updated_at = ? WHERE id = ?", (stamp(), item_id))
         if not keep_worklog:

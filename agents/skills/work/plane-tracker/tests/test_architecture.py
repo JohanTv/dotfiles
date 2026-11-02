@@ -27,7 +27,7 @@ DECISION = os.path.join(SKILL, "docs", "decisions", "0025-contrato-json-de-lectu
 PLAN = os.path.join(SKILL, "docs", "rfcs", "0021-arquitectura-de-lectura-consultas-y-vistas", "plan-de-migracion.md")
 GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
-CURRENT_PHASE = 6
+CURRENT_PHASE = 7
 # Fase del plan en que cada función de aptitud pasa a estar activa. F3-golden es la mitad de F3 que necesita sobres reales (fase 1).
 PHASES = {"F1": 0, "F2": 1, "F3": 0, "F3-golden": 1, "F4": 0, "F5": 1, "F6": 1, "F7": 1, "F8": 0, "F9": 1, "F10": 5, "F11": 5, "F12": 1, "F13": 0,
           "F14": 0, "F15": 0}
@@ -194,6 +194,10 @@ class Architecture(unittest.TestCase):
         self.assertTrue(envelopes, "ningún golden emite el sobre plane-tracker/1")
         for filename, command, doc in envelopes:
             self.assertEqual(envelope.validate(doc), [], f"{filename}: {command}")
+        error_envelopes = [(f, c, d) for f, c, d in golden_json_outputs() if isinstance(d, dict) and d.get("schema") == voc.SCHEMA and d.get("status") == "error"]
+        self.assertTrue(error_envelopes, "ningún golden emite el sobre de error plane-tracker/1")
+        for filename, command, doc in error_envelopes:
+            self.assertEqual(envelope.validate_error(doc), [], f"{filename}: {command}")
 
     # F4 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F4")
@@ -262,6 +266,8 @@ class Architecture(unittest.TestCase):
 
         unknown = set()
         for filename, command, doc in golden_json_outputs():
+            if isinstance(doc, dict) and doc.get("status") == "error":
+                continue
             words = [w for w in command.split() if not w.startswith("-")]
             where = f"{filename}::{command[:50]}"
             if isinstance(doc, dict) and doc.get("schema") == voc.SCHEMA and doc.get("view") in voc.VIEWS:  # ya migrada al sobre: las filas son del vocabulario

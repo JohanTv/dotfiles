@@ -48,11 +48,11 @@ def cmd_outbox_flush(args, conn, base_url, api_key, workspace, default_project_i
         _print_flush(result)
     if result["stopped"] == "unauthorized":
         sys.stderr.write("Error: Plane rechazó las credenciales (HTTP 401); revisa PLANE_API_KEY. El flush se detuvo.\n")
-        sys.exit(1)
+        return 1
     if result["stopped"] == "unavailable":
         raise result["unavailable"]
     if result["failed_total"]:
-        sys.exit(1)
+        return 1
 
 
 def cmd_outbox_drop(args, conn, base_url, api_key, workspace, default_project_id):

@@ -1,6 +1,7 @@
 """Nombres retirados, verbos ausentes o mal escritos: texto exacto, código 2 y una sugerencia que sí parsea."""
 import contextlib
 import io
+import json
 import os
 import shlex
 import sys
@@ -86,12 +87,13 @@ SILENT = ["", "--json", "-h", "--help", "get OPS-13", "list --json", "report tim
 
 def run_main(argv):
     err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+    out = io.StringIO()
+    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(out):
         try:
             main(argv)
         except SystemExit as exc:
-            return exc.code, err.getvalue()
-    return None, err.getvalue()
+            return exc.code, err.getvalue(), out.getvalue()
+    return None, err.getvalue(), out.getvalue()
 
 
 GROUP_ROWS = [  # con `report` convertido en grupo (fase 5): la vista es obligatoria y ninguna entrada lanza KeyError
@@ -129,9 +131,16 @@ class Renamed(unittest.TestCase):
         try:
             for line, expected in ROWS:
                 with self.subTest(argv=line):
-                    code, err = run_main(shlex.split(line))
+                    argv = shlex.split(line)
+                    code, err, out = run_main(argv)
                     self.assertEqual(code, 2)
-                    self.assertEqual(err.splitlines()[-1], f"plane-tracker: error: {expected}")  # avisos ajenos del GC no cuentan
+                    if "--json" in argv:
+                        doc = json.loads(out)
+                        self.assertEqual(doc["code"], "usage")
+                        self.assertEqual(doc["exit"], 2)
+                        self.assertEqual(doc["message"], expected)
+                    else:
+                        self.assertEqual(err.splitlines()[-1], f"plane-tracker: error: {expected}")  # avisos ajenos del GC no cuentan
         finally:
             os.environ.update(saved)
 

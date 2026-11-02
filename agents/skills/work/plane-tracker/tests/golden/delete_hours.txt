@@ -8,7 +8,7 @@ Error: OMNIFY-1 tiene 1 registro(s) de horas que no son tuyos o de autor no conf
 $ plane.py delete OMNIFY-1 --json
 [exit 1]
 --- stdout ---
-{"status": "refused", "action": "delete", "reason": "foreign_hours", "ticket": "OMNIFY-1", "title": "Validaciones de formulario SMS", "comments": 4, "already_gone": false, "hours_own": 2, "hours_foreign": 1, "hours_local_only": 0, "own_minutes": 120}
+{"code":"refused","detail":{"action":"delete","already_gone":false,"comments":4,"hours_foreign":1,"hours_local_only":0,"hours_own":2,"own_minutes":120,"reason":"foreign_hours","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},"exit":1,"message":"OMNIFY-1 tiene 1 registro(s) de horas que no son tuyos o de autor no confirmado; eliminar el ticket los destruiría. Conserva el ticket: plane-tracker update OMNIFY-1 --state Cancelado","schema":"plane-tracker/1","status":"error"}
 --- stderr ---
 
 

@@ -106,8 +106,9 @@ $ plane.py outbox flush --json
   "failed_total": 0,
   "unavailable": "conexión cortada"
 }
+{"code":"plane_unavailable","exit":3,"message":"Plane no responde desde las 12:00 (conexión cortada). Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.","schema":"plane-tracker/1","status":"error"}
 --- stderr ---
-Plane no responde desde las 12:00 (conexión cortada). Puede que Plane haya recibido la solicitud; comprueba el estado antes de reintentar.
+
 
 $ plane.py outbox drop 2
 [exit 1]

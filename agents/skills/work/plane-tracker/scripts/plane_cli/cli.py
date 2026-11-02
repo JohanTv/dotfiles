@@ -78,8 +78,21 @@ def command_tree(parser):
     return tree
 
 
+class PlaneParser(argparse.ArgumentParser):
+    _json_mode = False
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+    def error(self, message):
+        if self._json_mode:
+            raise CliError("usage", message, exit_code=2)
+        super().error(message)
+
+
 def build_parser():
-    parser = argparse.ArgumentParser(description="CLI de Plane CE para agentes de IA")
+    parser = PlaneParser(description="CLI de Plane CE para agentes de IA")
     add_json_flag(parser)
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="<comando>")
     for entry in COMMANDS:
@@ -90,9 +103,14 @@ def build_parser():
     return parser
 
 
+def is_json_mode(argv):
+    """Detecta --json en argv para saber si los errores tempranos deben salir en JSON."""
+    return "--json" in argv
+
+
 def _warn_pending(args, conn):
     """Aviso único por stderr de lo que sigue sin publicarse; los comandos `outbox` ya lo muestran."""
-    if args.command == "outbox":
+    if args is None or getattr(args, "command", None) == "outbox" or conn is None:
         return
     try:
         notice = pending_notice(conn)
@@ -104,32 +122,55 @@ def _warn_pending(args, conn):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    json_mode = is_json_mode(argv)
+    PlaneParser._json_mode = json_mode
     parser = build_parser()
-    hint = renamed.suggestion(argv, command_tree(parser))
-    if hint:
-        sys.stderr.write(f"plane-tracker: error: {hint}\n")
-        sys.exit(2)
-    args = parser.parse_args(argv)
-
-    base_url = get_env_or_fail("PLANE_BASE_URL", "URL de Plane")
-    api_key = get_env_or_fail("PLANE_API_KEY", "API Key de Plane")
-    workspace = os.environ.get("PLANE_WORKSPACE_SLUG", "teamprogra")
-    default_project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
-
-    conn = get_db()
-    init_db(conn)
-
+    conn = None
+    args = None
     try:
-        args.handler(args, conn, base_url, api_key, workspace, default_project_id)
+        hint = renamed.suggestion(argv, command_tree(parser))
+        if hint:
+            raise CliError("usage", hint, exit_code=2)
+        args = parser.parse_args(argv)
+
+        base_url = get_env_or_fail("PLANE_BASE_URL", "URL de Plane")
+        if not base_url:
+            raise CliError("env_missing", "Variable de entorno 'PLANE_BASE_URL' (URL de Plane) no configurada.",
+                           hint="Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.")
+        api_key = get_env_or_fail("PLANE_API_KEY", "API Key de Plane")
+        if not api_key:
+            raise CliError("env_missing", "Variable de entorno 'PLANE_API_KEY' (API Key de Plane) no configurada.",
+                           hint="Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.")
+        workspace = os.environ.get("PLANE_WORKSPACE_SLUG", "teamprogra")
+        default_project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
+
+        conn = get_db()
+        init_db(conn)
+
+        ret = args.handler(args, conn, base_url, api_key, workspace, default_project_id)
+        if isinstance(ret, int) and ret != 0:
+            sys.exit(ret)
     except PlaneUnavailable as exc:
-        sys.stderr.write(format_unavailable(exc))
+        if json_mode or (args is not None and getattr(args, "json", False)):
+            print(dumps(CliError("plane_unavailable", format_unavailable(exc).strip()).to_dict()))
+        else:
+            sys.stderr.write(format_unavailable(exc))
         sys.exit(3)
     except CliError as exc:
-        if getattr(args, "json", False):
+        if json_mode or (args is not None and getattr(args, "json", False)):
             print(dumps(exc.to_dict()))
         else:
-            sys.stderr.write(f"Error: {exc.render()}\n")
+            if exc.code == "usage":
+                sys.stderr.write(f"plane-tracker: error: {exc.render()}\n")
+            elif exc.message.startswith("Error:") or exc.message.startswith("Error "):
+                sys.stderr.write(f"{exc.render()}\n")
+            elif exc.code == "duplicate" and "Ya hay un registro" in exc.message:
+                sys.stderr.write(f"{exc.render()}\n")
+            else:
+                sys.stderr.write(f"Error: {exc.render()}\n")
         sys.exit(exc.exit_code)
     finally:
-        _warn_pending(args, conn)
-        conn.close()
+        if conn is not None:
+            if args is not None:
+                _warn_pending(args, conn)
+            conn.close()

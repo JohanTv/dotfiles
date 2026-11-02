@@ -20,9 +20,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from plane_cli import circuit, config
+from plane_cli import circuit, clock, config
 from plane_cli.circuit import PlaneUnavailable
-from plane_cli import clock
+from plane_cli.errors import CliError
 
 
 REQUEST_LOG_MAX_BYTES = 1_000_000
@@ -192,9 +192,8 @@ def http_detail(exc):
 
 
 def fail_http(url, status, detail):
-    """Imprime un error HTTP definitivo y termina con código 1."""
-    sys.stderr.write(f"Error HTTP {status} en {url}: {detail}\n")
-    sys.exit(1)
+    """Lanza CliError de error HTTP definitivo con código 1."""
+    raise CliError("http_error", f"Error HTTP {status} en {url}: {detail}", detail={"status": status, "url": url})
 
 
 def _rate_limit_wait(exc):
@@ -246,8 +245,7 @@ def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
         except _Transient as exc:
             transient = exc
         except _Definitive as exc:
-            sys.stderr.write(f"Error TLS en {url}: {exc}\n")
-            sys.exit(1)
+            raise CliError("http_error", f"Error TLS en {url}: {exc}", detail={"url": url})
         else:
             circuit.record(True)
             return result

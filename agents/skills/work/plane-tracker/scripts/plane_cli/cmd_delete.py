@@ -15,6 +15,7 @@ import urllib.parse
 
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
+from plane_cli.errors import CliError
 from plane_cli.resolve import get_actor_uuid, get_project_identifier, resolve_issue, resolve_project_and_seq
 from plane_cli.timeutil import time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
@@ -25,12 +26,9 @@ _MARKER = "PLANE_WORKLOG_METADATA"
 
 
 def _stop(args, reason, message, **extra):
-    """Termina con código 1 sin tocar nada: en --json el motivo va por stdout; si no, el texto por stderr."""
-    if getattr(args, "json", False):
-        print(json.dumps({"status": "refused", "action": "delete", "reason": reason, **extra}))
-    else:
-        sys.stderr.write(message + "\n")
-    sys.exit(1)
+    """Termina con código 1 sin tocar nada: en --json el motivo va en el sobre de error; si no, por stderr."""
+    clean_msg = message[7:] if message.startswith("Error: ") else message
+    raise CliError("refused", clean_msg, detail={"action": "delete", "reason": reason, **extra})
 
 
 def _read_comments(args, url, api_key):
@@ -152,7 +150,7 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
             print("  También se pierden adjuntos, enlaces, subtareas e historial (no se han consultado).")
             print(f"  Para conservarlo sin eliminar: plane-tracker update {label} --state Cancelado")
             print(f"  Para eliminarlo:               plane-tracker delete {label} --yes" + (" --discard-worklogs" if plan["hours_own"] else ""))
-        sys.exit(1)
+        return 1
 
     if issue:
         api_request(base, api_key, method="DELETE")

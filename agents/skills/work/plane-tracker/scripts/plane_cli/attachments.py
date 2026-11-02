@@ -18,6 +18,7 @@ import session_clock
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
 from plane_cli.envelope import build
+from plane_cli.errors import CliError
 from plane_cli.freshness import Env, fetch_attachments
 from plane_cli.output import emit
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
@@ -70,11 +71,9 @@ def validate_attachment_paths(paths):
     """Valida antes de tocar Plane: así un ticket no queda creado a medias por un archivo inválido."""
     for path in paths:
         if not os.path.isfile(path):
-            sys.stderr.write(f"Error: '{path}' no es un archivo.\n")
-            sys.exit(1)
+            raise CliError("not_found", f"'{path}' no es un archivo.")
         if os.path.getsize(path) > ATTACH_MAX_BYTES:
-            sys.stderr.write(f"Error: '{path}' supera {ATTACH_MAX_BYTES // (1024 * 1024)} MB.\n")
-            sys.exit(1)
+            raise CliError("invalid_input", f"'{path}' supera {ATTACH_MAX_BYTES // (1024 * 1024)} MB.")
 
 
 def delete_attachment(base_url, api_key, workspace, project_id, issue_id, attachment_id):
@@ -100,8 +99,7 @@ def _upload_files(args, conn, base_url, api_key, workspace, default_project_id, 
         try:
             name, size = upload_attachment(base_url, api_key, workspace, project_id, issue["id"], path)
         except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError) as exc:
-            sys.stderr.write(f"Error subiendo '{path}': {exc}\n")
-            sys.exit(1)
+            raise CliError("http_error", f"Error subiendo '{path}': {exc}")
         print(f"✔ Adjunto subido a {issue_ref}: {name} ({size / 1024:.1f} KB)")
     return project_id, issue
 

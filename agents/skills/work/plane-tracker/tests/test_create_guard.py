@@ -16,6 +16,7 @@ from plane_cli import cmd_tickets_write as ctw  # noqa: E402
 from plane_cli import create_guard as cg  # noqa: E402
 from plane_cli import db  # noqa: E402
 from plane_cli.api import PlaneUnavailable  # noqa: E402
+from plane_cli.errors import CliError  # noqa: E402
 
 PROJECT = "proj-1"
 
@@ -130,12 +131,12 @@ class SubmitIssue(Base):
 
     def test_duplicate_in_cache_is_refused_without_posting(self):
         self.add_issue("Crear algo", 1, ticket="OMNIFY-8")
-        err = io.StringIO()
-        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+        with self.assertRaises(CliError) as ctx:
             self.submit()
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("OMNIFY-8", err.getvalue())
-        self.assertIn("--allow-duplicate", err.getvalue())
+        self.assertEqual(ctx.exception.code, "duplicate")
+        self.assertEqual(ctx.exception.exit_code, 1)
+        self.assertIn("OMNIFY-8", ctx.exception.render())
+        self.assertIn("--allow-duplicate", ctx.exception.render())
         self.assertEqual(self.posts, [])
 
     def test_allow_duplicate_skips_the_check(self):
@@ -149,8 +150,9 @@ class SubmitIssue(Base):
         self.assertTrue(cg._has_open_mark(self.conn, PROJECT, "Crear algo"))
         self.refresh_effect = lambda: self.add_issue("Crear algo", 0, ticket="OMNIFY-9")  # Plane sí lo aplicó
         self.post_result = {"id": "otro"}
-        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+        with self.assertRaises(CliError) as ctx:
             self.submit()
+        self.assertEqual(ctx.exception.code, "duplicate")
         self.assertEqual(len(self.posts), 1)  # el reintento no llegó a enviarse
 
     def test_unconfirmed_post_allows_the_retry_when_the_ticket_does_not_exist(self):

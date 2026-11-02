@@ -1,7 +1,7 @@
 """Error de comando con código registrado, mensaje, pista y salida (contrato de errores de `plane-tracker/1`).
 
 Expone: CliError (con to_dict() y render()).
-No hace: terminar el programa ni imprimir; solo `cli.main()` captura un CliError y decide (fase 7). Ningún `sys.exit` existente se reemplaza todavía.
+No hace: terminar el programa ni imprimir; solo `cli.main()` captura un CliError y decide (fase 7).
 El código de salida sale del registro (vocabulary.ERRORS); un código no registrado es un defecto del programa y lanza ValueError.
 """
 

@@ -147,9 +147,9 @@ plane-tracker: error: 'comment-edit' ya no existe; usa: plane-tracker comment ed
 $ plane.py --json attachments OMNIFY-1   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 2]
 --- stdout ---
-
+{"code":"usage","exit":2,"message":"'attachments' ya no existe; usa: plane-tracker --json attachment list OMNIFY-1","schema":"plane-tracker/1","status":"error"}
 --- stderr ---
-plane-tracker: error: 'attachments' ya no existe; usa: plane-tracker --json attachment list OMNIFY-1
+
 
 $ plane.py attach OMNIFY-1 adj.txt --replace x   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 2]

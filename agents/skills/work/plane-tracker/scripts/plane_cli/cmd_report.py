@@ -51,7 +51,7 @@ def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_
     emit(view, doc, getattr(args, "json", False))
     errors = [i for i in audit.issues if i["code"] in vocabulary.CHECK_ERROR_CODES]
     if errors or doc["summary"]["unreachable"]:
-        sys.exit(1 if errors else 3)
+        return 1 if errors else 3
 
 
 def register_report_time(sub):

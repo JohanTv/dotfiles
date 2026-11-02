@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import clock_support  # noqa: E402
 import golden_support as gs  # noqa: E402
 from plane_cli import api, circuit, config  # noqa: E402
+from plane_cli.errors import CliError  # noqa: E402
 
 PROJECTS = "/api/v1/workspaces/ws/projects/"
 
@@ -100,11 +101,11 @@ class Transport(unittest.TestCase):
 
     def test_500_is_definitive_and_not_retried(self):
         self.fake.add_fault("GET", "/projects/$", "status", 500)
-        err = io.StringIO()
-        with redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+        with self.assertRaises(CliError) as ctx:
             self.call()
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn(f"Error HTTP 500 en {self.url}: ", err.getvalue())
+        self.assertEqual(ctx.exception.code, "http_error")
+        self.assertEqual(ctx.exception.exit_code, 1)
+        self.assertIn(f"Error HTTP 500 en {self.url}: ", ctx.exception.message)
         self.assertEqual(len(self.hits()), 1)
         with self.assertRaises(urllib.error.HTTPError) as raised:
             self.call(raise_on_error=True)
@@ -113,9 +114,10 @@ class Transport(unittest.TestCase):
 
     def test_400_on_post_is_definitive(self):
         self.fake.add_fault("POST", "/projects/$", "status", 400)
-        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as ctx:
+        with self.assertRaises(CliError) as ctx:
             self.call("POST")
-        self.assertEqual(ctx.exception.code, 1)
+        self.assertEqual(ctx.exception.code, "http_error")
+        self.assertEqual(ctx.exception.exit_code, 1)
         self.assertEqual(len(self.hits("POST")), 1)
 
     def test_writes_are_never_retried(self):
@@ -177,11 +179,11 @@ class Transport(unittest.TestCase):
 
     def test_certificate_error_is_definitive_and_does_not_count(self):
         failure = urllib.error.URLError(ssl.SSLCertVerificationError(1, "certificate verify failed"))
-        err = io.StringIO()
-        with mock.patch("urllib.request.urlopen", side_effect=failure), redirect_stderr(err), self.assertRaises(SystemExit) as ctx:
+        with mock.patch("urllib.request.urlopen", side_effect=failure), self.assertRaises(CliError) as ctx:
             self.call()
-        self.assertEqual(ctx.exception.code, 1)
-        self.assertIn(f"Error TLS en {self.url}: ", err.getvalue())
+        self.assertEqual(ctx.exception.code, "http_error")
+        self.assertEqual(ctx.exception.exit_code, 1)
+        self.assertIn(f"Error TLS en {self.url}: ", ctx.exception.message)
         self.assertEqual(circuit.describe()["consec"], 0)
         self.assertEqual(self.sleeps, [])
 
@@ -201,8 +203,9 @@ class Transport(unittest.TestCase):
 
     def test_429_is_retried_for_every_method_and_does_not_count(self):
         self.fake.add_fault("POST", "/projects/$", "status", 429)
-        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+        with self.assertRaises(CliError) as ctx:
             self.call("POST")
+        self.assertEqual(ctx.exception.code, "http_error")
         self.assertEqual(len(self.hits("POST")), 3)
         self.assertEqual(self.sleeps, [1.5, 1.5])
         self.assertEqual(circuit.describe()["consec"], 0)

@@ -31,14 +31,16 @@ $ plane.py update OMNIFY-1 --state inexistente
 --- stdout ---
 
 --- stderr ---
-Error: Estado desconocido 'inexistente'. Estados válidos en proyecto: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
+Error: Estado desconocido 'inexistente'.
+Estados válidos en proyecto: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
 
 $ plane.py update OMNIFY-1 --priority enorme
 [exit 1]
 --- stdout ---
 
 --- stderr ---
-Error: Prioridad desconocida 'enorme'. Opciones: urgent, high, medium, low, none.
+Error: Prioridad desconocida 'enorme'.
+Opciones: urgent, high, medium, low, none.
 
 $ plane.py update OMNIFY-1 --due-date 31/12/2026
 [exit 1]
@@ -163,14 +165,16 @@ $ plane.py create [RFC] Algo -p nope
 --- stdout ---
 
 --- stderr ---
-Error: Proyecto 'nope' no encontrado. Opciones: OMNIFY, OPS
+Error: Proyecto 'nope' no encontrado.
+Opciones: OMNIFY, OPS
 
 $ plane.py create [FEAT] Algo --state nope
 [exit 1]
 --- stdout ---
 
 --- stderr ---
-Error: Estado desconocido 'nope'. Estados válidos: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
+Error: Estado desconocido 'nope'.
+Estados válidos: backlog, pendiente, progreso, pausado, pruebas, revisión, revision, completado, cancelado
 
 $ plane.py create [FEAT] Algo --attach no-existe.txt
 [exit 1]

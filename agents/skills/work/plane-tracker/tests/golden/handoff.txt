@@ -31,7 +31,7 @@ $ plane.py handoff --base nope
 --- stdout ---
 
 --- stderr ---
-ERROR: No existe origin/nope localmente (¿falta un fetch?).
+Error: No existe origin/nope localmente (¿falta un fetch?).
 
 $ plane.py handoff --base --evil
 [exit 2]
@@ -46,6 +46,6 @@ $ plane.py handoff
 --- stdout ---
 
 --- stderr ---
-ERROR: No estás dentro de un repositorio git.
+Error: No estás dentro de un repositorio git.
 
 === peticiones al servidor ===

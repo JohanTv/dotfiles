@@ -13,6 +13,7 @@ import session_clock
 
 from plane_cli.api import api_request
 from plane_cli.config import add_json_flag
+from plane_cli.errors import CliError
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.proposal_store import load_recent_proposal, save_group, save_proposal
 from plane_cli.proposals import build_proposal, build_split, current_session_id, print_proposal, print_split
@@ -48,7 +49,7 @@ def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_proje
             print("   Registra cada parte con: plane-tracker comment add <TICKET> -m \"...\" --accept-proposal")
         else:
             print_proposal(result, "reparto", sys.stdout)
-        sys.exit(0 if result["ok"] else 1)
+        return 0 if result["ok"] else 1
 
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     key = issue_ref.upper()
@@ -64,7 +65,7 @@ def cmd_propose_duration(args, conn, base_url, api_key, workspace, default_proje
         print(json.dumps(result, indent=2, ensure_ascii=False))
     else:
         print_proposal(result, key, sys.stdout)
-    sys.exit(0 if result["ok"] else 1)
+    return 0 if result["ok"] else 1
 
 
 def _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue):
@@ -77,8 +78,7 @@ def _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue):
     comments = res if isinstance(res, list) else res.get("results", [])
     own = [c for c in comments if not actor or c.get("actor") == actor]
     if not own:
-        sys.stderr.write("Error: No hay comentarios propios en el ticket. Indica el ID con --comment-id.\n")
-        sys.exit(1)
+        raise CliError("not_found", "No hay comentarios propios en el ticket.", hint="Indica el ID con --comment-id.")
     return max(own, key=lambda c: c.get("created_at", "")).get("id")
 
 
@@ -124,8 +124,7 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
         print(f"✔ Comentario {cid} actualizado en {issue_ref}")
     elif getattr(args, "embed_metadata", False):
         if not local_meta:
-            sys.stderr.write("Error: no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.\n")
-            sys.exit(1)
+            raise CliError("not_found", "no hay worklog local vinculado a ese comentario; usa --duration para registrarlo.")
         current = api_request(url, api_key).get("comment_html") or ""
         if "PLANE_WORKLOG_METADATA" in current:
             print(f"✔ El comentario {cid} ya lleva su metadata")
@@ -143,8 +142,7 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
             try:
                 meta = corrected_metadata(old_meta, args.duration, args.track, args.capacity_bucket, args.worker_type, getattr(args, "force", False))
             except ValueError as exc:
-                sys.stderr.write(f"Error: {exc}\n")
-                sys.exit(1)
+                raise CliError("invalid_input", str(exc))
         else:
             # Comentario sin telemetría: su hora de publicación (local) es el fin; inicio = fin - duración
             end = datetime.fromisoformat(c["created_at"].replace("Z", "+00:00")).astimezone()

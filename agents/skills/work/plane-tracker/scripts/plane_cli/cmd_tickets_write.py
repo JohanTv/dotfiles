@@ -14,6 +14,7 @@ from plane_cli import create_guard
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.config import add_json_flag
 from plane_cli.attachments import upload_attachment, validate_attachment_paths
+from plane_cli.errors import CliError
 from plane_cli.mdhtml import markdown_to_html
 from plane_cli.resolve import get_labels_map, get_projects_map, get_states_map, resolve_issue, resolve_project_and_seq
 
@@ -23,8 +24,7 @@ def cmd_link(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
     if not re.match(r"^https?://", args.url):
-        sys.stderr.write("Error: la URL debe empezar por http:// o https://\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "la URL debe empezar por http:// o https://")
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/links/"
     existing = api_request(url, api_key).get("results", [])
     if any(l.get("url") == args.url for l in existing):
@@ -45,22 +45,19 @@ def _description_html(text):
 def _read_description(args):
     """Lee la descripción de `-d/--description` o `-f/--description-file`; None si no se indicó ninguna."""
     if getattr(args, "description", None) and getattr(args, "description_file", None):
-        sys.stderr.write("Error: usa --description o --description-file, no ambos.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "usa --description o --description-file, no ambos.")
     if getattr(args, "description_file", None):
         try:
             with open(args.description_file, encoding="utf-8") as fh:
                 text = fh.read()
         except OSError as exc:
-            sys.stderr.write(f"Error: no se pudo leer '{args.description_file}': {exc}\n")
-            sys.exit(1)
+            raise CliError("invalid_input", f"no se pudo leer '{args.description_file}': {exc}")
     else:
         text = getattr(args, "description", None)
     if text is None:
         return None
     if not text.strip():
-        sys.stderr.write("Error: La descripción no puede estar vacía.\n")
-        sys.exit(1)
+        raise CliError("invalid_input", "La descripción no puede estar vacía.")
     return text
 
 
@@ -73,8 +70,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     if args.title is not None:
         title = args.title.strip()
         if not title:
-            sys.stderr.write("Error: El título no puede estar vacío.\n")
-            sys.exit(1)
+            raise CliError("invalid_input", "El título no puede estar vacío.")
         patch_data["name"] = title
 
     description = _read_description(args)
@@ -85,15 +81,15 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
         states_map = get_states_map(conn, base_url, api_key, workspace, project_id)
         target_state = args.state.lower().strip().replace("ó", "o").replace("é", "e").replace("á", "a")
         if target_state not in states_map:
-            sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos en proyecto: {', '.join(states_map.keys())}\n")
-            sys.exit(1)
+            raise CliError("unknown_state", f"Estado desconocido '{args.state}'.",
+                           hint=f"Estados válidos en proyecto: {', '.join(states_map.keys())}")
         patch_data["state"] = states_map[target_state]
 
     if args.priority:
         prio = args.priority.lower().strip()
         if prio not in ("urgent", "high", "medium", "low", "none"):
-            sys.stderr.write(f"Error: Prioridad desconocida '{args.priority}'. Opciones: urgent, high, medium, low, none.\n")
-            sys.exit(1)
+            raise CliError("invalid_input", f"Prioridad desconocida '{args.priority}'.",
+                           hint="Opciones: urgent, high, medium, low, none.")
         patch_data["priority"] = prio
 
     if args.labels:
@@ -114,8 +110,7 @@ def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
             try:
                 datetime.strptime(val, "%Y-%m-%d")
             except ValueError:
-                sys.stderr.write(f"Error: Fecha inválida '{val}'. Formato: YYYY-MM-DD.\n")
-                sys.exit(1)
+                raise CliError("bad_date", f"Fecha inválida '{val}'. Formato: YYYY-MM-DD.")
             patch_data[field] = val
 
     if not patch_data:
@@ -146,9 +141,8 @@ def _submit_issue(args, conn, base_url, api_key, workspace, project_id, project_
         duplicates = create_guard.recent_duplicates(conn, base_url, api_key, workspace, project_id, project_ident, title)
         if duplicates:
             ticket, age = duplicates[0]
-            sys.stderr.write(f"Error: ya existe un ticket con ese título en {project_ident}: {ticket} (creado hace {age}). "
-                             "Si es un reintento tras un error de red no lo repitas; para crear otro igual usa --allow-duplicate.\n")
-            sys.exit(1)
+            raise CliError("duplicate", f"ya existe un ticket con ese título en {project_ident}: {ticket} (creado hace {age}).",
+                           hint="Si es un reintento tras un error de red no lo repitas; para crear otro igual usa --allow-duplicate.")
 
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/"
     create_guard.mark_unconfirmed(conn, project_id, title)
@@ -158,7 +152,7 @@ def _submit_issue(args, conn, base_url, api_key, workspace, project_id, project_
         if exc.delivered == "no":
             create_guard.clear_mark(conn, project_id, title)
         raise
-    except SystemExit:
+    except (SystemExit, CliError):
         create_guard.clear_mark(conn, project_id, title)
         raise
     create_guard.clear_mark(conn, project_id, title)
@@ -182,8 +176,8 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
                 project_id = projects_map[p_upper]["id"]
                 project_ident = p_upper
             else:
-                sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado. Opciones: {', '.join(projects_map.keys())}\n")
-                sys.exit(1)
+                raise CliError("unknown_project", f"Proyecto '{args.project}' no encontrado.",
+                               hint=f"Opciones: {', '.join(projects_map.keys())}")
     else:
         for k, v in projects_map.items():
             if v["id"] == project_id:
@@ -211,8 +205,8 @@ def cmd_create(args, conn, base_url, api_key, workspace, default_project_id):
         if norm_state in states_map:
             payload["state"] = states_map[norm_state]
         else:
-            sys.stderr.write(f"Error: Estado desconocido '{args.state}'. Estados válidos: {', '.join(states_map.keys())}\n")
-            sys.exit(1)
+            raise CliError("unknown_state", f"Estado desconocido '{args.state}'.",
+                           hint=f"Estados válidos: {', '.join(states_map.keys())}")
 
     if getattr(args, "labels", None):
         labels_map = get_labels_map(conn, base_url, api_key, workspace, project_id)
