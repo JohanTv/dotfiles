@@ -1,7 +1,7 @@
 ---
 id: "0017"
 title: La sincronización de worklogs depende de una lista fija de proyectos y de una lectura de comentarios por ticket
-status: abierto
+status: corregido
 created: 2026-11-01
 summary: "`sync` consulta solo proyectos fijados en el código, lee los comentarios ticket por ticket y no pagina de forma efectiva (`limit` lo ignora la API), así que un periodo con muchos tickets o fuera de esos proyectos produce un reporte parcial presentado como completo."
 ---
@@ -31,6 +31,10 @@ Un periodo con más tickets de los que caben en el presupuesto de peticiones, o 
 3. Acotar las lecturas de comentarios a los tickets con actividad en el periodo y respetar el límite de tasa (cabeceras `X-RateLimit-*`), deteniéndose con cobertura parcial.
 4. Marca de sincronización por proyecto y periodo, y nota de cobertura cuando algo quedó fuera.
 5. Partir `sync_remote_worklogs` (149 de 150 líneas) antes de cambiarla.
+
+## Corrección (fase 4 del RFC 0021)
+
+`sync.py` se partió en funciones pequeñas y ahora: sincroniza los proyectos **accesibles** (un `-p` desconocido o sin acceso es `unknown_project`, ya no una lista vacía en silencio); pagina con `per_page=100` y `cursor` ordenando por `-updated_at` y se detiene al llegar a una página toda anterior al periodo (la API ignora `limit` y los filtros de fecha); lee los comentarios solo de los tickets con actividad en el periodo; se detiene antes de agotar el presupuesto de tasa (`X-RateLimit-Remaining`) y deja la sincronización marcada como incompleta; y escribe una marca **por proyecto y periodo** (`worklog_sync`). Un fallo de lectura de comentarios (404, 403, 500) también deja ese proyecto incompleto en vez de ignorarse. Las pruebas están en `tests/test_worklog_sync.py`, contra un servidor falso que ignora `limit` y pagina: 22 tickets con registros y un proyecto fuera de la antigua lista fija se reconstruyen completos.
 
 ## Criterio de cierre
 

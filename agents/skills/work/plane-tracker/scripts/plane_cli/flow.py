@@ -100,8 +100,8 @@ def worklogs_from_comments(comments):
             dur = time_to_minutes(meta["end_time"]) - time_to_minutes(meta["start_time"])
             if dur < 0:
                 dur += 24 * 60
-        if not dur or dur < 1:
-            continue
+        if not dur or dur < 1 or not meta.get("date"):
+            continue  # sin fecha medida no se puede ubicar en la ventana del flujo
         out.append({"date": meta.get("date"), "start_time": meta.get("start_time"), "end_time": meta.get("end_time"),
                     "duration_minutes": dur, "worker_type": meta.get("worker_type", "human"), "plane_comment_id": c.get("id"),
                     "segments": meta.get("segments")})

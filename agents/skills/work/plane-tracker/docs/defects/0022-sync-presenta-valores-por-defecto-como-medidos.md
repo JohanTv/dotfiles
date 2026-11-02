@@ -35,6 +35,12 @@ Lo que no viene en el comentario queda **marcado como no medido**: no se inventa
 3. No derivar fecha ni hora de `clock` al sincronizar: si el comentario no las trae, la fila no entra en reportes por periodo y se cuenta como no medida.
 4. Estado desconocido: mostrarlo como tal (`state: "unknown"`), no como "Pendiente".
 
+## Corrección parcial (fase 4 del RFC 0021)
+
+Hecho: la sincronización ya **no deriva fecha ni hora del reloj** (sin fecha u hora de inicio medidas, el comentario no entra y se cuenta: `worklog_sync.unmeasured`; el extractor del formato de tabla heredado tampoco inventa fecha, `worker_type`, `phase` ni balde); el fin se calcula desde el inicio medido y la duración; las notas ya no se rellenan con el título del ticket; balde, fase, rol, tipo de trabajador, pista y notas que no vengan en el comentario se guardan con su **procedencia** (`worklogs.defaulted_json`, también en `comment add` para lo que completó por defecto); un estado que la caché no conoce se muestra como `unknown` (`state_group: unknown`), no como Pendiente; dos sincronizaciones del mismo comentario en instantes distintos dan filas idénticas.
+
+**Pendiente (fase 5):** que un reporte por balde separe lo no declarado de `deep_work` (`report time`, `summary.by_capacity` con `undeclared`, nota `hours_defaulted`, prueba F10). Mientras tanto el defecto sigue **abierto**.
+
 ## Criterio de cierre
 
 - Un comentario con telemetría parcial no produce una fila con horas o balde inventados; el golden de sincronización lo muestra.

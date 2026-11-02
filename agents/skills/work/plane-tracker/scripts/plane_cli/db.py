@@ -269,6 +269,20 @@ def init_sync_state(conn):
         );
     """)
     ensure_columns(conn, "projects", {"is_member": "INTEGER NOT NULL DEFAULT 1", "archived": "INTEGER NOT NULL DEFAULT 0"})
+    # Marca de sincronización de horas por proyecto y periodo (defecto 0010): `complete` = se leyeron todos los comentarios candidatos; `unmeasured` = comentarios con
+    # telemetría sin fecha u hora que no entraron. Procedencia de los campos de cada fila (defecto 0022): lista JSON de los que NO vinieron del comentario.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS worklog_sync (
+            project_ident TEXT NOT NULL,
+            date_from TEXT NOT NULL,
+            date_to TEXT NOT NULL,
+            as_of REAL NOT NULL,
+            complete INTEGER NOT NULL DEFAULT 0,
+            unmeasured INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (project_ident, date_from, date_to)
+        );
+    """)
+    ensure_columns(conn, "worklogs", {"defaulted_json": "TEXT NOT NULL DEFAULT '[]'"})
 
 
 def init_search_index(conn):

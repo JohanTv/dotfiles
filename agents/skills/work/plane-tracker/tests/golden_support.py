@@ -334,7 +334,14 @@ class FakePlane:
                 new = {"id": f"99000000-0000-4000-8000-{self.counter:012d}", "sequence_id": 100 + self.counter, "name": body.get("name"),
                        "priority": body.get("priority", "none")}
                 return self.reply(handler, 201, new)
-            return self.reply(handler, 200, {"results": d["issues"].get(pid, []), "next_page_results": False, "total_count": len(d["issues"].get(pid, []))})
+            items, query = list(d["issues"].get(pid, [])), parse_qs(urlsplit(handler.path).query)
+            if query.get("order_by") == ["-updated_at"]:
+                items.sort(key=lambda i: i.get("updated_at") or "", reverse=True)
+            size = d.get("issues_page_size")  # None: una sola página (la API real ignora `limit`; `per_page` pagina)
+            start = int(query.get("cursor", ["0"])[0]) if size else 0
+            page = items[start:start + size] if size else items
+            more = bool(size) and start + size < len(items)
+            return self.reply(handler, 200, {"results": page, "next_page_results": more, "next_cursor": str(start + size) if more else None, "total_count": len(items)})
         if len(tail) >= 2 and tail[0] == "issues":
             iid, sub = tail[1], tail[2:]
             issue = next((i for i in d["issues"].get(pid, []) if i["id"] == iid), None)

@@ -25,7 +25,7 @@ class Degrade(unittest.TestCase):
         code, out, err = self.run_cli("report", "--date", "2026-10-20", "--refresh")
         self.assertEqual(code, 0, err)
         self.assertIn("Sincronización incompleta: Plane no responde (HTTP 502)", err)
-        self.assertEqual(self.sb.db_dump("SELECT COUNT(*) AS n FROM sync_metadata WHERE key LIKE 'sync:%'")[0]["n"], 0)
+        self.assertEqual(self.sb.db_dump("SELECT COUNT(*) AS n FROM worklog_sync")[0]["n"], 0)
 
     def test_report_refresh_without_plane_exits_zero(self):
         code, out, err = self.run_cli("report", "--date", "2026-10-20", "--refresh", env_set={"PLANE_OFFLINE": "1"})

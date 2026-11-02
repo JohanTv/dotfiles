@@ -14,9 +14,11 @@ from plane_cli.config import add_json_flag
 from plane_cli.flow import cmd_report_flow
 from plane_cli.outbox import count_open, open_keys
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
-from plane_cli.sync import sync_remote_worklogs
+from plane_cli.store_worklogs import accessible_idents, hours_status
+from plane_cli.sync import SYNC_COOLDOWN, sync_remote_worklogs
 from plane_cli.timeutil import (
     DIAS_SEMANA,
+    age_text,
     calculate_klee_union_minutes,
     expand_segments,
     format_minutes,
@@ -26,8 +28,6 @@ from plane_cli.timeutil import (
 from plane_cli.worklog import CHECK_ERRORS, check_worklogs, extract_metadata_from_comment, find_metadata_block
 from plane_cli import clock
 
-
-SYNC_COOLDOWN = 300   # 5 minutos
 
 
 def cmd_report_check(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str):
@@ -108,6 +108,21 @@ def _warn_unpublished(args, conn, s_str, e_str):
         sys.stderr.write(f"⏳ {count} registro(s) de este periodo siguen sin publicarse (outbox list).\n")
 
 
+def _warn_hours_coverage(status, now):
+    """Un reporte nunca presenta como completo un periodo que no se ha comparado con Plane: si no está verificado, lo dice y cómo corregirlo."""
+    if status.verified:
+        if now - status.as_of > SYNC_COOLDOWN:
+            sys.stderr.write(f"ℹ Horas sincronizadas con Plane hace {age_text(now - status.as_of)}.\n")
+        return
+    if status.verified is None:
+        sys.stderr.write("⚠ No se pudo comprobar qué proyectos cubre el reporte (sin catálogo local de proyectos): usa `report --refresh` con conexión.\n")
+        return
+    if status.never:
+        sys.stderr.write(f"⚠ Sin sincronizar con Plane para este periodo: {', '.join(status.never)}. El reporte puede estar incompleto; usa `report --refresh`.\n")
+    if status.partial:
+        sys.stderr.write(f"⚠ La última sincronización quedó incompleta en: {', '.join(status.partial)}. El reporte puede estar incompleto; usa `report --refresh`.\n")
+
+
 def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
     today = clock.local_today()
     is_week = getattr(args, "week", False)
@@ -122,21 +137,18 @@ def cmd_report(args, conn, base_url, api_key, workspace, default_project_id):
         _warn_unpublished(args, conn, s_str, e_str)
         return cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id, s_str, e_str)
 
-    # Verificar si necesitamos sincronizar remotamente
-    sync_meta = conn.execute("SELECT updated_at FROM sync_metadata WHERE key = ?", (f"sync:{workspace}",)).fetchone()
-    last_synced = sync_meta["updated_at"] if sync_meta else 0
+    # Se sincroniza si se fuerza o si algún proyecto del alcance no tiene una sincronización COMPLETA y reciente que cubra todo el periodo (defecto 0010): que haya
+    # algún registro local no prueba que el periodo esté al día.
+    project = getattr(args, "project", None)
+    status = hours_status(conn, accessible_idents(conn, workspace, project), s_str, e_str)
     now = clock.timestamp()
-
-    # Contar registros existentes en el rango
-    count_row = conn.execute("SELECT COUNT(*) as cnt FROM worklogs WHERE date >= ? AND date <= ?", (s_str, e_str)).fetchone()
-    has_entries = count_row["cnt"] > 0
-
-    needs_sync = force_sync or (not has_entries and (now - last_synced > SYNC_COOLDOWN))
-    if needs_sync:
+    if force_sync or not (status.verified and now - status.as_of <= SYNC_COOLDOWN):
         try:
-            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=getattr(args, "project", None))
+            sync_remote_worklogs(conn, base_url, api_key, workspace, s_str, e_str, filter_project=project)
         except PlaneUnavailable as exc:
             sys.stderr.write(f"⚠ Plane no responde ({exc.cause}); se omite la sincronización y se usan los datos locales.\n")
+        status = hours_status(conn, accessible_idents(conn, workspace, project), s_str, e_str)
+    _warn_hours_coverage(status, now)
 
     _warn_unpublished(args, conn, s_str, e_str)
 

@@ -75,7 +75,7 @@ Vistas `list` y `get`. Las filas breves (`list --brief`) llevan solo `ticket`, `
 | `uuid` | `str` | UUID del ticket; siempre en `get`, ausente en listas |
 | `title` | `str!` | título |
 | `state` | `str!` | **nombre** del estado (`unknown` si la caché no lo conoce); el UUID no se expone |
-| `state_group` | `str!` | `backlog`, `unstarted`, `started`, `completed`, `cancelled`; `triage` puede aparecer |
+| `state_group` | `str!` | `backlog`, `unstarted`, `started`, `completed`, `cancelled`; `triage` puede aparecer y `unknown` si la caché no conoce el estado |
 | `priority` | `str` | `urgent`, `high`, `medium`, `low`, `none` |
 | `project` | `str!` | identificador del proyecto |
 | `assignees` | `list` | `{id, name}` asignados ahora |

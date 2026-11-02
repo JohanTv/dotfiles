@@ -78,7 +78,7 @@ REPLACES = {
     "ticket": {"ticket": ("ticket_id", "issue", "issue_id"), "uuid": ("id",), "title": ("name",), "state": ("state_name",),
                "project": ("project_id",), "target_date": ("due_date",), "plane_updated_at": ("updated_at",), "description": ("description_html",)},
     "hours": {"ticket": ("ticket_id",), "project": ("project_id",), "minutes": ("duration_minutes",), "capacity": ("capacity_bucket",),
-              "author": ("author_id",)},
+              "author": ("author_id",), "provenance": ("defaulted_json",)},
     "assignment_events": {"at": ("at_utc",)},
     "outbox_item": {"minutes": ("duration_minutes",)},
     "comments": {"author": ("actor", "created_by"), "text": ("comment_html",)},

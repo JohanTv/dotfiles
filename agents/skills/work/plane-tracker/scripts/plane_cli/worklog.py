@@ -44,27 +44,15 @@ def extract_metadata_from_comment(comment_html):
             dur = int((t2 - t1).total_seconds() / 60)
             if dur < 0:
                 dur += 24 * 60
-        except Exception:
-            dur = 60
+        except ValueError:
+            dur = None  # una hora ilegible no se sustituye por 60 minutos inventados
 
-        d_str = date_match.group(1) if date_match else clock.local_now().strftime("%Y-%m-%d")
-        notes_str = notes_match.group(1).strip() if notes_match else ""
-        bucket_str = bucket_match.group(1).strip() if bucket_match else "deep_work"
-        track_str = track_match.group(1).strip() if track_match else "main"
-
-        return {
-            "schema_version": "2.2",
-            "date": d_str,
-            "start_time": s_time,
-            "end_time": e_time,
-            "duration_minutes": dur,
-            "track": track_str,
-            "worker_type": "human",
-            "capacity_bucket": bucket_str,
-            "notes": notes_str,
-            "stoppers": [],
-            "phase": "dev"
-        }
+        # Solo lo que el comentario trae: nada se completa con el reloj ni con valores por defecto (defecto 0022); quien consume decide qué hace con lo que falta.
+        found = {"date": date_match.group(1) if date_match else None, "duration_minutes": dur,
+                 "track": track_match.group(1).strip() if track_match else None,
+                 "capacity_bucket": bucket_match.group(1).strip() if bucket_match else None,
+                 "notes": notes_match.group(1).strip() if notes_match else None}
+        return {"schema_version": "2.2", "start_time": s_time, "end_time": e_time, **{k: v for k, v in found.items() if v is not None}}
 
     return None
 
@@ -91,6 +79,11 @@ def upsert_worklog(conn, entry):
     raw_payload = json.dumps(entry.get("raw_payload", entry), ensure_ascii=False)
     created_at = entry.get("created_at", moment.isoformat())
     author_id = entry.get("author_id")
+    # Procedencia (defecto 0022): los campos que no vinieron en la entrada y se completaron con un valor por defecto constan como no medidos.
+    defaulted = entry.get("defaulted")
+    if defaulted is None:
+        defaulted = [f for f in ("worker_type", "capacity_bucket", "phase", "role", "track", "notes") if f not in entry]
+    defaulted_json = json.dumps(sorted(defaulted))
 
     with conn:
         conn.execute("""
@@ -98,8 +91,8 @@ def upsert_worklog(conn, entry):
                 ticket_id, track, date, start_time, end_time, duration_minutes,
                 plane_comment_id, project_id, issue_name, worker_type,
                 capacity_bucket, phase, role, notes, stoppers_json, raw_payload,
-                created_at, updated_at, author_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                created_at, updated_at, author_id, defaulted_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(ticket_id, track, date, start_time) DO UPDATE SET
                 end_time = excluded.end_time,
                 duration_minutes = excluded.duration_minutes,
@@ -113,12 +106,13 @@ def upsert_worklog(conn, entry):
                 stoppers_json = excluded.stoppers_json,
                 raw_payload = excluded.raw_payload,
                 author_id = COALESCE(excluded.author_id, worklogs.author_id),
+                defaulted_json = excluded.defaulted_json,
                 updated_at = excluded.updated_at;
         """, (
             t_id, track, d_str, s_time, e_time, dur,
             comment_id, p_id, i_name, w_type,
             bucket, phase, role, notes, stoppers, raw_payload,
-            created_at, now, author_id
+            created_at, now, author_id, defaulted_json
         ))
 
 

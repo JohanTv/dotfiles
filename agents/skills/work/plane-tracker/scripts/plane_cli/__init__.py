@@ -5,7 +5,7 @@ Capas (cada una solo importa de las anteriores; los cmd_* no se importan entre s
                    rutas de caché y variables de entorno; reloj central (única fuente de la hora real); vocabulario cerrado y error de comando
                    (datos y excepciones puros: vocabulary no importa nada del paquete y errors solo importa vocabulary)
   2. db, circuit, api   SQLite local, circuito de fallo rápido y cliente HTTP de Plane
-  3. mdhtml, cache, resolve, timeutil, coverage, envelope, scope, scope_flags, freshness, store_issues, query_issues, query_get, query_catalogs, query_misc, render_issues, render_get, render_catalogs, render_misc, views, output, history_sweep, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
+  3. mdhtml, cache, resolve, timeutil, coverage, envelope, store_worklogs, scope, scope_flags, freshness, store_issues, query_issues, query_get, query_catalogs, query_misc, render_issues, render_get, render_catalogs, render_misc, views, output, history_sweep, worklog, outbox, outbox_flush, create_guard, sync, proposal_store, proposals, flow, attachments, renamed
                    lógica reutilizable (sin parsers ni argparse)
   4. cmd_*         un módulo por familia de comandos: register_<comando>(sub) + cmd_<comando>(...)
   5. cli           parser raíz, COMMANDS (árbol ordenado de comandos y grupos) y main()
@@ -28,7 +28,8 @@ Módulos:
   outbox          cola de salida de `comment add`: guardado previo, reclamo atómico, entrega idempotente, list y drop
   outbox_flush    publicación de la cola (`outbox flush`)
   create_guard    guarda de duplicados de `create` (título reciente, envíos sin confirmar)
-  sync            sincroniza worklogs de los comentarios de Plane a SQLite
+  sync            sincroniza worklogs de los comentarios de Plane a SQLite (proyectos accesibles, marca por proyecto y periodo, sin valores inventados)
+  store_worklogs  proyectos accesibles y estado de verificación de las horas por proyecto y periodo (solo lectura)
   proposal_store  last_proposal.json con exclusión entre procesos
   proposals       medición de sesión y propuestas de duración (también --split)
   flow            lead/cycle time y esfuerzo por ticket; `report flow`

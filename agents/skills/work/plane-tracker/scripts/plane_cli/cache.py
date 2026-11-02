@@ -141,7 +141,7 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
             seq = iss.get("sequence_id")
             if not seq:
                 continue
-            s_info = states_by_id.get(iss.get("state"), ("Pendiente", "unstarted"))
+            s_info = states_by_id.get(iss.get("state"), ("unknown", "unknown"))  # un estado que la caché no conoce se muestra como tal (defecto 0022)
             conn.execute("""
                 INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at,
                                           created_at, completed_at, start_date, target_date, archived_at, assignees_json, created_by, plane_updated_at)

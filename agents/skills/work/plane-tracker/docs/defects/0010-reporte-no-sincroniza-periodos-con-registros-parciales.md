@@ -1,7 +1,7 @@
 ---
 id: "0010"
 title: El reporte no sincroniza con Plane los periodos que tienen registros locales parciales
-status: abierto
+status: corregido
 created: 2026-10-31
 summary: "`report` solo sincroniza si el periodo no tiene ningún registro local; con uno solo muestra un resultado parcial como completo y sin aviso."
 ---
@@ -47,6 +47,10 @@ La marca `sync:<workspace>` es global; la solución debe persistirla **por proye
 1. **Aviso (mínimo):** al imprimir el reporte, mostrar "datos locales sincronizados hace X" o "nunca sincronizado; usa `--refresh`" cuando no haya una sincronización reciente del periodo.
 2. **Criterio de sincronización:** sincronizar por antigüedad (`now - last_synced > SYNC_COOLDOWN`, 5 min) con independencia de `has_entries`, o por día sin registros locales; mantener `--offline`/`PLANE_OFFLINE` para no sincronizar.
 3. **Degradación:** si Plane no responde, mantener el aviso actual ("Plane no responde") y añadir que el resultado es local y posiblemente incompleto.
+
+## Corrección (fase 4 del RFC 0021)
+
+`report` ya no decide por "hay algún registro local": sincroniza si se fuerza o si algún proyecto del alcance no tiene una sincronización **completa y reciente (5 min) que cubra todo el periodo** (marca por proyecto y periodo, tabla `worklog_sync`; un periodo más ancho no queda cubierto por uno más estrecho). Después de sincronizar, o si no se pudo, el reporte avisa por stderr de lo que no está verificado (proyectos sin sincronizar, sincronización incompleta, o la antigüedad de los datos). Pruebas en `tests/test_worklog_sync.py` (un registro local no oculta los remotos de la semana; con y sin Plane).
 
 ## Criterio de cierre
 

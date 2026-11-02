@@ -220,6 +220,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         "role": meta.get("role", "backend_engineer"),
         "notes": meta.get("notes", issue.get("name", "")),
         "stoppers": meta.get("stoppers", []),
+        "defaulted": [f for f in ("phase", "role", "notes") if f not in meta],  # lo que no declaró el comentario y se completó con un valor por defecto (defecto 0022)
         "plane_comment_id": None,
         "created_at": now.isoformat(),
         "author_id": known_actor(conn, workspace),
