@@ -73,6 +73,17 @@ plane-tracker report --week
 
 ## 2. Detalle de Comandos
 
+### `plane-tracker list` con filtros (mis tickets)
+Vista filtrada desde la caché local; funciona sin conexión y avisa de la antigüedad de los datos. Necesita saber quién eres (`PLANE_ACTOR_UUID` o `PLANE_USERNAME`; `whoami` lo comprueba).
+
+```bash
+plane-tracker list --mine --open               # asignados a ti ahora (según la última sincronización), sin cerrados
+plane-tracker list --created --all-projects    # creados por ti, en todos los proyectos
+plane-tracker list --involved --open           # asignado, creador, con horas registradas o asignado alguna vez, con la razón de cada uno
+plane-tracker list --involved --refresh-history --budget 25   # trae el historial de asignación de hasta 25 tickets pendientes (reanuda; no repite lo ya traído)
+```
+*Qué NO afirma:* `--involved` muestra "Historial de asignación verificado en X de Y tickets": que un ticket no aparezca no prueba que nunca estuviste asignado. Las horas registradas salen solo de la base local de esta máquina. Detalle y límites en `docs/decisions/0019`.
+
 ### A. `plane-tracker search` (Búsqueda Momento Cero)
 Permite saber en **menos de 0.08 segundos** si un requerimiento ya existe en Plane antes de codificar o duplicar tickets.
 

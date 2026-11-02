@@ -24,7 +24,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     projects_map = get_projects_map(conn, base_url, api_key, workspace)
 
     # Filtro por autor: solo mis comentarios alimentan mi reporte (los tickets pueden ser compartidos)
-    actor_uuid = get_actor_uuid(base_url, api_key, workspace)
+    actor_uuid = get_actor_uuid(base_url, api_key, workspace, conn)
     if not actor_uuid:
         sys.stderr.write("⚠ Sin PLANE_USERNAME/PLANE_ACTOR_UUID: el sync mezclará horas de compañeros en tickets compartidos.\n")
     

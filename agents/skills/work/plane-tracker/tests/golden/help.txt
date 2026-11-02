@@ -80,13 +80,33 @@ options:
 $ plane.py list --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py list [-h] [-p PROJECT] [--json]
+usage: plane.py list [-h] [-p PROJECT] [--mine | --created | --involved]
+                     [--open] [--all-projects] [--limit N] [--refresh]
+                     [--refresh-history] [--budget N] [--json]
+
+Sin filtros, los últimos tickets del proyecto según la API. Con --mine,
+--created, --involved, --open, --all-projects o --refresh, una vista filtrada
+desde la caché local (funciona sin conexión).
 
 options:
   -h, --help            show this help message and exit
   -p, --project PROJECT
                         Identificador del proyecto (ej: OMNIFY, OPS,
                         OMNILEADS)
+  --mine                Solo los asignados a ti (según la última
+                        sincronización)
+  --created             Solo los creados por ti
+  --involved            Asignados, creados, con horas registradas o asignados
+                        alguna vez, con la razón de cada uno
+  --open                Sin completados, cancelados ni archivados
+  --all-projects        Todos los proyectos del workspace
+  --limit N             Máximo de tickets a mostrar (por defecto 30)
+  --refresh             Forzar la sincronización de tickets con Plane
+  --refresh-history     Traer el historial de asignación de los tickets
+                        pendientes (una petición por ticket; reanuda donde
+                        quedó)
+  --budget N            Máximo de tickets por ejecución de --refresh-history
+                        (por defecto 25)
   --json                Salida en JSON
 --- stderr ---
 

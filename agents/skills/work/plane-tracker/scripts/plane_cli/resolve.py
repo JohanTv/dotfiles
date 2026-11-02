@@ -1,7 +1,7 @@
 """Resolución de proyectos, tickets, estados, etiquetas y usuario activo contra Plane, con caché SQLite.
 
 Expone: get_projects_map(), get_project_identifier(), resolve_project_and_seq(), local_ticket_label(), resolve_issue(),
-get_states_map(), get_labels_map(), get_actor_uuid(), detect_ticket_from_git().
+get_states_map(), get_labels_map(), get_actor_uuid(), require_actor(), get_members_map(), detect_ticket_from_git().
 No hace: imprimir resultados ni escribir en Plane. Ante PlaneUnavailable, proyectos, estados y etiquetas se sirven de la
 caché local aunque haya vencido (con aviso), y sin caché lanzan PlaneUnavailable (código 3 en el CLI).
 """
@@ -280,13 +280,20 @@ def get_labels_map(conn, base_url, api_key, workspace, project_id, force_refresh
     return mapping
 
 
-def get_actor_uuid(base_url, api_key, workspace):
+def _remember_actor(conn, key, value):
+    with conn:
+        conn.execute("INSERT INTO sync_metadata (key, value, updated_at) VALUES (?, ?, ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at", (key, value, clock.timestamp()))
+
+
+def get_actor_uuid(base_url, api_key, workspace, conn=None):
     """
     UUID del usuario activo en Plane, usado para filtrar el sync y no imputar
     al reporte los comentarios de compañeros en tickets compartidos.
 
     Fuentes: PLANE_ACTOR_UUID (UUID directo) o PLANE_USERNAME (display_name / email).
     Si no está configurado, devuelve None y el sync queda sin filtro (con advertencia).
+    Con `conn`, el UUID resuelto por PLANE_USERNAME se recuerda en local: así funciona sin conexión y no consulta /members/ cada vez.
     """
     explicit = os.environ.get("PLANE_ACTOR_UUID")
     if explicit:
@@ -295,6 +302,11 @@ def get_actor_uuid(base_url, api_key, workspace):
     username = os.environ.get("PLANE_USERNAME", "").strip().lower()
     if not username:
         return None
+    cache_key = f"actor:{workspace}:{username}"
+    if conn is not None:
+        row = conn.execute("SELECT value FROM sync_metadata WHERE key = ?", (cache_key,)).fetchone()
+        if row:
+            return row["value"]
 
     members = api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/members/", api_key)
     members = members if isinstance(members, list) else members.get("results", [])
@@ -305,7 +317,38 @@ def get_actor_uuid(base_url, api_key, workspace):
             str(r.get("first_name") or "").strip().lower(),
         }
         if username in candidates:
+            if conn is not None:
+                _remember_actor(conn, cache_key, r.get("id"))
             return r.get("id")
 
     sys.stderr.write(f"⚠ PLANE_USERNAME='{username}' no coincide con ningún miembro del workspace.\n")
     return None
+
+
+def require_actor(conn, base_url, api_key, workspace):
+    """UUID de quien usa la herramienta, o error de uso (código 1): un filtro "mío" sin identidad no devuelve todo en silencio."""
+    actor = get_actor_uuid(base_url, api_key, workspace, conn)
+    if not actor:
+        sys.stderr.write("Error: no sé quién eres: define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).\n")
+        sys.exit(1)
+    return actor
+
+
+def get_members_map(conn, base_url, api_key, workspace):
+    """{UUID: nombre} de las personas del workspace, desde la caché local (TTL de un día). Sin Plane sirve lo que haya; sin nada, {} (los nombres son opcionales)."""
+    now = clock.timestamp()
+    rows = conn.execute("SELECT user_id, name, updated_at FROM members").fetchall()
+    if rows and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
+        return {r["user_id"]: r["name"] for r in rows}
+    try:
+        data = api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/members/", api_key)
+    except PlaneUnavailable:
+        return {r["user_id"]: r["name"] for r in rows}
+    items = data if isinstance(data, list) else data.get("results", [])
+    with conn:
+        for m in items:
+            name = m.get("display_name") or m.get("email") or m.get("first_name") or ""
+            if m.get("id"):
+                conn.execute("INSERT INTO members (user_id, name, updated_at) VALUES (?, ?, ?) "
+                             "ON CONFLICT(user_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at", (m["id"], name, now))
+    return {m["id"]: (m.get("display_name") or m.get("email") or m.get("first_name") or "") for m in items if m.get("id")}

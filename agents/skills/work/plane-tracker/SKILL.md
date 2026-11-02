@@ -40,7 +40,8 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | :--- | :--- |
 | Buscar antes de crear | `plane-tracker search "<intención>"` |
 | Ver ticket | `plane-tracker get T [--last N] [--history]` |
-| Listar tickets | `plane-tracker list -p OMNIFY` |
+| Listar tickets | `plane-tracker list -p OMNIFY` (sin filtros, desde la API) |
+| Mis tickets | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` (caché local; necesita `PLANE_ACTOR_UUID` o `PLANE_USERNAME`) |
 | Cambiar título/descripción/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` (la descripción reemplaza la actual) |
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--attach ARCH...]` |
 | Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`) |

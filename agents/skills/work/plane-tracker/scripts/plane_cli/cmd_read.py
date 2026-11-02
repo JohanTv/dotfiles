@@ -14,6 +14,7 @@ from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, sync_issues_cache, warn_stale
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
+from plane_cli.list_filtered import add_list_filter_flags, cmd_list_filtered, wants_filtered
 from plane_cli.resolve import (
     get_actor_uuid,
     get_labels_map,
@@ -129,6 +130,8 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
+    if wants_filtered(args):
+        return cmd_list_filtered(args, conn, base_url, api_key, workspace, default_project_id)
     project_id = default_project_id
     if getattr(args, "project", None):
         projects_map = get_projects_map(conn, base_url, api_key, workspace)
@@ -352,8 +355,11 @@ def register_get(sub):
 
 
 def register_list(sub):
-    p_list = sub.add_parser("list", help="Listar los tickets del proyecto")
+    p_list = sub.add_parser("list", help="Listar los tickets del proyecto",
+                            description="Sin filtros, los últimos tickets del proyecto según la API. Con --mine, --created, --involved, --open, "
+                                        "--all-projects o --refresh, una vista filtrada desde la caché local (funciona sin conexión).")
     p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
+    add_list_filter_flags(p_list)
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
 

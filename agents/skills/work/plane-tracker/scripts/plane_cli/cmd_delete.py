@@ -94,6 +94,7 @@ def _forget_locally(conn, issue_id, label):
         conn.execute("DELETE FROM outbox WHERE wl_ticket_id = ? AND state IN ('sent', 'dropped')", (label,))
         conn.execute("DELETE FROM issues_fts WHERE ticket_id = ?", (label,))
         conn.execute("DELETE FROM issues_cache WHERE ticket_id = ? OR id = ?", (label, issue_id or ""))
+        conn.execute("DELETE FROM assignment_events WHERE ticket_id = ? OR issue_id = ?", (label, issue_id or ""))
         for table in ("issue_snapshots", "state_transitions", "flow_fetch"):
             conn.execute(f"DELETE FROM {table} WHERE issue_id = ?", (issue_id or "",))
 
@@ -124,7 +125,7 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
     base = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_id}/"
     comments = _read_comments(args, base + "comments/", api_key) if issue else []
     found = _hour_comments(comments)
-    plan = _assess(conn, label, found, get_actor_uuid(base_url, api_key, workspace) if found else None)
+    plan = _assess(conn, label, found, get_actor_uuid(base_url, api_key, workspace, conn) if found else None)
     summary = {"ticket": label, "title": issue.get("name") if issue else None, "comments": len(comments), "already_gone": not issue,
                **{k: plan[k] for k in ("hours_own", "hours_foreign", "hours_local_only", "own_minutes")}}
 

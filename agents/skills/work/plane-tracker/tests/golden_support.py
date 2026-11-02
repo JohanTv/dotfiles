@@ -81,18 +81,18 @@ def build_data():
         P1: [
             {"id": "10000000-0000-4000-8000-000000000001", "sequence_id": 1, "name": "Validaciones de formulario SMS", "priority": "high",
              "state": s(P1, "Progreso"), "created_at": "2026-10-01T10:00:00Z", "updated_at": "2026-10-20T15:00:00Z", "completed_at": None,
-             "start_date": "2026-10-01", "target_date": "2026-10-27", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": []},
+             "start_date": "2026-10-01", "target_date": "2026-10-27", "description_html": "<p>Validar <b>formulario</b> de campañas.</p>", "labels": [], "assignees": [OTHER], "created_by": OTHER, "updated_by": None},
             {"id": "10000000-0000-4000-8000-000000000002", "sequence_id": 2, "name": "Acortador de enlaces", "priority": "medium",
              "state": s(P1, "Completado"), "created_at": "2026-10-10T09:00:00Z", "updated_at": "2026-10-15T12:00:00Z",
-             "completed_at": "2026-10-15T12:00:00Z", "start_date": None, "target_date": None, "description_html": "", "labels": []},
+             "completed_at": "2026-10-15T12:00:00Z", "start_date": None, "target_date": None, "description_html": "", "labels": [], "assignees": [ME], "created_by": ME, "updated_by": None},
             {"id": "10000000-0000-4000-8000-000000000003", "sequence_id": 3, "name": "Webhook SMS duplicado", "priority": "low",
              "state": s(P1, "Cancelado"), "created_at": "2026-10-05T09:00:00Z", "updated_at": "2026-10-06T12:00:00Z",
-             "completed_at": None, "start_date": None, "target_date": None, "description_html": "<p>Sin alcance.</p>", "labels": []},
+             "completed_at": None, "start_date": None, "target_date": None, "description_html": "<p>Sin alcance.</p>", "labels": [], "assignees": [], "created_by": OTHER, "updated_by": None},
         ],
         P2: [
             {"id": "20000000-0000-4000-8000-000000000013", "sequence_id": 13, "name": "Tareas Rápidas y Soporte - W43", "priority": "none",
              "state": s(P2, "Progreso"), "created_at": "2026-10-19T09:00:00Z", "updated_at": "2026-10-20T16:00:00Z", "completed_at": None,
-             "start_date": "2026-10-19", "target_date": "2026-10-25", "description_html": "", "labels": []},
+             "start_date": "2026-10-19", "target_date": "2026-10-25", "description_html": "", "labels": [], "assignees": [ME, OTHER], "created_by": OTHER, "updated_by": None},
         ],
     }
     c = lambda cid, actor, created, html: {"id": cid, "actor": actor, "created_by": actor, "created_at": created, "comment_html": html}
@@ -121,6 +121,14 @@ def build_data():
         ],
     }
     activities = {
+        "10000000-0000-4000-8000-000000000001": [
+            {"id": "a0000000-0000-4000-8000-000000000010", "field": "assignees", "created_at": "2026-10-02T09:00:00Z", "old_identifier": None,
+             "new_identifier": ME, "old_value": None, "new_value": "tester"},
+            {"id": "a0000000-0000-4000-8000-000000000011", "field": "assignees", "created_at": "2026-10-08T09:00:00Z", "old_identifier": ME,
+             "new_identifier": None, "old_value": "tester", "new_value": None},
+            {"id": "a0000000-0000-4000-8000-000000000012", "field": "assignees", "created_at": "2026-10-08T09:00:01Z", "old_identifier": None,
+             "new_identifier": OTHER, "old_value": None, "new_value": "otro"},
+        ],
         "10000000-0000-4000-8000-000000000002": [
             {"id": "a0000000-0000-4000-8000-000000000001", "field": "state", "created_at": "2026-10-10T09:00:30Z", "old_identifier": None,
              "new_identifier": s(P1, "Backlog"), "old_value": None, "new_value": "Backlog"},

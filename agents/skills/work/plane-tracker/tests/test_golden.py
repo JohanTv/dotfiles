@@ -16,6 +16,7 @@ NO_ENV = ("PLANE_BASE_URL", "PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_PROJ
 WORKLOG_COLS = ("ticket_id", "track", "date", "start_time", "end_time", "duration_minutes", "plane_comment_id", "project_id", "issue_name",
                 "worker_type", "capacity_bucket", "phase", "role", "notes", "stoppers_json", "raw_payload", "created_at")
 WORKLOGS = ("worklogs", "SELECT * FROM worklogs ORDER BY ticket_id, track, duration_minutes, notes, date", WORKLOG_COLS)
+ASSIGNMENTS = ("assignment_events", "SELECT * FROM assignment_events ORDER BY issue_id, at_utc, event_id", ("event_id", "issue_id", "ticket_id", "at_utc", "kind", "user_id", "user_name"))
 RANDOM_FIELDS = ("client_id", "external_id")  # ids al azar; las fechas y horas NO se enmascaran: el reloj está congelado
 LATENCY_FIELDS = ("ms", "p50_ms", "p95_ms", "max_ms")
 SESS = ["--agent", "claude", "--session", gs.SESSION]
@@ -203,6 +204,15 @@ class Golden(unittest.TestCase):
                  ["comment", "edit", "OMNIFY-1", "--duration", "10"],
                  ["comment", "delete", "OMNIFY-1", "--comment-id", CID4]]
         self.golden("comment_edit_delete", steps, db_queries=[WORKLOGS])
+
+    def test_list_filters(self):
+        steps = [["list", "--mine"], ["list", "--mine", "--open", "--json"], ["list", "--created"], ["list", "--open"], ["list", "--all-projects", "--open"],
+                 ["comment", "add", "OMNIFY-3", "-m", "horas locales", "--duration", "10", "--track", "t1"],
+                 ["list", "--involved"], ["list", "--involved", "--refresh-history", "--budget", "2"],
+                 ["list", "--involved", "--refresh-history", "--budget", "5", "--json"], ["list", "--mine", "--limit", "1"],
+                 {"args": ["list", "--mine"], "env_drop": ("PLANE_ACTOR_UUID",)}, ["list", "--mine", "--created"],
+                 {"args": ["list", "--mine", "--refresh"], "env_set": OFFLINE}, ["list", "-p", "NOPE", "--open"]]
+        self.golden("list_filters", steps, scrub=RANDOM_FIELDS, db_queries=[ASSIGNMENTS])
 
     def test_delete(self):
         steps = [["delete", "OMNIFY-3"], ["delete", "OMNIFY-3", "--json"], ["delete"], ["delete", "@"], ["delete", "162"],

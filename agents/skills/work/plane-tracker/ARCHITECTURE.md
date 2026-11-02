@@ -39,6 +39,8 @@ El tope duro por archivo es de 450 líneas y lo verifica `tests/test_structure.p
 | `plane_cli/cmd_tickets_write.py` | Comandos `create`, `update` y `link add`. |
 | `plane_cli/cmd_delete.py` | Comando `delete`: decide con los comentarios del ticket (paginados) unidos a lo local, falla cerrado y limpia lo local; sin `--yes` solo informa. |
 | `plane_cli/cmd_read.py` | Comandos `get`, `list`, `search`, `labels`, `projects` y `whoami`. |
+| `plane_cli/list_filtered.py` | `list` con `--mine`, `--created`, `--involved`, `--open`, `--all-projects`: selección sobre la caché de tickets, razones y cobertura. |
+| `plane_cli/assignments.py` | Historial de asignación medido (`assignment_events`), su cobertura y el barrido con presupuesto (`--refresh-history`). |
 | `plane_cli/cmd_report.py` | Comandos `report` (actividad; `report flow` delega en `flow`) y `worklog check`. |
 | `plane_cli/cmd_outbox.py` | Comandos `outbox list`, `outbox flush` y `outbox drop`. |
 | `plane_cli/cmd_ops.py` | Comandos `health`, `focus set\|clear\|status` y `handoff`, con sus ayudantes de git. |

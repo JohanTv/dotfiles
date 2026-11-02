@@ -1,0 +1,268 @@
+$ plane.py list --mine
+[exit 0]
+--- stdout ---
+
+📋 Tickets asignados a ti en OMNIFY (1) · caché de hace 1 min:
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+
+
+$ plane.py list --mine --open --json
+[exit 0]
+--- stdout ---
+{
+  "mode": "mine",
+  "scope": [
+    "OMNIFY"
+  ],
+  "count": 0,
+  "total": 0,
+  "cached_at": "2026-11-02T12:00:00+00:00",
+  "history_coverage": null,
+  "notes": [
+    "La asignación es la de la última sincronización de la caché."
+  ],
+  "results": []
+}
+--- stderr ---
+
+
+$ plane.py list --created
+[exit 0]
+--- stdout ---
+
+📋 Tickets creados por ti en OMNIFY (1) · caché de hace 1 min:
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+
+
+$ plane.py list --open
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY (1) · caché de hace 1 min:
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+
+
+$ plane.py list --all-projects --open
+[exit 0]
+--- stdout ---
+
+📋 Tickets en todos los proyectos (2) · caché de hace 1 min:
+  • OPS-13       Progreso     [NONE]    Tareas Rápidas y Soporte - W43
+      ↳ asignados: tester, otro
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro
+--- stderr ---
+
+
+$ plane.py comment add OMNIFY-3 -m horas locales --duration 10 --track t1
+[exit 0]
+--- stdout ---
+✔ Comentario publicado exitosamente en OMNIFY-3 (ID Comentario: c9000000-0000-4000-8000-000000000001)
+--- stderr ---
+
+
+$ plane.py list --involved
+[exit 0]
+--- stdout ---
+
+📋 Tickets en los que estás involucrado en OMNIFY (2) · caché de hace 1 min:
+  • OMNIFY-3     Cancelado    [LOW]     Webhook SMS duplicado
+      ↳ asignados: sin asignar · razones: horas registradas (10 min)
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Historial de asignación verificado en 0 de 3 tickets; `--refresh-history` lo amplía.
+  ℹ Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+
+
+$ plane.py list --involved --refresh-history --budget 2
+[exit 0]
+--- stdout ---
+
+📋 Tickets en los que estás involucrado en OMNIFY (3) · caché de hace 1 min:
+  • OMNIFY-3     Cancelado    [LOW]     Webhook SMS duplicado
+      ↳ asignados: sin asignar · razones: horas registradas (10 min)
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro · razones: fue asignado
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Historial de asignación verificado en 2 de 3 tickets; `--refresh-history` lo amplía.
+  ℹ Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017).
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+🔄 Historial de asignación: 2 ticket(s) traído(s); quedan 1 pendiente(s)
+
+$ plane.py list --involved --refresh-history --budget 5 --json
+[exit 0]
+--- stdout ---
+{
+  "mode": "involved",
+  "scope": [
+    "OMNIFY"
+  ],
+  "count": 3,
+  "total": 3,
+  "cached_at": "2026-11-02T12:00:00+00:00",
+  "history_coverage": {
+    "verified": 3,
+    "total": 3
+  },
+  "notes": [
+    "La asignación es la de la última sincronización de la caché.",
+    "Historial de asignación verificado en 3 de 3 tickets.",
+    "Las horas registradas salen solo de la base local de esta máquina y pueden faltar (defecto 0017)."
+  ],
+  "results": [
+    {
+      "ticket": "OMNIFY-3",
+      "title": "Webhook SMS duplicado",
+      "state": "Cancelado",
+      "priority": "low",
+      "assignees": [],
+      "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+      "reasons": [
+        "horas registradas (10 min)"
+      ],
+      "plane_updated_at": "2026-10-06T12:00:00Z",
+      "assignment_events": []
+    },
+    {
+      "ticket": "OMNIFY-2",
+      "title": "Acortador de enlaces",
+      "state": "Completado",
+      "priority": "medium",
+      "assignees": [
+        {
+          "id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "name": "tester"
+        }
+      ],
+      "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
+      "reasons": [
+        "asignado",
+        "creador"
+      ],
+      "plane_updated_at": "2026-10-15T12:00:00Z",
+      "assignment_events": []
+    },
+    {
+      "ticket": "OMNIFY-1",
+      "title": "Validaciones de formulario SMS",
+      "state": "Progreso",
+      "priority": "high",
+      "assignees": [
+        {
+          "id": "bbbbbbbb-0000-4000-8000-000000000002",
+          "name": "otro"
+        }
+      ],
+      "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+      "reasons": [
+        "fue asignado"
+      ],
+      "plane_updated_at": "2026-10-20T15:00:00Z",
+      "assignment_events": [
+        {
+          "at_utc": "2026-10-02T09:00:00Z",
+          "kind": "added",
+          "user_id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "user_name": "tester"
+        },
+        {
+          "at_utc": "2026-10-08T09:00:00Z",
+          "kind": "removed",
+          "user_id": "aaaaaaaa-0000-4000-8000-000000000001",
+          "user_name": "tester"
+        },
+        {
+          "at_utc": "2026-10-08T09:00:01Z",
+          "kind": "added",
+          "user_id": "bbbbbbbb-0000-4000-8000-000000000002",
+          "user_name": "otro"
+        }
+      ]
+    }
+  ]
+}
+--- stderr ---
+🔄 Historial de asignación: 1 ticket(s) traído(s)
+
+$ plane.py list --mine --limit 1
+[exit 0]
+--- stdout ---
+
+📋 Tickets asignados a ti en OMNIFY (1) · caché de hace 1 min:
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+
+
+$ plane.py list --mine   [sin PLANE_ACTOR_UUID]
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: no sé quién eres: define PLANE_ACTOR_UUID o PLANE_USERNAME (`plane-tracker whoami` lo comprueba).
+
+$ plane.py list --mine --created
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py list [-h] [-p PROJECT] [--mine | --created | --involved]
+                     [--open] [--all-projects] [--limit N] [--refresh]
+                     [--refresh-history] [--budget N] [--json]
+plane.py list: error: argument --created: not allowed with argument --mine
+
+$ plane.py list --mine --refresh
+[exit 0]
+--- stdout ---
+
+📋 Tickets asignados a ti en OMNIFY (1) · caché de hace 1 min:
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester · razones: asignado, creador
+  ℹ La asignación es la de la última sincronización de la caché.
+  ℹ Solo este proyecto; `--all-projects` incluye los demás.
+--- stderr ---
+⚠ Datos locales de hace 1 min; Plane no responde.
+
+$ plane.py list -p NOPE --open
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'NOPE' no encontrado. Opciones: OMNIFY, OPS
+
+=== peticiones al servidor ===
+GET /api/v1/workspaces/ws/projects/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
+GET /api/v1/workspaces/ws/members/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/ {"comment_html": "<p>horas locales</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"<VOLATIL>\", \"date\": \"2026-11-02\", \"duration_minutes\": 10, \"end_time\": \"12:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"horas locales\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"11:50\", \"stoppers\": [], \"track\": \"t1\", \"worker_type\": \"human\"} -->", "external_id": "<VOLATIL>", "external_source": "plane-tracker"}
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/activities/?per_page=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000002/activities/?per_page=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/activities/?per_page=100
+
+=== assignment_events ===
+{"at_utc": "2026-10-02T09:00:00Z", "event_id": "a0000000-0000-4000-8000-000000000010:added", "issue_id": "10000000-0000-4000-8000-000000000001", "kind": "added", "ticket_id": "OMNIFY-1", "user_id": "aaaaaaaa-0000-4000-8000-000000000001", "user_name": "tester"}
+{"at_utc": "2026-10-08T09:00:00Z", "event_id": "a0000000-0000-4000-8000-000000000011:removed", "issue_id": "10000000-0000-4000-8000-000000000001", "kind": "removed", "ticket_id": "OMNIFY-1", "user_id": "aaaaaaaa-0000-4000-8000-000000000001", "user_name": "tester"}
+{"at_utc": "2026-10-08T09:00:01Z", "event_id": "a0000000-0000-4000-8000-000000000012:added", "issue_id": "10000000-0000-4000-8000-000000000001", "kind": "added", "ticket_id": "OMNIFY-1", "user_id": "bbbbbbbb-0000-4000-8000-000000000002", "user_name": "otro"}

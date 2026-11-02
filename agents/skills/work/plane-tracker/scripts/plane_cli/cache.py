@@ -63,7 +63,19 @@ def _fetch_all_issues(base_url, api_key, workspace, project_id):
         cursor = data.get("next_cursor")
         if not data.get("next_page_results") or not cursor:
             break
+    else:
+        sys.stderr.write(f"⚠ El proyecto tiene más de {len(results)} tickets: solo se sincronizaron los primeros {len(results)}; los demás no aparecerán en la caché.\n")
     return results
+
+
+def _ref_id(value):
+    """UUID de una referencia a persona: Plane la devuelve como cadena o, según el endpoint, como objeto con `id`."""
+    return value.get("id") if isinstance(value, dict) else value
+
+
+def assignee_ids(issue):
+    """Lista de UUID de los asignados de un issue (vacía si no hay o el dato no viene)."""
+    return [i for i in (_ref_id(a) for a in (issue.get("assignees") or [])) if i]
 
 
 def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
@@ -94,10 +106,11 @@ def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_id
             s_info = states_by_id.get(iss.get("state"), ("Pendiente", "unstarted"))
             conn.execute("""
                 INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at,
-                                          created_at, completed_at, start_date, target_date, archived_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                          created_at, completed_at, start_date, target_date, archived_at, assignees_json, created_by, plane_updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (iss["id"], seq, f"{project_ident}-{seq}", project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"), "", now,
-                  iss.get("created_at"), iss.get("completed_at"), iss.get("start_date"), iss.get("target_date"), iss.get("archived_at")))
+                  iss.get("created_at"), iss.get("completed_at"), iss.get("start_date"), iss.get("target_date"), iss.get("archived_at"),
+                  json.dumps(assignee_ids(iss)), _ref_id(iss.get("created_by")), iss.get("updated_at")))
         conn.execute("DELETE FROM issues_fts;")
         conn.execute("INSERT INTO issues_fts (ticket_id, title, labels_csv) SELECT ticket_id, title, labels_csv FROM issues_cache;")
 

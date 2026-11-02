@@ -25,7 +25,12 @@ $ plane.py list --json
     "start_date": "2026-10-01",
     "target_date": "2026-10-27",
     "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-    "labels": []
+    "labels": [],
+    "assignees": [
+      "bbbbbbbb-0000-4000-8000-000000000002"
+    ],
+    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+    "updated_by": null
   },
   {
     "id": "10000000-0000-4000-8000-000000000002",
@@ -39,7 +44,12 @@ $ plane.py list --json
     "start_date": null,
     "target_date": null,
     "description_html": "",
-    "labels": []
+    "labels": [],
+    "assignees": [
+      "aaaaaaaa-0000-4000-8000-000000000001"
+    ],
+    "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
+    "updated_by": null
   },
   {
     "id": "10000000-0000-4000-8000-000000000003",
@@ -53,7 +63,10 @@ $ plane.py list --json
     "start_date": null,
     "target_date": null,
     "description_html": "<p>Sin alcance.</p>",
-    "labels": []
+    "labels": [],
+    "assignees": [],
+    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+    "updated_by": null
   }
 ]
 --- stderr ---
@@ -75,7 +88,12 @@ $ plane.py --json list
     "start_date": "2026-10-01",
     "target_date": "2026-10-27",
     "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-    "labels": []
+    "labels": [],
+    "assignees": [
+      "bbbbbbbb-0000-4000-8000-000000000002"
+    ],
+    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+    "updated_by": null
   },
   {
     "id": "10000000-0000-4000-8000-000000000002",
@@ -89,7 +107,12 @@ $ plane.py --json list
     "start_date": null,
     "target_date": null,
     "description_html": "",
-    "labels": []
+    "labels": [],
+    "assignees": [
+      "aaaaaaaa-0000-4000-8000-000000000001"
+    ],
+    "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
+    "updated_by": null
   },
   {
     "id": "10000000-0000-4000-8000-000000000003",
@@ -103,7 +126,10 @@ $ plane.py --json list
     "start_date": null,
     "target_date": null,
     "description_html": "<p>Sin alcance.</p>",
-    "labels": []
+    "labels": [],
+    "assignees": [],
+    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+    "updated_by": null
   }
 ]
 --- stderr ---

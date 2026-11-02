@@ -13,6 +13,7 @@ import flow_metrics
 import session_clock
 
 from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.assignments import assignment_rows, record_assignments
 from plane_cli.resolve import get_states_map, resolve_issue, resolve_project_and_seq
 from plane_cli.timeutil import format_minutes, time_to_minutes
 from plane_cli.worklog import extract_metadata_from_comment
@@ -49,19 +50,20 @@ def load_states_by_id(conn, base_url, api_key, workspace, project_id):
     return {r["id"]: {"name": r["name"], "group": r["group_name"]} for r in rows}
 
 
-def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, ticket_label):
+def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, ticket_label, strict=False):
     """Transiciones de estado del issue (Plane no tiene endpoint por proyecto: una llamada por ticket).
 
-    Incremental: un ticket cuyo updated_at no cambió no se vuelve a pedir (los abiertos expiran a la hora).
+    Incremental: un ticket cuyo updated_at no cambió no se vuelve a pedir (los abiertos expiran a la hora). Las mismas actividades traen los
+    cambios de asignado (assignments.py); un ticket sin ese historial se vuelve a pedir una vez. Con `strict` una falla de red se propaga (barrido).
     """
     now = clock.timestamp()
-    cached = conn.execute("SELECT fetched_at, issue_updated_at FROM flow_fetch WHERE issue_id = ?", (issue["id"],)).fetchone()
+    cached = conn.execute("SELECT fetched_at, issue_updated_at, assignments_fetched FROM flow_fetch WHERE issue_id = ?", (issue["id"],)).fetchone()
     fresh = bool(
-        cached and cached["issue_updated_at"] == issue.get("updated_at")
+        cached and cached["issue_updated_at"] == issue.get("updated_at") and cached["assignments_fetched"]
         and (issue.get("completed_at") or now - cached["fetched_at"] < FLOW_TTL_SECONDS)
     )
     if not fresh:
-        found, cursor = [], None
+        found, assigned, cursor = [], [], None
         try:
             for _ in range(FLOW_MAX_PAGES):
                 url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/activities/?per_page=100"
@@ -69,6 +71,7 @@ def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, tic
                     url += f"&cursor={urllib.parse.quote(cursor)}"
                 data = api_request(url, api_key, raise_on_error=True)
                 for a in data.get("results", []):
+                    assigned += assignment_rows(a, issue["id"], ticket_label)
                     if a.get("field") == "state" and a.get("new_identifier") and a.get("created_at"):
                         found.append((a["id"], issue["id"], ticket_label, a["created_at"], a.get("old_identifier"),
                                       a["new_identifier"], a.get("old_value"), a.get("new_value")))
@@ -77,8 +80,12 @@ def fetch_transitions(conn, base_url, api_key, workspace, project_id, issue, tic
                 cursor = data.get("next_cursor")
             with conn:
                 conn.executemany("INSERT OR REPLACE INTO state_transitions VALUES (?,?,?,?,?,?,?,?)", found)
-                conn.execute("INSERT OR REPLACE INTO flow_fetch VALUES (?,?,?)", (issue["id"], now, issue.get("updated_at")))
+                record_assignments(conn, assigned)
+                conn.execute("INSERT OR REPLACE INTO flow_fetch (issue_id, fetched_at, issue_updated_at, assignments_fetched) VALUES (?,?,?,1)",
+                             (issue["id"], now, issue.get("updated_at")))
         except (urllib.error.URLError, OSError) as exc:
+            if strict:
+                raise
             sys.stderr.write(f"⚠ Sin conexión con Plane para {ticket_label} ({exc}): se usan las transiciones almacenadas.\n")
     rows = conn.execute("SELECT at_utc, from_id, to_id FROM state_transitions WHERE issue_id = ? ORDER BY at_utc", (issue["id"],)).fetchall()
     return [{"at": session_clock.parse_time(r["at_utc"]), "from_id": r["from_id"], "to_id": r["to_id"]} for r in rows]

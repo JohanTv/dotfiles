@@ -1,6 +1,6 @@
 """Base de datos local SQLite3 (WAL): conexión y esquema.
 
-Expone: get_db(), ensure_columns(), init_snapshot_table(), init_outbox_tables(), init_db().
+Expone: get_db(), ensure_columns(), init_snapshot_table(), init_outbox_tables(), init_people_tables(), init_db().
 No hace: consultas de negocio ni acceso a red.
 La caché contiene texto de comentarios: el directorio se deja en 0700 y la base en 0600 (los archivos -wal y -shm
 heredan los permisos de la base).
@@ -82,6 +82,32 @@ def init_outbox_tables(conn):
         CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open
             ON outbox(wl_ticket_id, wl_track, wl_date, wl_start_time) WHERE state IN ('pending','sending','failed');
     """)
+
+
+def init_people_tables(conn):
+    """Personas del workspace e historial de asignación medido (ver assignments.py)."""
+    # Personas del workspace (UUID -> nombre) para mostrar asignados sin consultar Plane cada vez.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS members (
+            user_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            updated_at REAL NOT NULL
+        );
+    """)
+    # Historial de asignación medido (independiente de issues_cache: sobrevive a su resync). Solo lo que se trajo de las actividades.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS assignment_events (
+            event_id TEXT PRIMARY KEY,
+            issue_id TEXT NOT NULL,
+            ticket_id TEXT NOT NULL,
+            at_utc TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('added','removed')),
+            user_id TEXT NOT NULL,
+            user_name TEXT
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assignment_issue ON assignment_events(issue_id, at_utc);")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_assignment_user ON assignment_events(user_id, kind);")
 
 
 def init_db(conn):
@@ -216,10 +242,15 @@ def init_db(conn):
         ensure_columns(conn, "issues_cache", {
             "created_at": "TEXT", "completed_at": "TEXT", "start_date": "TEXT",
             "target_date": "TEXT", "archived_at": "TEXT",
+            # Quién tiene el ticket y quién lo creó (lista JSON de UUID y UUID) y cuándo lo tocó Plane (updated_at de Plane, no de la sincronización).
+            "assignees_json": "TEXT", "created_by": "TEXT", "plane_updated_at": "TEXT",
         })
+        # Marca de que el historial de asignación de ese ticket ya se trajo (cachés previas solo traían las transiciones de estado).
+        ensure_columns(conn, "flow_fetch", {"assignments_fetched": "INTEGER NOT NULL DEFAULT 0"})
 
         init_snapshot_table(conn)
         init_outbox_tables(conn)
+        init_people_tables(conn)
 
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(

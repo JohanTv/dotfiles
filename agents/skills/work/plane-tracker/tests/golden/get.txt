@@ -37,6 +37,11 @@ $ plane.py get OMNIFY-1 --json
   "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
   "labels": [],
+  "assignees": [
+    "bbbbbbbb-0000-4000-8000-000000000002"
+  ],
+  "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+  "updated_by": null,
   "comments": [
     {
       "id": "c1000000-0000-4000-8000-000000000001",
@@ -90,6 +95,11 @@ $ plane.py --json get OMNIFY-1
   "target_date": "2026-10-27",
   "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
   "labels": [],
+  "assignees": [
+    "bbbbbbbb-0000-4000-8000-000000000002"
+  ],
+  "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+  "updated_by": null,
   "comments": [
     {
       "id": "c1000000-0000-4000-8000-000000000001",
@@ -207,6 +217,9 @@ $ plane.py get OMNIFY-3 --history --json
   "target_date": null,
   "description_html": "<p>Sin alcance.</p>",
   "labels": [],
+  "assignees": [],
+  "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
+  "updated_by": null,
   "flow": {
     "outcome": "cancelled",
     "flags": [
@@ -298,6 +311,11 @@ $ plane.py get 10000000-0000-4000-8000-000000000002 --json
   "target_date": null,
   "description_html": "",
   "labels": [],
+  "assignees": [
+    "aaaaaaaa-0000-4000-8000-000000000001"
+  ],
+  "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
+  "updated_by": null,
   "comments": [
     {
       "id": "c2000000-0000-4000-8000-000000000005",
