@@ -91,6 +91,11 @@ class Golden(unittest.TestCase):
         steps = [["list"], ["list", "--json"], ["--json", "list"], ["list", "-p", "OPS"], ["list", "-p", "nope"],
                  ["search", "formulario"], ["search", "3"], ["search", "OMNIFY-2"], ["search", "zzz"], ["search", "validaciones", "--json", "-p", "OMNIFY"],
                  ["search", "x", "-p", "NOPE"], ["search", "de la", "--refresh"], ["search", "soporte", "-p", "OPS"], ["search", "backend"], ["search", "bug"],
+                 ["list", "--text", "formulario"], ["list", "--text", "3"], ["list", "--text", "OMNIFY-2"], ["list", "--text", "zzz"],
+                 ["list", "--text", "validaciones", "--json", "-p", "OMNIFY"], ["list", "--text", "x", "-p", "NOPE"], ["list", "--text", "de la", "--refresh"],
+                 ["list", "--text", "soporte", "-p", "OPS"], ["list", "--text", "backend"], ["list", "--text", "bug"],
+                 ["list", "--text", "sms", "--open", "--brief", "--json"], ["list", "--brief", "--json", "--limit", "2"], ["list", "--json", "--verbose", "--limit", "1"],
+                 ["list", "enlaces"],
                  ["labels"], ["labels", "--json", "-p", "OPS", "--refresh"], ["labels", "-p", "NOPE"],
                  ["projects"], ["projects", "--json", "--refresh"]]
         self.golden("read_list_search_labels_projects", steps)

@@ -100,7 +100,8 @@ $ plane.py list
 --- stdout ---
 
 --- stderr ---
-Plane no responde y no hay caché local de los tickets del proyecto.
+Error: Plane no responde y no hay caché local de los tickets de OMNIFY.
+Conéctate y usa --refresh.
 
 $ plane.py attachment list 10000000-0000-4000-8000-000000000001
 [exit 3]

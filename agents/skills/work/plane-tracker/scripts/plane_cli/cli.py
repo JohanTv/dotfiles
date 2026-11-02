@@ -19,6 +19,8 @@ from plane_cli import attachments, cmd_comment, cmd_comment_ops, cmd_delete, cmd
 from plane_cli.circuit import PlaneUnavailable, format_unavailable
 from plane_cli.config import add_json_flag, get_env_or_fail
 from plane_cli.db import get_db, init_db
+from plane_cli.envelope import dumps
+from plane_cli.errors import CliError
 from plane_cli.outbox import pending_notice
 
 COMMANDS = (
@@ -122,6 +124,12 @@ def main(argv=None):
     except PlaneUnavailable as exc:
         sys.stderr.write(format_unavailable(exc))
         sys.exit(3)
+    except CliError as exc:
+        if getattr(args, "json", False):
+            print(dumps(exc.to_dict()))
+        else:
+            sys.stderr.write(f"Error: {exc.render()}\n")
+        sys.exit(exc.exit_code)
     finally:
         _warn_pending(args, conn)
         conn.close()

@@ -2,150 +2,27 @@ $ plane.py list
 [exit 0]
 --- stdout ---
 
-📋 Tickets recientes (3 obtenidos):
-  • #1    [HIGH]    Validaciones de formulario SMS
-  • #2    [MEDIUM]  Acortador de enlaces
-  • #3    [LOW]     Webhook SMS duplicado
+📋 Tickets en OMNIFY (3) · caché de hace 1 min:
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester
+  • OMNIFY-3     Cancelado    [LOW]     Webhook SMS duplicado
+      ↳ asignados: sin asignar
 --- stderr ---
 
 
 $ plane.py list --json
 [exit 0]
 --- stdout ---
-[
-  {
-    "id": "10000000-0000-4000-8000-000000000001",
-    "sequence_id": 1,
-    "name": "Validaciones de formulario SMS",
-    "priority": "high",
-    "state": "11003922-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-01T10:00:00Z",
-    "updated_at": "2026-10-20T15:00:00Z",
-    "completed_at": null,
-    "start_date": "2026-10-01",
-    "target_date": "2026-10-27",
-    "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-    "labels": [
-      "1b000000-0000-4000-8000-11111111-111",
-      "1b200000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [
-      "bbbbbbbb-0000-4000-8000-000000000002"
-    ],
-    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
-    "updated_by": null
-  },
-  {
-    "id": "10000000-0000-4000-8000-000000000002",
-    "sequence_id": 2,
-    "name": "Acortador de enlaces",
-    "priority": "medium",
-    "state": "11005808-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-10T09:00:00Z",
-    "updated_at": "2026-10-15T12:00:00Z",
-    "completed_at": "2026-10-15T12:00:00Z",
-    "start_date": null,
-    "target_date": null,
-    "description_html": "",
-    "labels": [
-      "1b100000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [
-      "aaaaaaaa-0000-4000-8000-000000000001"
-    ],
-    "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
-    "updated_by": null
-  },
-  {
-    "id": "10000000-0000-4000-8000-000000000003",
-    "sequence_id": 3,
-    "name": "Webhook SMS duplicado",
-    "priority": "low",
-    "state": "11004618-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-05T09:00:00Z",
-    "updated_at": "2026-10-06T12:00:00Z",
-    "completed_at": null,
-    "start_date": null,
-    "target_date": null,
-    "description_html": "<p>Sin alcance.</p>",
-    "labels": [
-      "1b200000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [],
-    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
-    "updated_by": null
-  }
-]
+{"count":3,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"assignees":[{"id":"aaaaaaaa-0000-4000-8000-000000000001","name":"tester"}],"completed_at":"2026-10-15T12:00:00Z","created_at":"2026-10-10T09:00:00Z","created_by":"aaaaaaaa-0000-4000-8000-000000000001","labels":["bug"],"plane_updated_at":"2026-10-15T12:00:00Z","priority":"medium","project":"OMNIFY","start_date":null,"state":"Completado","state_group":"completed","target_date":null,"ticket":"OMNIFY-2","title":"Acortador de enlaces"},{"assignees":[],"completed_at":null,"created_at":"2026-10-05T09:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["sms"],"plane_updated_at":"2026-10-06T12:00:00Z","priority":"low","project":"OMNIFY","start_date":null,"state":"Cancelado","state_group":"cancelled","target_date":null,"ticket":"OMNIFY-3","title":"Webhook SMS duplicado"}],"schema":"plane-tracker/1","scope":{"limit":20,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
 --- stderr ---
 
 
 $ plane.py --json list
 [exit 0]
 --- stdout ---
-[
-  {
-    "id": "10000000-0000-4000-8000-000000000001",
-    "sequence_id": 1,
-    "name": "Validaciones de formulario SMS",
-    "priority": "high",
-    "state": "11003922-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-01T10:00:00Z",
-    "updated_at": "2026-10-20T15:00:00Z",
-    "completed_at": null,
-    "start_date": "2026-10-01",
-    "target_date": "2026-10-27",
-    "description_html": "<p>Validar <b>formulario</b> de campa\u00f1as.</p>",
-    "labels": [
-      "1b000000-0000-4000-8000-11111111-111",
-      "1b200000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [
-      "bbbbbbbb-0000-4000-8000-000000000002"
-    ],
-    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
-    "updated_by": null
-  },
-  {
-    "id": "10000000-0000-4000-8000-000000000002",
-    "sequence_id": 2,
-    "name": "Acortador de enlaces",
-    "priority": "medium",
-    "state": "11005808-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-10T09:00:00Z",
-    "updated_at": "2026-10-15T12:00:00Z",
-    "completed_at": "2026-10-15T12:00:00Z",
-    "start_date": null,
-    "target_date": null,
-    "description_html": "",
-    "labels": [
-      "1b100000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [
-      "aaaaaaaa-0000-4000-8000-000000000001"
-    ],
-    "created_by": "aaaaaaaa-0000-4000-8000-000000000001",
-    "updated_by": null
-  },
-  {
-    "id": "10000000-0000-4000-8000-000000000003",
-    "sequence_id": 3,
-    "name": "Webhook SMS duplicado",
-    "priority": "low",
-    "state": "11004618-0000-4000-8000-11111111-111",
-    "created_at": "2026-10-05T09:00:00Z",
-    "updated_at": "2026-10-06T12:00:00Z",
-    "completed_at": null,
-    "start_date": null,
-    "target_date": null,
-    "description_html": "<p>Sin alcance.</p>",
-    "labels": [
-      "1b200000-0000-4000-8000-11111111-111"
-    ],
-    "assignees": [],
-    "created_by": "bbbbbbbb-0000-4000-8000-000000000002",
-    "updated_by": null
-  }
-]
+{"count":3,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"assignees":[{"id":"aaaaaaaa-0000-4000-8000-000000000001","name":"tester"}],"completed_at":"2026-10-15T12:00:00Z","created_at":"2026-10-10T09:00:00Z","created_by":"aaaaaaaa-0000-4000-8000-000000000001","labels":["bug"],"plane_updated_at":"2026-10-15T12:00:00Z","priority":"medium","project":"OMNIFY","start_date":null,"state":"Completado","state_group":"completed","target_date":null,"ticket":"OMNIFY-2","title":"Acortador de enlaces"},{"assignees":[],"completed_at":null,"created_at":"2026-10-05T09:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["sms"],"plane_updated_at":"2026-10-06T12:00:00Z","priority":"low","project":"OMNIFY","start_date":null,"state":"Cancelado","state_group":"cancelled","target_date":null,"ticket":"OMNIFY-3","title":"Webhook SMS duplicado"}],"schema":"plane-tracker/1","scope":{"limit":20,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
 --- stderr ---
 
 
@@ -153,8 +30,9 @@ $ plane.py list -p OPS
 [exit 0]
 --- stdout ---
 
-📋 Tickets recientes (1 obtenidos):
-  • #13   [NONE]    Tareas Rápidas y Soporte - W43
+📋 Tickets en OPS (1) · caché de hace 1 min:
+  • OPS-13       Progreso     [NONE]    Tareas Rápidas y Soporte - W43
+      ↳ asignados: tester, otro
 --- stderr ---
 
 
@@ -163,7 +41,8 @@ $ plane.py list -p nope
 --- stdout ---
 
 --- stderr ---
-Error: Proyecto 'nope' no encontrado. Opciones: OMNIFY, OPS
+Error: Proyecto 'nope' no encontrado.
+Opciones: OMNIFY, OPS. Usa -p OMNIFY.
 
 $ plane.py search formulario
 [exit 0]
@@ -282,6 +161,122 @@ $ plane.py search bug
 --- stderr ---
 
 
+$ plane.py list --text formulario
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «formulario» (1) · caché de hace 1 min:
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro
+--- stderr ---
+
+
+$ plane.py list --text 3
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «3» (0) · caché de hace 1 min:
+--- stderr ---
+
+
+$ plane.py list --text OMNIFY-2
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «OMNIFY-2» (0) · caché de hace 1 min:
+--- stderr ---
+
+
+$ plane.py list --text zzz
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «zzz» (0) · caché de hace 1 min:
+--- stderr ---
+
+
+$ plane.py list --text validaciones --json -p OMNIFY
+[exit 0]
+--- stdout ---
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"text_fields":["title","labels"]},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"}],"schema":"plane-tracker/1","scope":{"limit":20,"order":"rank,-sequence","projects":["OMNIFY"],"state":"all","text":"validaciones"},"summary":null,"total":1,"view":"list"}
+--- stderr ---
+
+
+$ plane.py list --text x -p NOPE
+[exit 1]
+--- stdout ---
+
+--- stderr ---
+Error: Proyecto 'NOPE' no encontrado.
+Opciones: OMNIFY, OPS. Usa -p OMNIFY.
+
+$ plane.py list --text de la --refresh
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «de la» (0) · caché de hace 1 min:
+--- stderr ---
+
+
+$ plane.py list --text soporte -p OPS
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OPS con «soporte» (1) · caché de hace 1 min:
+  • OPS-13       Progreso     [NONE]    Tareas Rápidas y Soporte - W43
+      ↳ asignados: tester, otro
+--- stderr ---
+
+
+$ plane.py list --text backend
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «backend» (1) · caché de hace 1 min:
+  • OMNIFY-1     Progreso     [HIGH]    Validaciones de formulario SMS
+      ↳ asignados: otro
+--- stderr ---
+
+
+$ plane.py list --text bug
+[exit 0]
+--- stdout ---
+
+📋 Tickets en OMNIFY con «bug» (1) · caché de hace 1 min:
+  • OMNIFY-2     Completado   [MEDIUM]  Acortador de enlaces
+      ↳ asignados: tester
+--- stderr ---
+
+
+$ plane.py list --text sms --open --brief --json
+[exit 0]
+--- stdout ---
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{"text_fields":["title","labels"]},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"project":"OMNIFY","state":"Progreso","state_group":"started","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"}],"schema":"plane-tracker/1","scope":{"limit":20,"order":"rank,-sequence","projects":["OMNIFY"],"state":"open","text":"sms"},"summary":null,"total":1,"view":"list"}
+--- stderr ---
+
+
+$ plane.py list --brief --json --limit 2
+[exit 0]
+--- stdout ---
+{"count":2,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[],"results":[{"project":"OMNIFY","state":"Progreso","state_group":"started","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"},{"project":"OMNIFY","state":"Completado","state_group":"completed","ticket":"OMNIFY-2","title":"Acortador de enlaces"}],"schema":"plane-tracker/1","scope":{"limit":2,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
+--- stderr ---
+
+
+$ plane.py list --json --verbose --limit 1
+[exit 0]
+--- stdout ---
+{"count":1,"coverage":{"age_s":0,"as_of":"2026-11-02T12:00:00Z","complete":true,"detail":{},"source":"cache","stale":false,"unavailable":[]},"notes":[{"code":"single_project","hint":"Usa --all-projects.","text":"Alcance de un solo proyecto: OMNIFY."},{"code":"truncated","hint":"Sube --limit o acota el alcance.","text":"Se muestran 1 de 3 resultados."}],"results":[{"assignees":[{"id":"bbbbbbbb-0000-4000-8000-000000000002","name":"otro"}],"completed_at":null,"created_at":"2026-10-01T10:00:00Z","created_by":"bbbbbbbb-0000-4000-8000-000000000002","labels":["backend","sms"],"plane_updated_at":"2026-10-20T15:00:00Z","priority":"high","project":"OMNIFY","start_date":"2026-10-01","state":"Progreso","state_group":"started","target_date":"2026-10-27","ticket":"OMNIFY-1","title":"Validaciones de formulario SMS"}],"schema":"plane-tracker/1","scope":{"limit":1,"order":"-updated,project,-sequence","projects":["OMNIFY"],"state":"all"},"summary":null,"total":3,"view":"list"}
+--- stderr ---
+
+
+$ plane.py list enlaces
+[exit 2]
+--- stdout ---
+
+--- stderr ---
+usage: plane.py [-h] [--json] <comando> ...
+plane.py: error: unrecognized arguments: enlaces
+
 $ plane.py labels
 [exit 0]
 --- stdout ---
@@ -363,18 +358,17 @@ $ plane.py projects --json --refresh
 
 
 === peticiones al servidor ===
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=50
 GET /api/v1/workspaces/ws/projects/
-GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=50
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
+GET /api/v1/workspaces/ws/members/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
-GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?limit=100
+GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
+GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/?per_page=100&fields=id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
 GET /api/v1/workspaces/ws/projects/

@@ -78,7 +78,7 @@ Parte de [0021](./README.md) (versión 2, reordenado tras la [revisión adversar
 | Fase | Estado | Commit o decisión |
 | :---: | :--- | :--- |
 | 0 | cerrada | Decisión [0025](../../decisions/0025-contrato-json-de-lectura.md); commits `daf88ef`, `84f96bc`, `82a360c`, `f0add02`, `c5b3187`, `6d0f7d8`, `609f839`. Hallazgos V15-V22 en la [revisión](./revision-adversarial.md) (V20 abierto) |
-| 1 | pendiente | |
+| 1 | cerrada | Commit «feat(plane-tracker): rebuild list on the query model (phase 1)»; hallazgos V23-V28 en la [revisión](./revision-adversarial.md) |
 | 2 | pendiente | |
 | 3 | pendiente | |
 | 4 | pendiente | |

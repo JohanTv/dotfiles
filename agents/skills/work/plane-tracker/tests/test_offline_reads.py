@@ -31,6 +31,8 @@ class Offline(unittest.TestCase):
         path = os.path.join(self.sb.home, ".cache", "plane", "worklogs.db")
         conn = sqlite3.connect(path)
         conn.execute(f"UPDATE {table} SET updated_at = updated_at - ?" if table != "issue_snapshots" else "UPDATE issue_snapshots SET fetched_at = fetched_at - ?", (seconds,))
+        if table == "issues_cache":
+            conn.execute("UPDATE issue_sync SET as_of = as_of - ?", (seconds,))
         conn.commit()
         conn.close()
 
@@ -62,19 +64,26 @@ class Offline(unittest.TestCase):
     def test_list_offline_from_cache(self):
         self.cli("search", "formulario")
         self.age("issues_cache", 90 * 60)
+        before = self.mark()
         code, out, err = self.cli("list", "--json", offline=True)
-        rows = json.loads(out)
-        self.assertEqual([r["sequence_id"] for r in rows], [3, 2, 1])
-        self.assertEqual(set(rows[0]), {"id", "sequence_id", "name", "priority", "state_name", "cached_at"})
-        self.assertIn("hace 1 h", err)
+        doc = json.loads(out)
+        self.assertEqual([r["ticket"] for r in doc["results"]], ["OMNIFY-1", "OMNIFY-2", "OMNIFY-3"])
+        self.assertEqual(doc["coverage"]["source"], "cache")
+        self.assertEqual((doc["coverage"]["stale"], doc["coverage"]["complete"], doc["coverage"]["age_s"]), (True, None, 5400))
+        self.assertIn("cache_stale", [n["code"] for n in doc["notes"]])
+        self.assertEqual(err, "", "lo que va en notes y coverage no se repite por stderr")
         code, out, err = self.cli("list", offline=True)
-        self.assertIn("#1", out)
+        self.assertIn("OMNIFY-1", out)
+        self.assertIn("caché de hace 1 h", out)
+        self.assertEqual(self.mark(), before)
 
     def test_list_without_cache_exits_3(self):
         self.cli("projects")
         code, out, err = self.cli("list", offline=True, ok=False)
         self.assertEqual(code, 3)
-        self.assertIn("no hay caché local de los tickets del proyecto", err)
+        self.assertIn("Plane no responde y no hay caché local de los tickets de OMNIFY.", err)
+        code, out, err = self.cli("list", "--json", offline=True, ok=False)
+        self.assertEqual((code, json.loads(out)["code"], err), (3, "no_cache", ""))
 
     # --- catálogos ------------------------------------------------------------
     def test_catalogs_stale_while_error(self):

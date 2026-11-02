@@ -7,7 +7,8 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from test_assignments import memory_db, put_issue  # noqa: E402
-from plane_cli import cmd_delete, list_filtered, resolve, worklog  # noqa: E402
+from plane_cli import cmd_delete, query_issues, resolve, worklog  # noqa: E402
+from plane_cli.scope import Scope  # noqa: E402
 
 ME, OTHER = "me-uuid", "other-uuid"
 
@@ -51,7 +52,7 @@ class Involvement(unittest.TestCase):
         put_issue(conn, 1)
         for i, (minutes, author) in enumerate(rows):
             worklog.upsert_worklog(conn, entry(f"1{i}:00", minutes=minutes, author=author))
-        items, _ = list_filtered._select(conn, ["p"], "involved", ME, False)
+        items, _ = query_issues.select(conn, Scope(ticket_person={"relation": "involved", "actor": ME}), ["p"])
         return [r for i in items for r in i["reasons"]]
 
     def test_only_my_hours_count_as_mine(self):

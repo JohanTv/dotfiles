@@ -1,7 +1,7 @@
 """Aritmética de horarios y fusión de intervalos (medida de Klee) para los reportes de actividad.
 
 Expone: time_to_minutes(), minutes_to_time(), calculate_klee_union_minutes(), expand_segments(),
-merge_daily_worklogs(), format_minutes(), render_day_block(), age_text(), iso_utc(), DIAS_SEMANA.
+merge_daily_worklogs(), format_minutes(), render_day_block(), age_text(), iso_utc(), iso_z(), DIAS_SEMANA.
 No hace: red ni acceso a la base de datos.
 """
 
@@ -228,3 +228,8 @@ def age_text(seconds):
 
 def iso_utc(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds")
+
+
+def iso_z(epoch):
+    """Instante ISO UTC con sufijo Z, como el contrato `plane-tracker/1` (`as_of`)."""
+    return iso_utc(epoch)[:-6] + "Z"

@@ -17,15 +17,17 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+import golden_support as gs  # noqa: E402
 import test_structure as ts  # noqa: E402
-from plane_cli import coverage as cov_mod, envelope, errors, vocabulary as voc  # noqa: E402
+from plane_cli import cli, coverage as cov_mod, envelope, errors, vocabulary as voc  # noqa: E402
+from plane_cli.scope_flags import flags_for  # noqa: E402
 
 SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECISION = os.path.join(SKILL, "docs", "decisions", "0025-contrato-json-de-lectura.md")
 PLAN = os.path.join(SKILL, "docs", "rfcs", "0021-arquitectura-de-lectura-consultas-y-vistas", "plan-de-migracion.md")
 GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
-CURRENT_PHASE = 0
+CURRENT_PHASE = 1
 # Fase del plan en que cada función de aptitud pasa a estar activa. F3-golden es la mitad de F3 que necesita sobres reales (fase 1).
 PHASES = {"F1": 0, "F2": 1, "F3": 0, "F3-golden": 1, "F4": 0, "F5": 1, "F6": 1, "F7": 1, "F8": 0, "F9": 1, "F10": 5, "F11": 5, "F12": 1, "F13": 0,
           "F14": 0, "F15": 0}
@@ -34,8 +36,8 @@ DEPENDENCIES = {
     "config": ((), 0), "clock": ((), 0), "vocabulary": ((), 0), "errors": (("vocabulary",), 0), "timeutil": (("clock", "vocabulary"), 0),
     "coverage": (("vocabulary", "timeutil"), 0), "envelope": (("vocabulary", "coverage"), 0),
     "scope": (("vocabulary", "errors"), 1), "scope_flags": (("vocabulary", "config"), 1), "store_*": (("db", "coverage", "vocabulary"), 1),
-    "freshness": (("resolve", "cache", "sync", "api", "coverage"), 1), "query_*": (("store_*", "scope", "coverage", "assignments"), 1),
-    "render_*": (("vocabulary", "timeutil"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
+    "freshness": (("resolve", "cache", "sync", "api", "coverage", "scope", "errors", "clock", "timeutil"), 1), "query_*": (("store_*", "scope", "coverage", "assignments"), 1),
+    "render_*": (("vocabulary", "timeutil", "coverage"), 1), "views": (("query_*", "render_*", "envelope", "coverage"), 1),
     "cmd_read": (("views", "scope", "scope_flags", "freshness", "errors"), 3), "cmd_report": (("views", "scope", "scope_flags", "freshness", "errors"), 5),
     "cmd_sync": (("views", "scope", "scope_flags", "freshness", "errors"), 6),
 }
@@ -111,6 +113,20 @@ def pending(fid, what):
     raise AssertionError(f"{fid} sin escribir: {what}. Esta función de aptitud está activa desde la fase {PHASES[fid]}: hay que implementarla.")
 
 
+VIEW_COMMANDS = {"list": ["list"]}  # vista -> argv de su comando (las vistas de caché que F5, F6 y F7 recorren)
+NON_DIMENSIONAL_FLAGS = {"-h", "--help", "--json", "--refresh-history", "--budget"}  # flags que no son dimensiones ni controles (lista blanca de F2)
+
+
+def age_issues(sandbox, seconds):
+    """Envejece la caché de tickets de un Sandbox (también su marca de sincronización por proyecto)."""
+    import sqlite3
+    conn = sqlite3.connect(os.path.join(sandbox.home, ".cache", "plane", "worklogs.db"))
+    conn.execute("UPDATE issues_cache SET updated_at = updated_at - ?", (seconds,))
+    conn.execute("UPDATE issue_sync SET as_of = as_of - ?", (seconds,))
+    conn.commit()
+    conn.close()
+
+
 class Architecture(unittest.TestCase):
     # F1 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F1")
@@ -132,7 +148,10 @@ class Architecture(unittest.TestCase):
         for view in views.VIEWS.values():
             self.assertLessEqual(set(view.dims), voc.DIMENSIONS, view.name)
             self.assertLessEqual(set(view.controls), voc.CONTROLS, view.name)
-        pending("F2", "recorrer el parser de cada comando y comprobar que sus flags son solo los de dims/controls más una lista blanca no dimensional")
+        commands = cli._subparsers_of(cli.build_parser()).choices
+        for view in views.VIEWS.values():
+            declared = {opt for action in commands[view.name]._actions for opt in action.option_strings}
+            self.assertEqual(declared - NON_DIMENSIONAL_FLAGS, flags_for(view.dims, view.controls), f"flags de `{view.name}` frente a sus dims y controls")
 
     # F3 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F3")
@@ -258,7 +277,18 @@ class Architecture(unittest.TestCase):
     # F5-F7 ---------------------------------------------------------------------------------------------------------------------------
     @gate("F5")
     def test_f5_cache_views_answer_offline_over_a_cache_older_than_the_ttl(self):
-        pending("F5", "un golden por vista de caché con PLANE_OFFLINE=1 sobre una caché más vieja que el TTL: salida 0 y coverage.source en cache/local/snapshot")
+        for view, argv in VIEW_COMMANDS.items():
+            sandbox = gs.Sandbox()
+            self.addCleanup(sandbox.close)
+            self.assertEqual(sandbox.run(argv)[0], 0, view)
+            age_issues(sandbox, 2 * 3600)  # más vieja que el TTL: si no, la prueba no probaría nada
+            before = len(sandbox.fake.requests)
+            code, out, err = sandbox.run(argv + ["--json"], env_set={"PLANE_OFFLINE": "1"})
+            self.assertEqual(code, 0, f"{view}: {err}")
+            doc = json.loads(out)
+            self.assertIn(doc["coverage"]["source"], ("cache", "local", "snapshot"), view)
+            self.assertTrue(doc["coverage"]["stale"] and doc["coverage"]["complete"] is None, f"{view}: una caché vencida no es completa")
+            self.assertEqual(len(sandbox.fake.requests), before, f"{view}: PLANE_OFFLINE=1 no puede tocar la red")
 
     @gate("F6")
     def test_f6_acquisition_only_issues_get_requests(self):
@@ -268,11 +298,23 @@ class Architecture(unittest.TestCase):
                     methods = [k.value for k in node.keywords if k.arg == "method"] + node.args[2:3]
                     for method in methods:
                         self.assertTrue(isinstance(method, ast.Constant) and method.value == "GET", f"{os.path.basename(path)}:{node.lineno} usa un método distinto de GET")
-        pending("F6", "con el servidor falso: ninguna lectura, sync ni attachment list recibe un método distinto de GET")
+        for view, argv in VIEW_COMMANDS.items():
+            sandbox = gs.Sandbox()
+            self.addCleanup(sandbox.close)
+            for extra in ([], ["--refresh"], ["--all-projects", "--refresh"], ["--involved", "--refresh-history", "--budget", "2"]):
+                self.assertEqual(sandbox.run(argv + extra)[0], 0, f"{view} {extra}")
+            methods = {method for method, _path, _body in sandbox.fake.requests}
+            self.assertEqual(methods, {"GET"}, f"{view}: una lectura solo puede emitir GET")
+        # `sync` y `attachment list` se suman a esta comprobación en las fases 6 y 3.
 
     @gate("F7")
     def test_f7_output_is_byte_identical_under_two_time_zones(self):
-        pending("F7", "doble ejecución de cada vista con el mismo estado y reloj bajo TZ=UTC y otra zona, y comparación de bytes")
+        for view, argv in VIEW_COMMANDS.items():
+            sandbox = gs.Sandbox()
+            self.addCleanup(sandbox.close)
+            self.assertEqual(sandbox.run(argv)[0], 0)
+            outputs = {zone: sandbox.run(argv + ["--json", "--offline"], env_set={"TZ": zone})[1] for zone in ("UTC", "America/Lima", "Asia/Tokyo", "UTC")}
+            self.assertEqual(len(set(outputs.values())), 1, f"{view}: la salida cambia con la zona horaria o entre ejecuciones")
 
     # F8 ------------------------------------------------------------------------------------------------------------------------------
     @gate("F8")

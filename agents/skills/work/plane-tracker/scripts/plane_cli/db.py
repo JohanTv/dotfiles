@@ -256,6 +256,21 @@ def init_issue_tables(conn):
     })
 
 
+def init_sync_state(conn):
+    """Estado de la última sincronización de tickets por proyecto (recuento del servidor, recorte, si se sirvió vencido) y acceso a cada proyecto."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issue_sync (
+            project_id TEXT PRIMARY KEY,
+            total_count INTEGER,
+            fetched INTEGER NOT NULL DEFAULT 0,
+            capped INTEGER NOT NULL DEFAULT 0,
+            stale INTEGER NOT NULL DEFAULT 0,
+            as_of REAL NOT NULL
+        );
+    """)
+    ensure_columns(conn, "projects", {"is_member": "INTEGER NOT NULL DEFAULT 1", "archived": "INTEGER NOT NULL DEFAULT 0"})
+
+
 def init_search_index(conn):
     """Índice FTS5 de los tickets en caché."""
     conn.execute("""
@@ -277,4 +292,5 @@ def init_db(conn):
         init_snapshot_table(conn)
         init_outbox_tables(conn)
         init_people_tables(conn)
+        init_sync_state(conn)
         init_search_index(conn)

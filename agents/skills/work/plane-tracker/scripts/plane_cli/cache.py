@@ -1,6 +1,6 @@
 """Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets y snapshots.
 
-Expone: warn_stale(), serve_stale(), fail_no_cache(), sync_issues_cache(), save_snapshot(), offline_issue(),
+Expone: warn_stale(), serve_stale(), fail_no_cache(), sync_project_issues(), needs_sync(), last_sync(), sync_issues_cache(), save_snapshot(), offline_issue(),
 cached_issues(), issue_stub().
 No hace: formatear la salida de los comandos ni decidir cuándo estar sin conexión (eso lo señala PlaneUnavailable).
 Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen mandando.
@@ -8,14 +8,18 @@ Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen
 
 import json
 import sys
+import urllib.error
 import urllib.parse
 
+from plane_cli import api, clock
 from plane_cli.api import PlaneUnavailable, api_request
-from plane_cli import clock
+from plane_cli.errors import CliError
 from plane_cli.timeutil import age_text, iso_utc
 
 ISSUES_TTL = 1800  # 30 minutos
 ISSUES_MAX_PAGES = 20
+RATE_RESERVE = 3  # peticiones que se dejan sin gastar de cada ventana de tasa
+ISSUE_FIELDS = "id,sequence_id,name,priority,state,created_at,updated_at,completed_at,start_date,target_date,archived_at,assignees,created_by,labels"
 SNAPSHOT_KEEP_DAYS = 90
 SNAPSHOT_MAX_ROWS = 300
 LIST_LIMIT = 50
@@ -38,20 +42,31 @@ def serve_stale(rows, what):
     return rows
 
 
+class RateBudgetExhausted(Exception):
+    """El presupuesto de peticiones por ventana se agotó a mitad de una lectura: lo traído hasta ahora es parcial."""
+
+
+def _check_budget():
+    remaining = api.rate_limit()
+    if remaining and remaining["remaining"] is not None and remaining["remaining"] <= RATE_RESERVE:
+        raise RateBudgetExhausted()
+
+
 def _fetch_all_issues(base_url, api_key, workspace, project_id):
-    results, cursor = [], None
+    """(tickets, total_count del servidor o None, recortado). Un error HTTP definitivo se lanza como HTTPError; el presupuesto agotado, como RateBudgetExhausted."""
+    results, cursor, total = [], None, None
     for _ in range(ISSUES_MAX_PAGES):
-        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=100"
+        _check_budget()
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?per_page=100&fields={ISSUE_FIELDS}"
         if cursor:
             url += f"&cursor={urllib.parse.quote(cursor)}"
-        data = api_request(url, api_key)
+        data = api_request(url, api_key, raise_on_error=True)
         results += data.get("results", [])
+        total = data.get("total_count", total)
         cursor = data.get("next_cursor")
         if not data.get("next_page_results") or not cursor:
-            break
-    else:
-        sys.stderr.write(f"⚠ El proyecto tiene más de {len(results)} tickets: solo se sincronizaron los primeros {len(results)}; los demás no aparecerán en la caché.\n")
-    return results
+            return results, total, False
+    return results, total, True
 
 
 def _ref_id(value):
@@ -69,24 +84,56 @@ def _label_names_by_id(conn, project_id):
     return {r["id"]: r["name"].lower().strip() for r in conn.execute("SELECT id, name FROM labels WHERE project_id = ?", (project_id,))}
 
 
-def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
-    """Sincroniza los issues del proyecto en SQLite (búsqueda FTS5 instantánea). Sin Plane sirve la caché existente."""
+def last_sync(conn, project_id):
+    """Instante (época) de la última sincronización de tickets del proyecto, o None si nunca hubo."""
+    row = conn.execute("SELECT as_of FROM issue_sync WHERE project_id = ?", (project_id,)).fetchone()
+    if row:
+        return row["as_of"]
+    row = conn.execute("SELECT MAX(updated_at) AS t FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()
+    return row["t"] if row else None
+
+
+def needs_sync(conn, project_id, force_refresh=False):
+    """True si hay que ir a Plane: se fuerza, nunca se sincronizó o venció el TTL."""
+    synced = last_sync(conn, project_id)
+    return bool(force_refresh or not synced or (clock.timestamp() - synced) >= ISSUES_TTL)
+
+
+def _mark_stale(conn, project_id):
+    with conn:
+        conn.execute("UPDATE issue_sync SET stale = 1 WHERE project_id = ?", (project_id,))
+
+
+def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False, offline=False):
+    """Sincroniza los tickets del proyecto en SQLite (solo GET). Devuelve (estado, as_of) y nunca imprime ni termina el programa.
+
+    Estados: `fresh` (vigente), `synced`, `stale` (se sirvió lo almacenado vencido: la red falló o se pidió --offline), `rate_limited` (se detuvo antes de
+    agotar el presupuesto de tasa y se conserva lo almacenado), `forbidden` (403: el usuario no tiene acceso al proyecto) y `unavailable` (sin red ni datos).
+    as_of es el instante de la última sincronización completa (None si no hay). Persiste por proyecto el recuento del servidor, el recorte y si se sirvió vencido.
+    """
+    previous = last_sync(conn, project_id)
+    if offline or not needs_sync(conn, project_id, force_refresh):
+        expired = previous is not None and clock.timestamp() - previous >= ISSUES_TTL
+        return ("unavailable" if previous is None else "stale" if expired and offline else "fresh"), previous
     now = clock.timestamp()
-    row = conn.execute("SELECT MAX(updated_at) AS last_sync FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()
-    last_sync = row["last_sync"] if row else None
-    if not force_refresh and last_sync and (now - last_sync) < ISSUES_TTL:
-        return
-    states_by_id = {}
     try:
-        url_states = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/"
-        for s in api_request(url_states, api_key).get("results", []):
-            states_by_id[s["id"]] = (s["name"], s.get("group", ""))
-        results = _fetch_all_issues(base_url, api_key, workspace, project_id)
+        _check_budget()
+        states_by_id = {s["id"]: (s["name"], s.get("group", "")) for s in
+                        api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/", api_key, raise_on_error=True).get("results", [])}
+        results, total, capped = _fetch_all_issues(base_url, api_key, workspace, project_id)
+    except RateBudgetExhausted:
+        if previous:
+            _mark_stale(conn, project_id)
+        return "rate_limited", previous
     except PlaneUnavailable:
-        if last_sync:
-            warn_stale(last_sync)
-            return
-        fail_no_cache(f"los tickets de {project_ident}")
+        if previous:
+            _mark_stale(conn, project_id)
+        return ("stale" if previous else "unavailable"), previous
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        if exc.code == 403:
+            return "forbidden", previous
+        raise CliError("http_error", f"HTTP {exc.code} al leer los tickets de {project_ident}.", detail={"status": exc.code}) from exc
 
     label_names = _label_names_by_id(conn, project_id)
     with conn:
@@ -106,6 +153,23 @@ def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_id
                   json.dumps(assignee_ids(iss)), _ref_id(iss.get("created_by")), iss.get("updated_at")))
         conn.execute("DELETE FROM issues_fts;")
         conn.execute("INSERT INTO issues_fts (ticket_id, title, labels_csv) SELECT ticket_id, title, labels_csv FROM issues_cache;")
+        conn.execute("""
+            INSERT INTO issue_sync (project_id, total_count, fetched, capped, stale, as_of) VALUES (?, ?, ?, ?, 0, ?)
+            ON CONFLICT(project_id) DO UPDATE SET total_count = excluded.total_count, fetched = excluded.fetched, capped = excluded.capped,
+                stale = 0, as_of = excluded.as_of
+        """, (project_id, total, len(results), int(capped), now))
+    return "synced", now
+
+
+def sync_issues_cache(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False):
+    """sync_project_issues para los comandos que aún no usan el modelo de vistas: avisa por stderr o falla con el código 3 si no hay nada local."""
+    status, as_of = sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=force_refresh)
+    if status in ("stale", "rate_limited"):
+        warn_stale(as_of)
+    elif status == "unavailable":
+        fail_no_cache(f"los tickets de {project_ident}")
+    elif status == "forbidden":
+        raise CliError("http_error", f"Sin acceso al proyecto {project_ident} (HTTP 403).", detail={"status": 403})
 
 
 def save_snapshot(conn, issue, ticket_id, comments=None):

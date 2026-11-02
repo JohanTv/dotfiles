@@ -11,11 +11,13 @@ import re
 import sys
 
 from plane_cli.api import PlaneUnavailable, api_request
-from plane_cli.cache import cached_issues, fail_no_cache, offline_issue, save_snapshot, warn_stale
+from plane_cli.cache import fail_no_cache, offline_issue, save_snapshot
+from plane_cli.envelope import build, dumps
+from plane_cli.freshness import Env, catalogs, ensure
+from plane_cli.history_sweep import sweep
 from plane_cli.timeutil import age_text, iso_utc
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
-from plane_cli.list_filtered import add_list_filter_flags, cmd_list_filtered, wants_filtered
 from plane_cli.resolve import (
     get_actor_uuid,
     get_labels_map,
@@ -26,6 +28,9 @@ from plane_cli.resolve import (
     sync_issues,
 )
 from plane_cli import clock
+from plane_cli.scope import PERSON_FLAGS, resolve_scope
+from plane_cli.scope_flags import add_scope_args
+from plane_cli.views import LIST_LIMIT, VIEWS
 
 
 def _fetch_comments(base_url, api_key, workspace, project_id, issue):
@@ -132,38 +137,18 @@ def cmd_get(args, conn, base_url, api_key, workspace, default_project_id):
 
 
 def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
-    if wants_filtered(args):
-        return cmd_list_filtered(args, conn, base_url, api_key, workspace, default_project_id)
-    project_id = default_project_id
-    if getattr(args, "project", None):
-        projects_map = get_projects_map(conn, base_url, api_key, workspace)
-        p_upper = args.project.upper()
-        if p_upper in projects_map:
-            project_id = projects_map[p_upper]["id"]
-        else:
-            sys.stderr.write(f"Error: Proyecto '{args.project}' no encontrado. Opciones: {', '.join(projects_map.keys())}\n")
-            sys.exit(1)
-
-    url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?limit=50"
-    offline = False
-    try:
-        results = api_request(url, api_key).get("results", [])
-    except PlaneUnavailable:
-        results, cached_at = cached_issues(conn, project_id)
-        if not results:
-            fail_no_cache("los tickets del proyecto")
-        warn_stale(cached_at)
-        offline = True
-
-    if getattr(args, "json", False):
-        print(json.dumps(results, indent=2))
-    else:
-        print(f"\n📋 Tickets {'en caché local' if offline else 'recientes'} ({len(results)} {'disponibles' if offline else 'obtenidos'}):")
-        for iss in results[:15]:
-            prio = f"[{iss.get('priority', 'none').upper()}]"
-            seq = iss.get("sequence_id", "?")
-            print(f"  • #{seq:<4} {prio:<9} {iss.get('name')[:65]}")
-        print("")
+    """`list`: catálogos -> alcance -> frescura -> consulta -> sobre; el texto es un render del mismo sobre que el JSON."""
+    view = VIEWS["list"]
+    env = Env(base_url, api_key, workspace, default_project_id)
+    if args.offline:
+        os.environ["PLANE_OFFLINE"] = "1"  # --offline corta toda la red del proceso
+    cats = catalogs(conn, env, need_actor=any(getattr(args, flag, False) for flag, _ in PERSON_FLAGS))
+    scope = resolve_scope(args, cats, view)
+    acquisition = ensure(conn, env, view.name, scope, cats)
+    if args.refresh_history:
+        sweep(conn, env, [p.uuid for p in scope.projects], args.budget)
+    doc = build(view.name, scope.to_dict(view), view.query(conn, scope, cats, acquisition), verbose=args.verbose)
+    print(dumps(doc) if getattr(args, "json", False) else view.render(doc), end="\n" if getattr(args, "json", False) else "")
 
 
 def cmd_labels(args, conn, base_url, api_key, workspace, default_project_id):
@@ -208,7 +193,7 @@ def cmd_projects(args, conn, base_url, api_key, workspace, default_project_id):
     projects_map = get_projects_map(conn, base_url, api_key, workspace, force_refresh=force_refresh)
 
     if getattr(args, "json", False):
-        print(json.dumps(list(projects_map.values()), indent=2))
+        print(json.dumps([{k: p[k] for k in ("id", "name", "identifier")} for p in projects_map.values()], indent=2))
         return
 
     print(f"\n📂 Proyectos en el workspace '{workspace}':")
@@ -357,11 +342,14 @@ def register_get(sub):
 
 
 def register_list(sub):
-    p_list = sub.add_parser("list", help="Listar los tickets del proyecto",
-                            description="Sin filtros, los últimos tickets del proyecto según la API. Con --mine, --created, --involved, --open, "
-                                        "--all-projects o --refresh, una vista filtrada desde la caché local (funciona sin conexión).")
-    p_list.add_argument("-p", "--project", help="Identificador del proyecto (ej: OMNIFY, OPS, OMNILEADS)")
-    add_list_filter_flags(p_list)
+    view = VIEWS["list"]
+    p_list = sub.add_parser("list", help="Listar y buscar tickets (caché)",
+                            description="Tickets de la caché local, refrescada por TTL (30 min) con solo GET. Combina -p/--all-projects, --mine|--created|--involved, "
+                                        "--open y --text (título y etiquetas, por relevancia). Con --json, sobre plane-tracker/1 con alcance, cobertura y notas.")
+    add_scope_args(p_list, view.dims, view.controls, LIST_LIMIT)
+    p_list.add_argument("--refresh-history", action="store_true",
+                        help="Traer el historial de asignación de los tickets pendientes (una petición por ticket; reanuda donde quedó)")
+    p_list.add_argument("--budget", type=positive_int, default=25, metavar="N", help="Máximo de tickets por ejecución de --refresh-history (por defecto 25)")
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
 

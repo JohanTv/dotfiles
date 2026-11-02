@@ -22,10 +22,11 @@ PROJECTS_TTL = 86400  # 24 horas
 
 
 def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
-    """Obtiene el mapa de identifier -> UUID de proyectos desde SQLite o Plane API."""
+    """Mapa identifier -> {id, name, identifier, accessible} de proyectos desde SQLite o Plane API; `accessible` = miembro y no archivado."""
     now = clock.timestamp()
-    rows = conn.execute("SELECT identifier, project_id, name, updated_at FROM projects WHERE workspace = ?", (workspace,)).fetchall()
-    as_map = lambda items: {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"]} for r in items}
+    rows = conn.execute("SELECT identifier, project_id, name, updated_at, is_member, archived FROM projects WHERE workspace = ?", (workspace,)).fetchall()
+    as_map = lambda items: {r["identifier"]: {"id": r["project_id"], "name": r["name"], "identifier": r["identifier"],
+                                              "accessible": bool(r["is_member"]) and not r["archived"]} for r in items}
     if rows and not force_refresh and all((now - r["updated_at"]) < PROJECTS_TTL for r in rows):
         return as_map(rows)
 
@@ -41,16 +42,19 @@ def get_projects_map(conn, base_url, api_key, workspace, force_refresh=False):
             if ident:
                 p_id = proj["id"]
                 p_name = proj["name"]
-                projects_map[ident] = {"id": p_id, "name": p_name, "identifier": ident}
+                member, archived = proj.get("is_member", True) is not False, bool(proj.get("archived_at"))
+                projects_map[ident] = {"id": p_id, "name": p_name, "identifier": ident, "accessible": member and not archived}
                 conn.execute("""
-                    INSERT INTO projects (identifier, project_id, name, workspace, updated_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO projects (identifier, project_id, name, workspace, updated_at, is_member, archived)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(identifier) DO UPDATE SET
                         project_id = excluded.project_id,
                         name = excluded.name,
                         workspace = excluded.workspace,
-                        updated_at = excluded.updated_at;
-                """, (ident, p_id, p_name, workspace, now))
+                        updated_at = excluded.updated_at,
+                        is_member = excluded.is_member,
+                        archived = excluded.archived;
+                """, (ident, p_id, p_name, workspace, now, int(member), int(archived)))
 
     return projects_map
 
