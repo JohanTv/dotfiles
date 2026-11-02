@@ -1,10 +1,13 @@
 """Conversor de Markdown a HTML compatible con Plane CE (Tiptap/ProseMirror).
 
-Expone: markdown_to_html().
+Expone: markdown_to_html(), TASK_ITEM.
 No hace: red, disco ni estado; solo usa re y la biblioteca estándar.
 """
 
 import re
+
+# `- [ ] texto` o `* [x] texto` (la casilla va seguida de espacio o del fin de línea)
+TASK_ITEM = re.compile(r"^[-*]\s+\[([ xX])\](?:\s+(.*)|\s*)$")
 
 
 def markdown_to_html(md: str) -> str:
@@ -74,10 +77,24 @@ def markdown_to_html(md: str) -> str:
             i += 1
             continue
 
-        # Unordered list block (lines starting with - or *)
+        # Lista de tareas - [ ] / - [x]: antes que la lista normal (cuya expresión también captura estas líneas). Mismo marcado que guarda el editor de Plane
+        # (`taskList` / `taskItem` de Tiptap), para que las casillas sean interactivas al abrir el ticket.
+        if TASK_ITEM.match(line):
+            items = []
+            while i < len(lines) and TASK_ITEM.match(lines[i]):
+                done, text = TASK_ITEM.match(lines[i]).groups()
+                text = text or ""
+                box = ' checked="checked"' if done.lower() == "x" else ""
+                items.append(f'<li data-type="taskItem" data-checked="{"true" if box else "false"}"><label><input type="checkbox"{box}><span></span></label>'
+                             f"<div><p>{inline(escape(text))}</p></div></li>")
+                i += 1
+            html_parts.append('<ul data-type="taskList">' + "".join(items) + "</ul>")
+            continue
+
+        # Unordered list block (lines starting with - or *), sin llevarse las líneas de tarea que vengan después
         if re.match(r"^[-*]\s+", line):
             items = []
-            while i < len(lines) and re.match(r"^[-*]\s+", lines[i]):
+            while i < len(lines) and re.match(r"^[-*]\s+", lines[i]) and not TASK_ITEM.match(lines[i]):
                 item_text = inline(escape(re.sub(r"^[-*]\s+", "", lines[i])))
                 items.append(f"<li>{item_text}</li>")
                 i += 1
@@ -118,18 +135,6 @@ def markdown_to_html(md: str) -> str:
                 for row in rows
             )
             html_parts.append(f"<table><thead><tr>{th}</tr></thead><tbody>{tbody_rows}</tbody></table>")
-            continue
-
-        # Checkbox list item - [ ] / - [x]
-        if re.match(r"^[-*]\s+\[[ xX]\]", line):
-            items = []
-            while i < len(lines) and re.match(r"^[-*]\s+\[[ xX]\]", lines[i]):
-                checked = "x" in lines[i][3:5].lower()
-                text = inline(escape(re.sub(r"^[-*]\s+\[[ xX]\]\s*", "", lines[i])))
-                chk = ' checked=""' if checked else ""
-                items.append(f'<li><input type="checkbox"{chk} disabled> {text}</li>')
-                i += 1
-            html_parts.append('<ul class="task-list">' + "".join(items) + "</ul>")
             continue
 
         # Empty line → paragraph break (ya manejado por acumulación)

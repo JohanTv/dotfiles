@@ -65,7 +65,23 @@
 
 ### tarea
 '- [ ] pendiente\n- [x] hecho'
-<ul><li>[ ] pendiente</li><li>[x] hecho</li></ul>
+<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>pendiente</p></div></li><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked="checked"><span></span></label><div><p>hecho</p></div></li></ul>
+
+### tareas mezcladas
+'- a\n- [ ] b\n* [X] **c**\n- d'
+<ul><li>a</li></ul>
+<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>b</p></div></li><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked="checked"><span></span></label><div><p><strong>c</strong></p></div></li></ul>
+<ul><li>d</li></ul>
+
+### tarea vacía y sin espacio
+'- [ ]\n- [x]hola'
+<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p></p></div></li></ul>
+<ul><li>[x]hola</li></ul>
+
+### DoD
+'### DoD\n- [ ] criterio con `code`\n- [x] otro'
+<h3>DoD</h3>
+<ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>criterio con <code>code</code></p></div></li><li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked="checked"><span></span></label><div><p>otro</p></div></li></ul>
 
 ### bloque de código
 '```python\nx = 1 < 2\n```\ndespués'
