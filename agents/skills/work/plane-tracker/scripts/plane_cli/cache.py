@@ -1,7 +1,7 @@
 """Lecturas desde la caché local cuando Plane no responde: aviso de antigüedad, sincronización de tickets y snapshots.
 
-Expone: age_text(), warn_stale(), serve_stale(), fail_no_cache(), sync_issues_cache(), save_snapshot(), offline_issue(),
-cached_issues(), issue_stub(), iso_utc().
+Expone: warn_stale(), serve_stale(), fail_no_cache(), sync_issues_cache(), save_snapshot(), offline_issue(),
+cached_issues(), issue_stub().
 No hace: formatear la salida de los comandos ni decidir cuándo estar sin conexión (eso lo señala PlaneUnavailable).
 Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen mandando.
 """
@@ -9,26 +9,16 @@ Servir datos vencidos solo ocurre ante PlaneUnavailable: con red, los TTL siguen
 import json
 import sys
 import urllib.parse
-from datetime import datetime, timezone
 
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli import clock
+from plane_cli.timeutil import age_text, iso_utc
 
 ISSUES_TTL = 1800  # 30 minutos
 ISSUES_MAX_PAGES = 20
 SNAPSHOT_KEEP_DAYS = 90
 SNAPSHOT_MAX_ROWS = 300
 LIST_LIMIT = 50
-
-
-def age_text(seconds):
-    """Edad legible en min, h o d."""
-    minutes = max(1, int(seconds // 60))
-    if minutes < 60:
-        return f"{minutes} min"
-    if minutes < 1440:
-        return f"{minutes // 60} h"
-    return f"{minutes // 1440} d"
 
 
 def warn_stale(updated_at):
@@ -46,10 +36,6 @@ def serve_stale(rows, what):
         fail_no_cache(what)
     warn_stale(min(r["updated_at"] for r in rows))
     return rows
-
-
-def iso_utc(epoch):
-    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds")
 
 
 def _fetch_all_issues(base_url, api_key, workspace, project_id):

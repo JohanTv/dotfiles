@@ -11,7 +11,8 @@ import re
 import sys
 
 from plane_cli.api import PlaneUnavailable, api_request
-from plane_cli.cache import age_text, cached_issues, fail_no_cache, iso_utc, offline_issue, save_snapshot, warn_stale
+from plane_cli.cache import cached_issues, fail_no_cache, offline_issue, save_snapshot, warn_stale
+from plane_cli.timeutil import age_text, iso_utc
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import build_ticket_flow, flow_to_json, format_lifecycle, print_flow
 from plane_cli.list_filtered import add_list_filter_flags, cmd_list_filtered, wants_filtered

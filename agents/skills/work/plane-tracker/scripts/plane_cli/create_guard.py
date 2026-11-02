@@ -11,7 +11,7 @@ import re
 
 import session_clock
 from plane_cli.api import PlaneUnavailable
-from plane_cli.cache import age_text
+from plane_cli.timeutil import age_text
 from plane_cli.resolve import sync_issues
 from plane_cli import clock
 

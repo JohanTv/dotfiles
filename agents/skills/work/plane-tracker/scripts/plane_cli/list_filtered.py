@@ -16,7 +16,8 @@ import flow_metrics
 
 from plane_cli import clock
 from plane_cli.assignments import assignment_events_for, history_coverage, sweep_history
-from plane_cli.cache import age_text, fail_no_cache, iso_utc
+from plane_cli.cache import fail_no_cache
+from plane_cli.timeutil import age_text, iso_utc
 from plane_cli.config import add_json_flag, positive_int
 from plane_cli.flow import fetch_transitions
 from plane_cli.resolve import get_members_map, get_projects_map, require_actor, sync_issues

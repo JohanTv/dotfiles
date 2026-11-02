@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 import clock_support  # noqa: E402
 import golden_support as gs  # noqa: E402
-from plane_cli import cache, db  # noqa: E402
+from plane_cli import cache, db, timeutil  # noqa: E402
 
 OFF = {"PLANE_OFFLINE": "1"}
 
@@ -165,7 +165,7 @@ class Offline(unittest.TestCase):
 class Units(unittest.TestCase):
     def test_age_text(self):
         for seconds, text in ((5, "1 min"), (59 * 60, "59 min"), (3600, "1 h"), (23 * 3600 + 59 * 60, "23 h"), (86400, "1 d"), (5 * 86400, "5 d")):
-            self.assertEqual(cache.age_text(seconds), text)
+            self.assertEqual(timeutil.age_text(seconds), text)
 
     def test_snapshot_pruning_and_partial_update(self):
         controlled = clock_support.Clock()  # la poda usa la edad de cada instantánea: el reloj es controlado

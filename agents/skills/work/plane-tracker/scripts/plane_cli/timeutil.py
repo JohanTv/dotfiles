@@ -1,11 +1,12 @@
 """Aritmética de horarios y fusión de intervalos (medida de Klee) para los reportes de actividad.
 
 Expone: time_to_minutes(), minutes_to_time(), calculate_klee_union_minutes(), expand_segments(),
-merge_daily_worklogs(), format_minutes(), render_day_block(), DIAS_SEMANA.
+merge_daily_worklogs(), format_minutes(), render_day_block(), age_text(), iso_utc(), DIAS_SEMANA.
 No hace: red ni acceso a la base de datos.
 """
 
 import json
+from datetime import datetime, timezone
 
 
 DIAS_SEMANA = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
@@ -213,3 +214,17 @@ def render_day_block(date_obj, rows):
         lines.append("⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)")
 
     return "\n".join(lines)
+
+
+def age_text(seconds):
+    """Edad legible en min, h o d."""
+    minutes = max(1, int(seconds // 60))
+    if minutes < 60:
+        return f"{minutes} min"
+    if minutes < 1440:
+        return f"{minutes // 60} h"
+    return f"{minutes // 1440} d"
+
+
+def iso_utc(epoch):
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat(timespec="seconds")
