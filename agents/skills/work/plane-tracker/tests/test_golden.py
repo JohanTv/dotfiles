@@ -205,11 +205,33 @@ class Golden(unittest.TestCase):
         self.golden("comment_edit_delete", steps, db_queries=[WORKLOGS])
 
     def test_delete(self):
-        steps = [["comment", "add", "OMNIFY-1", "-m", "con horas", "--duration", "15", "--track", "t1"],
-                 ["delete", "OMNIFY-1"], ["delete", "OMNIFY-1", "--json"], ["delete"],
-                 ["delete", "OMNIFY-1", "--yes"], ["delete", "OMNIFY-1", "--yes", "--json"],
-                 ["delete", "OMNIFY-999", "--yes"]]
+        steps = [["delete", "OMNIFY-3"], ["delete", "OMNIFY-3", "--json"], ["delete"], ["delete", "@"], ["delete", "162"],
+                 ["comment", "add", "OMNIFY-3", "-m", "horas que solo existen en local", "--duration", "10", "--track", "t1"],
+                 ["delete", "OMNIFY-3", "--yes"], ["delete", "OMNIFY-3", "--yes", "--discard-worklogs"],
+                 ["delete", "OMNIFY-3", "--yes"], ["delete", "OMNIFY-999", "--yes"]]
         self.golden("delete", steps, db_queries=[WORKLOGS])
+
+    def test_delete_hours(self):
+        escaped = "<p>Bloque dañado.</p>&lt;!-- PLANE_WORKLOG_METADATA {&quot;date&quot;: &quot;2026-10-20&quot;} --&gt;"
+
+        def setup(sb):
+            sb.fake.data["comments"]["10000000-0000-4000-8000-000000000003"] = [
+                {"id": "c4000000-0000-4000-8000-000000000007", "actor": gs.ME, "created_by": gs.ME, "created_at": "2026-10-20T10:00:00Z", "comment_html": escaped}]
+        steps = [["delete", "OMNIFY-1", "--yes", "--discard-worklogs"], ["delete", "OMNIFY-1", "--json"],
+                 ["delete", "OMNIFY-2", "--yes"], ["delete", "OMNIFY-2", "--discard-worklogs"], ["delete", "OMNIFY-2", "--yes", "--discard-worklogs", "--json"],
+                 {"args": ["delete", "OPS-13", "--yes", "--discard-worklogs"], "env_drop": ("PLANE_ACTOR_UUID",)},
+                 ["delete", "OMNIFY-3", "--yes"], ["delete", "OMNIFY-3", "--yes", "--discard-worklogs"]]
+        self.golden("delete_hours", steps, setup=setup, db_queries=[WORKLOGS])
+
+    def test_delete_reads_everything_and_fails_closed(self):
+        def setup(sb):
+            sb.fake.data["comments_page_size"] = 1
+            sb.fake.add_fault("GET", r"/10000000-0000-4000-8000-000000000002/comments/$", "status", 403)
+            sb.fake.add_fault("DELETE", r"/issues/[^/]+/$", "commit_drop", n=1)
+        steps = [["delete", "OMNIFY-1", "--yes", "--discard-worklogs"], ["delete", "OMNIFY-2", "--yes", "--discard-worklogs"],
+                 ["comment", "add", "OMNIFY-3", "-m", "horas locales", "--duration", "10", "--track", "t1"],
+                 ["delete", "OMNIFY-3", "--yes", "--discard-worklogs"], ["delete", "OMNIFY-3", "--yes", "--discard-worklogs"]]
+        self.golden("delete_failures", steps, setup=setup, scrub=RANDOM_FIELDS, db_queries=[WORKLOGS])
 
     def test_update_create_link(self):
         steps = [["update", "OMNIFY-1", "--state", "Revisión", "--priority", "HIGH", "--labels", "backend,nope,BUG", "--start-date", "2026-10-01", "--due-date", "2026-10-27"],

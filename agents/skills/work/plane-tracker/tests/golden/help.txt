@@ -163,20 +163,22 @@ options:
 $ plane.py delete --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py delete [-h] [--yes] [--json] issue
+usage: plane.py delete [-h] [--yes] [--discard-worklogs] [--json] issue
 
 Elimina un work item de Plane con sus comentarios, adjuntos y enlaces, y borra
-sus datos locales. Sin --yes solo muestra el alcance. Para conservarlo,
-`update --state Cancelado`.
+sus datos locales. Sin --yes solo muestra el alcance. Con horas propias exige
+--discard-worklogs; con horas de otros se niega. Para conservarlo, `update
+--state Cancelado`.
 
 positional arguments:
-  issue       Ticket (ej: OPS-13); siempre explícito, no se deduce de la rama
-              de Git
+  issue               Ticket completo (ej: OPS-13); no se deduce de la rama de
+                      Git
 
 options:
-  -h, --help  show this help message and exit
-  --yes       Confirma la eliminación
-  --json      Salida en JSON
+  -h, --help          show this help message and exit
+  --yes               Confirma la eliminación
+  --discard-worklogs  Acepta perder las horas propias registradas en el ticket
+  --json              Salida en JSON
 --- stderr ---
 
 

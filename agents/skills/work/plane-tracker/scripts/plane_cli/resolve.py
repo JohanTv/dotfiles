@@ -10,9 +10,10 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 
-from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
 from plane_cli.cache import serve_stale
 from plane_cli import clock
 
@@ -163,11 +164,18 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
     sys.exit(1)
 
 
-def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None):
-    """Resuelve un ticket con paginación robusta."""
+def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None, missing_ok=False):
+    """Resuelve un ticket con paginación robusta. Con missing_ok devuelve None si el ticket no existe (en vez de terminar con error)."""
     if uuid_ref:
         url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{uuid_ref}/"
-        return api_request(url, api_key)
+        if not missing_ok:
+            return api_request(url, api_key)
+        try:
+            return api_request(url, api_key, raise_on_error=True)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return None
+            fail_http(url, exc.code, http_detail(exc))
 
     cursor = None
     while True:
@@ -184,6 +192,8 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
             break
         cursor = data.get("next_cursor")
 
+    if missing_ok:
+        return None
     sys.stderr.write(f"Error: Ticket #{seq_id} no encontrado en el proyecto.\n")
     sys.exit(1)
 

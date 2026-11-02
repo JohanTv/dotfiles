@@ -36,6 +36,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
@@ -324,6 +325,7 @@ class FakePlane:
                 if issue is None:
                     return self.reply(handler, 404, {"detail": "not found"})
                 if method == "DELETE":
+                    d["issues"][pid].remove(issue)
                     return self.reply(handler, 204, None)
                 return self.reply(handler, 200, {**issue, **body} if method == "PATCH" else issue)
             return self.issue_child(handler, method, iid, sub, body)
@@ -351,7 +353,12 @@ class FakePlane:
         if sub == ["comments"]:
             if method == "POST":
                 return self._post_comment(handler, iid, body)
-            return self.reply(handler, 200, {"results": d["comments"].get(iid, [])})
+            items, size = d["comments"].get(iid, []), d.get("comments_page_size")
+            if not size:
+                return self.reply(handler, 200, {"results": items})
+            start = int(parse_qs(urlsplit(handler.path).query).get("cursor", ["0"])[0])
+            more = start + size < len(items)
+            return self.reply(handler, 200, {"results": items[start:start + size], "next_page_results": more, "next_cursor": str(start + size) if more else None})
         if len(sub) == 2 and sub[0] == "comments":
             if method == "DELETE":
                 return self.reply(handler, 204, None)
