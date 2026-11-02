@@ -42,7 +42,7 @@ Script de un solo uso que importa `plane_cli` y, por comentario: lee el worklog 
 1. Añadir `--date`, `--since` y `--until` a `comment add` y `comment edit` para worklogs declarados: validar `since < until`, que la ventana coincida con `--duration` (o derivarla si se omite) y que no sea futura.
 2. Advertir si la ventana se solapa con otros worklogs del mismo ejecutor humano (la fusión de intervalos oculta el solape).
 3. Permitir corregir un worklog existente sin publicar otro (`comment edit --since/--until`) y hacer que `worklog check` compare también las horas del comentario con las del worklog local.
-4. Corregir el defecto de `comment edit -m`: detectar el bloque oculto en el texto original (antes de `markdown_to_html`) y conservarlo o insertarlo sin escapar.
+4. ~~Corregir el escape del bloque oculto en `comment edit -m`~~: separado y corregido en [0016](./0016-bloque-oculto-escapado-al-publicar-y-editar-comentarios.md).
 5. Documentar el caso retroactivo en `SKILL.md`, con tests de regresión (golden).
 
 ## Criterios de aceptación

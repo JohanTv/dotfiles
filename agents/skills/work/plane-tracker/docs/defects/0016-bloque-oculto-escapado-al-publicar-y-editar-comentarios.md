@@ -1,7 +1,7 @@
 ---
 id: "0016"
 title: El bloque oculto de telemetría se escapa y queda visible al publicar o editar comentarios
-status: abierto
+status: corregido
 created: 2026-11-01
 summary: "`markdown_to_html` escapa `<!-- PLANE_WORKLOG_METADATA ... -->`; `comment edit -m` pierde la telemetría y `comment add -m` publica el bloque visible además del real."
 ---
