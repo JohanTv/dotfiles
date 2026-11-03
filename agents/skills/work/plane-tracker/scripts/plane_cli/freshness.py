@@ -31,7 +31,7 @@ from plane_cli.resolve import (PROJECTS_TTL, get_actor_uuid, get_labels_map, get
 from plane_cli import store_transitions, store_worklogs
 from plane_cli.assignments import sweep_history
 from plane_cli.scope import ProjectRef
-from plane_cli.worklog_sync import SYNC_COOLDOWN, sync_remote_worklogs
+from plane_cli.worklog_sync import REPORT_SYNC_TIMEOUT, SYNC_COOLDOWN, sync_remote_worklogs
 from plane_cli.timeutil import iso_z
 from plane_cli.vocabulary import GET_INCLUDES_COVERED
 
@@ -305,7 +305,7 @@ def _offline(scope):
 
 
 def ensure_hours(conn, env, scope):
-    """Sincroniza las horas si se fuerza o si algún proyecto del alcance no tiene una sincronización completa y reciente que cubra el periodo; `--offline` no toca la red.
+    """Sincroniza las horas si se fuerza o si algún proyecto del alcance no tiene una sincronización completa y reciente que cubra el periodo; `--offline` no toca la red. Con red lenta degrada a local (timeout 3s).
 
     Cobertura: `cache` si se sincronizó ahora, si no `local`; `hours_verified` dice si cada proyecto está verificado para todo el periodo y `hours_scope` es `local` si no lo está
     (nota `hours_local_only`). Datos verificados pero más viejos que el enfriamiento, servidos porque no hubo red, constan como vencidos (`stale`).
@@ -314,10 +314,16 @@ def ensure_hours(conn, env, scope):
     status = store_worklogs.hours_status(conn, idents, period["from"], period["to"])
     now, synced, failed = clock.timestamp(), False, False
     offline = _offline(scope)
-    if not offline and (scope.refresh or not (status.verified and now - status.as_of <= SYNC_COOLDOWN)):
+    need_sync = scope.refresh or not (status.verified and now - status.as_of <= SYNC_COOLDOWN)
+    if not offline and need_sync:
         try:
-            sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"], filter_project=idents[0] if len(idents) == 1 else None, force=scope.refresh)
-            synced = True
+            res = sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"],
+                                       filter_project=idents[0] if len(idents) == 1 else None, force=scope.refresh,
+                                       timeout=REPORT_SYNC_TIMEOUT)
+            if res.unavailable:
+                failed = True
+            else:
+                synced = True
         except PlaneUnavailable:
             failed = True
         status = store_worklogs.hours_status(conn, idents, period["from"], period["to"])

@@ -71,7 +71,10 @@ def _is_old(issue, cutoff):
         return False  # sin fecha legible no se descarta: es candidato
 
 
-def _candidates(base_url, api_key, workspace, project_id, cutoff):
+REPORT_SYNC_TIMEOUT = 3.0  # timeout estricto para no demorar la terminal en reportes
+
+
+def _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=None):
     """(tickets con actividad desde `cutoff`, estado): ok | rate | forbidden | error | unavailable (con la excepción). Orden `-updated_at`: se corta al llegar a una página toda anterior."""
     found, cursor = [], None
     for _ in range(MAX_PAGES):
@@ -81,7 +84,7 @@ def _candidates(base_url, api_key, workspace, project_id, cutoff):
         if cursor:
             url += f"&cursor={urllib.parse.quote(cursor)}"
         try:
-            page = api_request(url, api_key, raise_on_error=True)
+            page = api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT)
         except PlaneUnavailable as exc:
             return found, ("unavailable", exc)
         except urllib.error.HTTPError as exc:
@@ -96,13 +99,13 @@ def _candidates(base_url, api_key, workspace, project_id, cutoff):
     return found, "rate"  # más páginas de las que se siguen: no se afirma que esté completo
 
 
-def _comments(base_url, api_key, workspace, project_id, issue):
+def _comments(base_url, api_key, workspace, project_id, issue, timeout=None):
     """(comentarios, estado): ok | rate | error | unavailable (con la excepción)."""
     if not _budget_left():
         return [], "rate"
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
     try:
-        return api_request(url, api_key, raise_on_error=True).get("results", []), "ok"
+        return api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT).get("results", []), "ok"
     except PlaneUnavailable as exc:
         return [], ("unavailable", exc)
     except urllib.error.HTTPError as exc:
@@ -192,7 +195,7 @@ def _report(result):
         sys.stderr.write("ℹ Sincronización completa: sin nuevos registros telemétricos.\n")
 
 
-def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None, force=False):
+def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date_to_str, filter_project=None, force=False, timeout=None):
     """Sincroniza los comentarios de Plane de los tickets con actividad en el periodo y los persiste en SQLite; devuelve el SyncResult. `force` relee también los tickets sin cambios."""
     sys.stderr.write("🔄 Sincronizando registros de actividad desde Plane API...\n")
     targets = _targets(conn, base_url, api_key, workspace, filter_project)
@@ -207,7 +210,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
 
     result, tasks = SyncResult(), []
     for ident, project_id in targets:
-        issues, state = _candidates(base_url, api_key, workspace, project_id, cutoff)
+        issues, state = _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=timeout)
         if isinstance(state, tuple):
             result.unavailable.append(state[1])
             break
@@ -220,7 +223,7 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     pending_tasks = [t for n, t in enumerate(tasks) if n not in skip]
     if not result.unavailable and pending_tasks:
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(_comments, base_url, api_key, workspace, pid, issue): (ident, issue) for ident, pid, issue in pending_tasks}
+            futures = {executor.submit(_comments, base_url, api_key, workspace, pid, issue, timeout): (ident, issue) for ident, pid, issue in pending_tasks}
             for future in as_completed(futures):
                 ident, issue = futures[future]
                 comments, state = future.result()
