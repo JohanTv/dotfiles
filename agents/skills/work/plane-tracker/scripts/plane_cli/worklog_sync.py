@@ -74,9 +74,17 @@ def _is_old(issue, cutoff):
 REPORT_SYNC_TIMEOUT = 3.0  # timeout estricto para no demorar la terminal en reportes
 
 
+def _remaining_timeout(deadline, fallback=None):
+    if deadline is None:
+        return fallback
+    rem = deadline - clock.timestamp()
+    return max(0.0, rem)
+
+
 def _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=None):
     """(tickets con actividad desde `cutoff`, estado): ok | rate | forbidden | error | unavailable (con la excepción). Orden `-updated_at`: se corta al llegar a una página toda anterior."""
     found, cursor = [], None
+    circuit_record = (timeout is None or timeout >= api.REQUEST_TIMEOUT)
     for _ in range(MAX_PAGES):
         if not _budget_left():
             return found, "rate"
@@ -84,7 +92,7 @@ def _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=None):
         if cursor:
             url += f"&cursor={urllib.parse.quote(cursor)}"
         try:
-            page = api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT)
+            page = api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT, circuit_record=circuit_record)
         except PlaneUnavailable as exc:
             return found, ("unavailable", exc)
         except urllib.error.HTTPError as exc:
@@ -104,8 +112,9 @@ def _comments(base_url, api_key, workspace, project_id, issue, timeout=None):
     if not _budget_left():
         return [], "rate"
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/"
+    circuit_record = (timeout is None or timeout >= api.REQUEST_TIMEOUT)
     try:
-        return api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT).get("results", []), "ok"
+        return api_request(url, api_key, raise_on_error=True, timeout=timeout or api.REQUEST_TIMEOUT, circuit_record=circuit_record).get("results", []), "ok"
     except PlaneUnavailable as exc:
         return [], ("unavailable", exc)
     except urllib.error.HTTPError as exc:
@@ -208,9 +217,25 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     except ValueError:
         cutoff = clock.local_today() - timedelta(days=7)
 
+    deadline = (clock.timestamp() + timeout) if timeout else None
     result, tasks = SyncResult(), []
+    candidates_by_ident = {}
+    if len(targets) <= 1:
+        for ident, project_id in targets:
+            rem = _remaining_timeout(deadline, timeout)
+            candidates_by_ident[ident] = _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=rem)
+    else:
+        with ThreadPoolExecutor(max_workers=min(len(targets), 4)) as executor:
+            futures = {
+                executor.submit(_candidates, base_url, api_key, workspace, pid, cutoff, timeout=_remaining_timeout(deadline, timeout)): ident
+                for ident, pid in targets
+            }
+            for fut in as_completed(futures):
+                ident = futures[fut]
+                candidates_by_ident[ident] = fut.result()
+
     for ident, project_id in targets:
-        issues, state = _candidates(base_url, api_key, workspace, project_id, cutoff, timeout=timeout)
+        issues, state = candidates_by_ident.get(ident, ([], "error"))
         if isinstance(state, tuple):
             result.unavailable.append(state[1])
             break
@@ -222,8 +247,11 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
     result.unchanged = len(skip)
     pending_tasks = [t for n, t in enumerate(tasks) if n not in skip]
     if not result.unavailable and pending_tasks:
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {executor.submit(_comments, base_url, api_key, workspace, pid, issue, timeout): (ident, issue) for ident, pid, issue in pending_tasks}
+        with ThreadPoolExecutor(max_workers=min(len(pending_tasks), 6)) as executor:
+            futures = {
+                executor.submit(_comments, base_url, api_key, workspace, pid, issue, timeout=_remaining_timeout(deadline, timeout)): (ident, issue)
+                for ident, pid, issue in pending_tasks
+            }
             for future in as_completed(futures):
                 ident, issue = futures[future]
                 comments, state = future.result()

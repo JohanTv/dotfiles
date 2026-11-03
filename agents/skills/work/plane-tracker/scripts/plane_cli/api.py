@@ -204,18 +204,22 @@ def _rate_limit_wait(exc):
     return min(wait + 0.5, RATE_LIMIT_MAX_WAIT)
 
 
-def api_request(url, api_key, method="GET", data=None, timeout=REQUEST_TIMEOUT, max_retries=3, raise_on_error=False):
+def api_request(url, api_key, method="GET", data=None, timeout=REQUEST_TIMEOUT, max_retries=3, raise_on_error=False, circuit_record=True):
     """Ejecuta una petición a la API de Plane. Lanza PlaneUnavailable (con el método de la petición) ante fallos transitorios."""
     try:
-        return _perform(url, api_key, method, data, timeout, max_retries, raise_on_error)
+        return _perform(url, api_key, method, data, timeout, max_retries, raise_on_error, circuit_record=circuit_record)
     except PlaneUnavailable as exc:
         exc.method = method
         raise
 
 
-def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
+def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error, circuit_record=True):
     if os.environ.get("PLANE_OFFLINE") == "1":
         raise PlaneUnavailable("offline", "no")
+    if timeout is not None and timeout <= 0:
+        desc = circuit.describe()
+        since = desc.get("since") or circuit.hhmm(clock.timestamp())
+        raise PlaneUnavailable("timeout", "no", since=since)
     circuit.gate(_probe_runner(url, api_key))
     payload = json.dumps(data).encode("utf-8") if data is not None else None
     headers = {"x-api-key": api_key, "Content-Type": "application/json"}
@@ -236,7 +240,8 @@ def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
                     exc.close()
                     time.sleep(_rate_limit_wait(exc))
                     continue
-                circuit.record(True)
+                if circuit_record:
+                    circuit.record(True)
                 if raise_on_error:
                     raise
                 detail = http_detail(exc)
@@ -247,11 +252,17 @@ def _perform(url, api_key, method, data, timeout, max_retries, raise_on_error):
         except _Definitive as exc:
             raise CliError("http_error", f"Error TLS en {url}: {exc}", detail={"url": url})
         else:
-            circuit.record(True)
+            if circuit_record:
+                circuit.record(True)
             return result
         if method == "GET" and not retried and transient.kind not in TIMEOUT_KINDS and transient.elapsed < RETRY_MAX_ELAPSED:
             retried = True
             time.sleep(RETRY_PAUSE)
             continue
-        state = circuit.record(False, transient.kind)
-        raise PlaneUnavailable(transient.kind, transient.delivered, since=circuit.hhmm(state["since"]))
+        if circuit_record:
+            state = circuit.record(False, transient.kind)
+            since = circuit.hhmm(state["since"])
+        else:
+            desc = circuit.describe()
+            since = desc.get("since") or circuit.hhmm(clock.timestamp())
+        raise PlaneUnavailable(transient.kind, transient.delivered, since=since)
