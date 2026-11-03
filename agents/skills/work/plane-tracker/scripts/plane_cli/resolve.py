@@ -165,8 +165,8 @@ def resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_
     raise CliError("invalid_input", f"Formato de ticket no reconocido: '{issue_ref}'. Usa 'OMNIFY-162', 'OPS-44' o solo '162'.")
 
 
-def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None, missing_ok=False):
-    """Resuelve un ticket con paginación robusta. Con missing_ok devuelve None si el ticket no existe (en vez de terminar con error)."""
+def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=None, missing_ok=False, issue_ref=None):
+    """Resuelve un ticket: 1 GET por UUID o por issue_ref (ej. 'OMNIFY-238'); fallback a paginación si falta."""
     if uuid_ref:
         url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{uuid_ref}/"
         if not missing_ok:
@@ -177,6 +177,19 @@ def resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref=Non
             if exc.code == 404:
                 return None
             fail_http(url, exc.code, http_detail(exc))
+
+    if issue_ref:
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/issues/{issue_ref}/"
+        try:
+            return api_request(url, api_key, raise_on_error=True)
+        except urllib.error.HTTPError as exc:
+            status, detail = exc.code, http_detail(exc)
+            exc.close()
+            if status == 404:
+                if missing_ok:
+                    return None
+            else:
+                fail_http(url, status, detail)
 
     cursor = None
     while True:

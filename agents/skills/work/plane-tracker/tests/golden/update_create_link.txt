@@ -206,30 +206,30 @@ $ plane.py link add OMNIFY-1 https://example.com/doc
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/states/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/labels/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b000000-0000-4000-8000-11111111-111", "1b100000-0000-4000-8000-11111111-111"], "priority": "high", "start_date": "2026-10-01", "state": "11004844-0000-4000-8000-11111111-111", "target_date": "2026-10-27"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"name": "[FEAT] Título renombrado", "priority": "low"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"state": "11005808-0000-4000-8000-11111111-111"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"labels": ["1b200000-0000-4000-8000-11111111-111"]}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<h2>Contexto</h2>\n<ul><li>punto uno</li><li>punto dos</li></ul>"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<h2>Descripción</h2>\n<ul><li>desde archivo</li></ul>", "priority": "high"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/ {"description_html": "<p>ya html</p>"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/states/
 GET /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/labels/
 POST /api/v1/workspaces/ws/projects/22222222-2222-4222-8222-222222222222/issues/ {"description_html": "<p>Texto <strong>md</strong></p>\n<ol><li>uno</li><li>dos</li></ol>", "labels": ["1b000000-0000-4000-8000-22222222-222", "1b100000-0000-4000-8000-22222222-222"], "name": "[FIX] Corregir validación del campo teléfono en formularios de campaña", "priority": "urgent", "start_date": "2026-10-26", "state": "22004750-0000-4000-8000-22222222-222", "target_date": "2026-10-27"}
@@ -240,12 +240,12 @@ PATCH /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/ {"name": "[FEAT] Flujo con slug", "priority": "none"}
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/ {"description_html": "<p>ya html</p>", "name": "Sin fase", "priority": "none"}
 GET /api/v1/workspaces/ws/projects/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/ {"title": "PR 1", "url": "https://example.com/pr/1"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
+GET /api/v1/workspaces/ws/issues/OMNIFY-1/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000001/links/ {"title": "https://example.com/doc", "url": "https://example.com/doc"}

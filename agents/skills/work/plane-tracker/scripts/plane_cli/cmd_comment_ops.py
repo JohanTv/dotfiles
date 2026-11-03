@@ -89,7 +89,7 @@ def _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue):
 def cmd_comment_delete(args, conn, base_url, api_key, workspace, default_project_id):
     """Elimina un comentario en Plane y su worklog en la BD local."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     cid = _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue)
     api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/", api_key, method="DELETE")
     with conn:
@@ -113,7 +113,7 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
     """Edita el texto de un comentario y/o registra su worklog local, sin publicar otro comentario."""
     as_json = getattr(args, "json", False)
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     cid = _resolve_own_comment(args, base_url, api_key, workspace, project_id, issue)
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/comments/{cid}/"
 

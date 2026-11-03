@@ -19,7 +19,7 @@
 | 0020 | [Las etiquetas de la caché de tickets se guardan siempre vacías](defects/0020-etiquetas-de-la-cache-de-tickets-siempre-vacias.md) | corregido | `sync_issues_cache` inserta `labels_csv` como cadena vacía, así que la búsqueda por etiqueta no funciona y un filtro futuro por etiqueta tampoco. |
 | 0022 | [La sincronización presenta valores por defecto como si estuvieran medidos](defects/0022-sync-presenta-valores-por-defecto-como-medidos.md) | corregido | `sync` rellena balde, fase, rol y horas con valores por defecto cuando el comentario no los trae, y la caché no distingue lo medido de lo supuesto; los estados desconocidos caen en 'Pendiente'. |
 | 0023 | [Una lectura que recibe un 403 termina el programa en vez de degradar](defects/0023-una-lectura-con-403-termina-el-programa.md) | abierto | `fail_http` hace `sys.exit(1)` ante cualquier 4xx definitivo, así que `list --all-projects` (y cualquier lectura multi-proyecto) aborta entera si un proyecto no es accesible para el usuario. |
-| 0024 | [Las lecturas piden más datos de los que usan](defects/0024-las-lecturas-piden-mas-datos-de-los-que-usan.md) | abierto | `list` baja hasta 1000 tickets con su descripción para imprimir 15, `resolve_issue` recorre el listado paginado del proyecto para encontrar un ticket y `limit` no limita nada porque la API lo ignora. |
+| 0024 | [Las lecturas piden más datos de los que usan](defects/0024-las-lecturas-piden-mas-datos-de-los-que-usan.md) | corregido | `list` baja hasta 1000 tickets con su descripción para imprimir 15, `resolve_issue` recorre el listado paginado del proyecto para encontrar un ticket y `limit` no limita nada porque la API lo ignora. |
 
 ## RFC
 

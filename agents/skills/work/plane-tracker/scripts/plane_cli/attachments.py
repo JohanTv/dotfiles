@@ -119,7 +119,7 @@ def attachment_id(value):
 def _upload_files(args, conn, base_url, api_key, workspace, default_project_id, files):
     """Resuelve el ticket, valida los archivos y los sube; devuelve (project_id, issue, issue_ref, uploaded)."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     validate_attachment_paths(files)
     uploaded = []
     as_json = getattr(args, "json", False)
@@ -172,7 +172,7 @@ def cmd_attachment_replace(args, conn, base_url, api_key, workspace, default_pro
 def cmd_attachment_delete(args, conn, base_url, api_key, workspace, default_project_id):
     """Elimina un adjunto del work item."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     delete_attachment(base_url, api_key, workspace, project_id, issue["id"], args.id)
     if getattr(args, "json", False):
         doc = {

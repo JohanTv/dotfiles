@@ -1,8 +1,9 @@
 ---
 id: "0024"
 title: Las lecturas piden más datos de los que usan
-status: abierto
+status: corregido
 created: 2026-11-02
+closed: 2026-11-02
 summary: "`list` baja hasta 1000 tickets con su descripción para imprimir 15, `resolve_issue` recorre el listado paginado del proyecto para encontrar un ticket y `limit` no limita nada porque la API lo ignora."
 ---
 
@@ -25,6 +26,14 @@ summary: "`list` baja hasta 1000 tickets con su descripción para imprimir 15, `
 3. Exponer las cabeceras de tasa en `api.py` y detenerse con cobertura parcial antes de agotar la cuota.
 4. Dejar de pasar `limit` (no tiene efecto).
 
+## Corrección aplicada
+
+1. `cache._fetch_all_issues` y `worklog_sync._candidates` usan `per_page=100` y `fields={ISSUE_FIELDS}` excluyendo descripciones HTML.
+2. `resolve_issue` ahora recibe `issue_ref` opcional y resuelve en 1 GET (`GET workspaces/{ws}/issues/{PRJ}-{n}/`) antes de caer en el listado paginado como fallback.
+3. Todos los comandos que interactúan con tickets (`cmd_update`, `cmd_comment_add`, `cmd_link`, `cmd_attachment_*`, `cmd_delete`, `outbox_flush`, `fetch_attachments`, `audit_worklogs`) propagan `issue_ref` obtenido de `resolve_project_and_seq`.
+4. `api.py` expone `rate_limit()` capturando `X-RateLimit-Remaining` y `X-RateLimit-Reset` en cada petición, y `cache` junto a `worklog_sync` respetan la reserva de tasa deteniéndose con cobertura parcial.
+5. Los golden tests reflejan la reducción directa de llamadas a `issues/` a favor de llamadas únicas a `issues/{PRJ}-{n}/`.
+
 ## Criterio de cierre
 
-- `get` de un ticket cuesta 1 GET para resolverlo; la sincronización de un proyecto descarga mucho menos que hoy (medido con un servidor falso que ignora `limit` y respeta `fields`).
+- `get` y las operaciones sobre un ticket cuestan 1 GET para resolverlo; la sincronización de un proyecto descarga mucho menos que antes. Cobertura de pruebas completa en verde (445 pruebas).

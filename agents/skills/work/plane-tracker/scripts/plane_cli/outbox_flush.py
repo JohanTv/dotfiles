@@ -28,7 +28,7 @@ PAUSE_SECONDS = 1.0
 
 def _resolve_target(conn, base_url, api_key, workspace, default_project_id, ticket_ref):
     """(project_id, issue_id) de un ticket: id de la caché verificado con un GET, o el listado paginado si la caché no lo conoce."""
-    project_id, seq_id, uuid_ref, _ = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, ticket_ref)
+    project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, ticket_ref)
     issue_id = uuid_ref
     if not issue_id:
         row = conn.execute("SELECT id FROM issues_cache WHERE project_id = ? AND sequence_id = ?", (project_id, seq_id)).fetchone()
@@ -36,7 +36,7 @@ def _resolve_target(conn, base_url, api_key, workspace, default_project_id, tick
     if issue_id:
         api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue_id}/", api_key, raise_on_error=True)
         return project_id, issue_id
-    return project_id, resolve_issue(base_url, api_key, workspace, project_id, seq_id, None)["id"]
+    return project_id, resolve_issue(base_url, api_key, workspace, project_id, seq_id, None, issue_ref=issue_ref)["id"]
 
 
 def _target_resolver(conn, base_url, api_key, workspace, default_project_id):

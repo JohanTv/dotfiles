@@ -160,7 +160,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
 
     if unavailable is None:
         try:
-            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+            issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
         except PlaneUnavailable as exc:
             unavailable = exc
     if unavailable is not None:

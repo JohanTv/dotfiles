@@ -122,7 +122,7 @@ def cmd_delete(args, conn, base_url, api_key, workspace, default_project_id):
     if not _REF_RE.match(ref):
         _stop(args, "bad_ref", "Error: delete exige el ticket completo (PREFIJO-N o UUID); no acepta '@', '.', números sueltos ni la rama de Git.")
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, ref)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, missing_ok=True)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, missing_ok=True, issue_ref=issue_ref)
     label, issue_id = _identify(conn, base_url, api_key, workspace, project_id, issue, issue_ref)
     traces = label and conn.execute("SELECT 1 FROM worklogs WHERE ticket_id = ? UNION ALL SELECT 1 FROM issues_cache WHERE ticket_id = ?", (label, label)).fetchone()
     if not issue and not traces:

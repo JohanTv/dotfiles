@@ -74,18 +74,18 @@ Error: OMNIFY-999 no existe en Plane y no hay nada local que limpiar.
 
 === peticiones al servidor ===
 GET /api/v1/workspaces/ws/projects/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
 POST /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/ {"comment_html": "<p>horas que solo existen en local</p>\n<!-- PLANE_WORKLOG_METADATA {\"capacity_bucket\": \"deep_work\", \"client_id\": \"pt-700fcc2c8baed673472d\", \"date\": \"2026-11-02\", \"duration_minutes\": 10, \"end_time\": \"12:00\", \"measured_by\": {\"kind\": \"declared\", \"worker_type\": \"human\"}, \"notes\": \"horas que solo existen en local\", \"phase\": \"dev\", \"schema_version\": \"2.2\", \"start_time\": \"11:50\", \"stoppers\": [], \"track\": \"t1\", \"worker_type\": \"human\"} -->", "external_id": "pt-700fcc2c8baed673472d", "external_source": "plane-tracker"}
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
 GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/comments/
 DELETE /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/10000000-0000-4000-8000-000000000003/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
-GET /api/v1/workspaces/ws/projects/11111111-1111-4111-8111-111111111111/issues/
+GET /api/v1/workspaces/ws/issues/OMNIFY-3/
+GET /api/v1/workspaces/ws/issues/OMNIFY-999/
 
 === worklogs ===

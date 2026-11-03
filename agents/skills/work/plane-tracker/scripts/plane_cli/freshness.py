@@ -275,7 +275,7 @@ def ensure_catalog(conn, env, kind, project=None, refresh=False):
 def fetch_attachments(conn, env, issue_arg):
     """(etiqueta del ticket, adjuntos crudos, Coverage de la API). `complete` solo es true si Plane no anuncia más páginas."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, env.base_url, env.api_key, env.workspace, env.default_project_id, issue_arg)
-    issue = resolve_issue(env.base_url, env.api_key, env.workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(env.base_url, env.api_key, env.workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     data = api_request(f"{env.base_url.rstrip('/')}/api/v1/workspaces/{env.workspace}/projects/{project_id}/issues/{issue['id']}/issue-attachments/", env.api_key)
     items = data if isinstance(data, list) else data.get("results", [])
     more = isinstance(data, dict) and bool(data.get("next_page_results"))
@@ -376,7 +376,7 @@ def audit_worklogs(conn, env, scope):
     for label, t_rows in sorted(by_ticket.items()):
         try:
             project_id, seq_id, uuid_ref, _ref = resolve_project_and_seq(conn, env.base_url, env.api_key, env.workspace, env.default_project_id, label)
-            issue = resolve_issue(env.base_url, env.api_key, env.workspace, project_id, seq_id, uuid_ref)
+            issue = resolve_issue(env.base_url, env.api_key, env.workspace, project_id, seq_id, uuid_ref, issue_ref=_ref)
             raw = api_request(f"{env.base_url.rstrip('/')}/api/v1/workspaces/{env.workspace}/projects/{project_id}/issues/{issue['id']}/comments/", env.api_key,
                               raise_on_error=True).get("results", [])
         except (SystemExit, urllib.error.URLError, OSError):

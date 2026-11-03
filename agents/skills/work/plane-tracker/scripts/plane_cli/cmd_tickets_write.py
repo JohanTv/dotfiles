@@ -23,7 +23,7 @@ from plane_cli.resolve import get_labels_map, get_projects_map, get_states_map, 
 def cmd_link(args, conn, base_url, api_key, workspace, default_project_id):
     """Adjunta un enlace (PR, doc) al work item: aparece en su panel de enlaces, sin notificar como comentario."""
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     if not re.match(r"^https?://", args.url):
         raise CliError("invalid_input", "la URL debe empezar por http:// o https://")
     url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/{issue['id']}/links/"
@@ -80,7 +80,7 @@ def _read_description(args):
 def cmd_update(args, conn, base_url, api_key, workspace, default_project_id):
     project_id, seq_id, uuid_ref, issue_ref = resolve_project_and_seq(conn, base_url, api_key, workspace, default_project_id, args.issue)
     args.issue = issue_ref
-    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref)
+    issue = resolve_issue(base_url, api_key, workspace, project_id, seq_id, uuid_ref, issue_ref=issue_ref)
     patch_data = {}
 
     if args.title is not None:
