@@ -24,6 +24,7 @@
   - *Inspección inicial:* `plane-tracker get <TICKET>` (sin `--full`, truncado a 300 caracteres).
   - *Profunda:* Solo al trabajar activamente en él, invoca `--full --no-comments` o `--last 3`. No re-pidas datos ya en contexto.
 - **Consultas de Estado ("Revisa el Plane"):** Responde en **6-8 líneas máximo**: Ticket/Título/Estado, resumen del contrato, siguiente paso/stopper y advertencia de `coverage`.
+- **Reporte Diario de Jornada ("Informe del Día"):** Ante solicitudes de fin de jornada o resumen diario ("mi informe del día", "reporte de hoy", "¿qué se hizo hoy?"), ejecuta directamente `plane-tracker report time --offline --all-projects` (0 tokens de red, respuesta <0.1s desde SQLite local). Presenta el consolidado ejecutivo (tiempo reloj vs esfuerzo, AI Leverage) y la tabla cronológica sin demoras ni llamadas síncronas a red.
 
 ### Estándar de Creación y Ciclo de Vida:
 - **Título y Etiquetas:** `[{FASE}] {Acción o resumen conciso en español}` (sin corchetes dobles). Mínimo 2 etiquetas: capa técnica (`backend`, `frontend`, `bd`, `infra`) y tipo (`bug`, `deuda-tecnica`, `seguridad`, `docs`); módulo si aplica (`plane-tracker labels`).

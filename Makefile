@@ -73,6 +73,9 @@ sync-skills:
 		for d in $(DOTFILES_DIR)/agents/skills/work/*; do \
 			if [ -d "$$d" ]; then \
 				ln -sfn "$$d" "$$HOME/.agents/skills/$$(basename "$$d")"; \
+				if [ -d "$$HOME/Code/.agents/skills" ]; then \
+					ln -sfn "$$d" "$$HOME/Code/.agents/skills/$$(basename "$$d")"; \
+				fi; \
 			fi \
 		done \
 	fi
