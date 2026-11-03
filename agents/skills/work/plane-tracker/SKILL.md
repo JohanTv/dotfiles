@@ -44,7 +44,6 @@ Las transiciones son deterministas según el hito técnico; se aplican con `plan
 | Mis tickets | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` (caché local; necesita `PLANE_ACTOR_UUID` o `PLANE_USERNAME`) |
 | Cambiar título/descripción/estado/prioridad/etiquetas | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` (la descripción reemplaza la actual) |
 | Crear ticket | `plane-tracker create "<título>" [-p OPS] [--branch-slug SLUG] [--attach ARCH...]` |
-| Worktrees multi-repo | `plane-worktree add TICKET DESCRIPTION REPO... [--type feat] [--base dev] [--reuse-branch] [--no-fetch]` · `plane-worktree list` · `plane-worktree audit [--no-fetch]` · `plane-worktree prune [--execute] [--include-stale] [--no-fetch]` |
 | Publicar bitácora | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` (o `--duration N`, o la ventana real `--since HH:MM --until HH:MM` con `--date YYYY-MM-DD` si no es hoy) |
 | Corregir comentario o worklog | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N \| --since HH:MM --until HH:MM]` |
 | Retirar un ticket | Por defecto `update T --state Cancelado` (conserva las horas). `plane-tracker delete T` solo si el usuario lo pide: muestra el alcance, `--yes` elimina; con horas propias exige `--discard-worklogs` y con horas de otros se niega |

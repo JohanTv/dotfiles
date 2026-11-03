@@ -24,6 +24,7 @@
     - `fix/OMNIFY-180-fix-date-picker`
     - `spike/OMNIFY-162-sms-concurrency-audit`
     - `fix/OPS-44-mitigate-n8n-stoppers`
+- **Iniciativas Multi-Repo:** Si un requerimiento cruza dos o más repositorios, no crees ramas sueltas manualmente; utiliza la skill `plane-worktree` para preparar el contenedor transaccional `.worktrees/{TICKET}-{slug}/`.
 - **Manejo de Ambigüedad:** Si el usuario solicita crear una rama o iniciar una tarea sin mencionar el ticket de Plane, el agente debe preguntar brevemente (ej. *"¿A qué ticket de Omnify asociamos esta rama?"*) antes de crearla.
 - **Proyectos Personales / Sin Plane:** Si el contexto es un proyecto personal, de código abierto o no vinculado a Plane, no forzar ticket ID; usar el formato convencional estándar: `{tipo}/{kebab-case-descripcion}`.
 
