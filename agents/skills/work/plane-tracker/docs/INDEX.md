@@ -31,6 +31,7 @@
 | 0011 | [Caché de la herramienta entre varias máquinas (¿base de datos compartida?)](rfcs/0011-cache-compartida-entre-maquinas/README.md) | borrador | Decidir cómo trabajar desde varias máquinas con la misma instancia de Plane; la recomendación actual es no añadir una base de datos remota y arreglar la sincronización. |
 | 0014 | [Contextos, perfiles y fuentes de tareas intercambiables](rfcs/0014-contextos-y-perfiles-personal-y-trabajo/README.md) | borrador | Aplazado a propósito. Usar la herramienta en varios contextos (trabajos, personal) y con varios sistemas de tareas; la decisión abierta es dónde vive la verdad del tiempo. |
 | 0021 | [Arquitectura de lectura - modelo de consulta, vistas y contrato de salida](rfcs/0021-arquitectura-de-lectura-consultas-y-vistas/README.md) | implementado | Un modelo común (alcance, cobertura, almacenes, consultas, vistas y sobre JSON versionado) para listar, buscar y reportar, con los principios convertidos en pruebas de arquitectura; funde `search` en `list`. Versión 2, tras la revisión adversarial. |
+| 0027 | [Sincronización incremental, granularidad en sync y separación CQS](rfcs/0027-sincronizacion-incremental-y-granularidad-sync.md) | propuesto | Rediseño arquitectónico del CLI plane-tracker para separar estrictamente lectura y sincronización (CQS), introduciendo sincronización delta incremental con marcas de agua (watermarks) en SQLite, paginación con parada temprana, granularidad por dominio y proyecto, y triggers automáticos de búsqueda FTS. |
 
 ## Decisiones
 
