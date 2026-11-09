@@ -191,13 +191,21 @@ $ plane.py sync --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,
 [exit 0]
 --- stdout ---
 usage: plane.py sync [-h] [-p PROJECT] [--all-projects] [--from FECHA]
-                     [--to FECHA] [--week] [--history] [--budget N] [--json]
+                     [--to FECHA] [--week] [--deep] [--history] [--budget N]
+                     [--json]
+                     [{all,tickets,hours,catalogs}]
 
 Mantenimiento con coste en peticiones (solo GET; escribe solo la base local).
 Sin flags: tickets del proyecto por defecto y sus horas de los últimos 30 días
 (-p otro proyecto, --all-projects todos, --from/--to/--week otro periodo). Con
---history: tickets y después el historial de asignación y las transiciones
-pendientes, con presupuesto y reanudable.
+target opcional: 'tickets' (solo tickets), 'hours' (solo horas), 'catalogs'
+(proyectos/etiquetas) o 'all' (por defecto). Con --history: tickets y después
+el historial de asignación.
+
+positional arguments:
+  {all,tickets,hours,catalogs}
+                        Qué sincronizar: tickets, hours, catalogs o all (por
+                        defecto)
 
 options:
   -h, --help            show this help message and exit
@@ -207,6 +215,7 @@ options:
   --from FECHA          Primer día del periodo (YYYY-MM-DD); solo, es ese día
   --to FECHA            Último día del periodo (YYYY-MM-DD); requiere --from
   --week                Semana en curso (lunes a domingo)
+  --deep                Reconciliación completa (ignora marcas de agua delta)
   --history             Traer el historial de asignación y las transiciones de
                         los tickets pendientes (1 petición por ticket; reanuda
                         donde quedó)

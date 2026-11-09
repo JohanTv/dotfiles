@@ -77,3 +77,29 @@ def ever_assigned(conn, actor):
     if not actor:
         return set()
     return {r["issue_id"] for r in conn.execute("SELECT DISTINCT issue_id FROM assignment_events WHERE user_id = ? AND kind = 'added'", (actor,))}
+
+
+def get_watermark(conn, domain, project_id):
+    """Fila de sync_watermarks para el dominio y proyecto o None si nunca se sincronizó (RFC 0027)."""
+    row = conn.execute("SELECT * FROM sync_watermarks WHERE domain = ? AND project_id = ?", (domain, project_id)).fetchone()
+    return dict(row) if row else None
+
+
+def set_watermark(conn, domain, project_id, last_sync_timestamp, server_high_watermark, status="synced",
+                  items_synced=0, pages_fetched=0, duration_ms=0, updated_at=None):
+    """Guarda o actualiza la marca de agua de sincronización delta (RFC 0027)."""
+    now = updated_at if updated_at is not None else last_sync_timestamp
+    conn.execute("""
+        INSERT INTO sync_watermarks (domain, project_id, last_sync_timestamp, server_high_watermark, status,
+                                     items_synced, pages_fetched, duration_ms, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(domain, project_id) DO UPDATE SET
+            last_sync_timestamp = excluded.last_sync_timestamp,
+            server_high_watermark = excluded.server_high_watermark,
+            status = excluded.status,
+            items_synced = excluded.items_synced,
+            pages_fetched = excluded.pages_fetched,
+            duration_ms = excluded.duration_ms,
+            updated_at = excluded.updated_at
+    """, (domain, project_id, last_sync_timestamp, server_high_watermark, status, items_synced, pages_fetched, duration_ms, now))
+

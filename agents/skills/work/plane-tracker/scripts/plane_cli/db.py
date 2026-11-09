@@ -291,10 +291,25 @@ def init_sync_state(conn):
             as_of REAL NOT NULL
         );
     """)
+    # Marcas de agua de sincronización delta por dominio y proyecto (RFC 0027).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sync_watermarks (
+            domain TEXT NOT NULL,
+            project_id TEXT NOT NULL,
+            last_sync_timestamp REAL NOT NULL,
+            server_high_watermark TEXT,
+            status TEXT NOT NULL DEFAULT 'synced',
+            items_synced INTEGER NOT NULL DEFAULT 0,
+            pages_fetched INTEGER NOT NULL DEFAULT 0,
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            updated_at REAL NOT NULL,
+            PRIMARY KEY (domain, project_id)
+        );
+    """)
 
 
 def init_search_index(conn):
-    """Índice FTS5 de los tickets en caché."""
+    """Índice FTS5 de los tickets en caché y triggers automáticos de sincronización (RFC 0027)."""
     conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS issues_fts USING fts5(
             ticket_id UNINDEXED,
@@ -302,6 +317,22 @@ def init_search_index(conn):
             labels_csv,
             tokenize = 'unicode61 remove_diacritics 2'
         );
+    """)
+    conn.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_issues_cache_ai AFTER INSERT ON issues_cache BEGIN
+            INSERT INTO issues_fts (rowid, ticket_id, title, labels_csv) VALUES (new.rowid, new.ticket_id, new.title, new.labels_csv);
+        END;
+    """)
+    conn.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_issues_cache_ad AFTER DELETE ON issues_cache BEGIN
+            DELETE FROM issues_fts WHERE rowid = old.rowid;
+        END;
+    """)
+    conn.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_issues_cache_au AFTER UPDATE ON issues_cache BEGIN
+            DELETE FROM issues_fts WHERE rowid = old.rowid;
+            INSERT INTO issues_fts (rowid, ticket_id, title, labels_csv) VALUES (new.rowid, new.ticket_id, new.title, new.labels_csv);
+        END;
     """)
 
 

@@ -44,7 +44,7 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Guarda en SQLite local 
 | **Cola de salida** | `plane-tracker outbox list` · `plane-tracker outbox flush` · `plane-tracker outbox drop N` |
 | **Marcar foco** | `plane-tracker focus set T` · `plane-tracker focus clear` · `plane-tracker focus status` |
 | **Medir sesión** | `plane-tracker worklog propose [T]` · `plane-tracker worklog check` |
-| **Sincronizar** | `plane-tracker sync [-p P \| --all-projects] [--from D --to D \| --week]` · `plane-tracker sync --history [--budget N]` |
+| **Sincronizar** | `plane-tracker sync [tickets\|hours\|all] [-p P \| --all-projects] [--from D --to D \| --week] [--deep]` · `plane-tracker sync --history [--budget N]` |
 | **Reportes** | `plane-tracker report time [--week \| --from D [--to D]] [--offline]` · `plane-tracker report flow [--week \| --from D [--to D]] [--offline]` |
 | **Diagnóstico** | `plane-tracker labels` · `plane-tracker projects` · `plane-tracker whoami` · `plane-tracker health` · `plane-tracker handoff` |
 

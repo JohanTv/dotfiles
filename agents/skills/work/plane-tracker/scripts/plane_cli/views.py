@@ -54,7 +54,7 @@ VIEWS = {
                           "siempre red: auditoría de los comentarios de cada ticket con registros locales", ("worklog", "check")),
     # `sync` no es una vista de lectura (escribe en la base local), pero comparte alcance y flags con ellas: sin consulta ni render propios (la salida de las escrituras es de la fase 8)
     "sync": View("sync", frozenset({"projects", "period"}), NONE, None, None, {"period_days": SYNC_DAYS}, "tickets del alcance y horas del periodo, o con --history el historial de asignación y las transiciones",
-                 ("sync",), frozenset({"--history", "--budget"})),
+                 ("sync",), frozenset({"--history", "--budget", "--deep"})),
     "outbox list": View("outbox list", NONE, NONE, query_misc.outbox, render_misc.render_outbox, {"state": "open"}, "solo la cola local", ("outbox", "list"),
                         frozenset({"--all"})),
 }

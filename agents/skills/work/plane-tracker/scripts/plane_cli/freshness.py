@@ -116,14 +116,14 @@ def _refresh_labels(conn, env, project_id):
         pass
 
 
-def _ensure_issues(conn, env, scope):
+def _ensure_issues(conn, env, scope, deep=False):
     statuses = {}
     for project in scope.projects:
-        force = scope.refresh or _outdated(conn, project.uuid)
+        force = scope.refresh or _outdated(conn, project.uuid) or deep
         if not scope.offline and cache.needs_sync(conn, project.uuid, force) and cache._budget_ok():  # sin presupuesto no se pide ni lo accesorio
             _refresh_labels(conn, env, project.uuid)
         statuses[project.ident] = cache.sync_project_issues(conn, env.base_url, env.api_key, env.workspace, project.uuid, project.ident,
-                                                            force_refresh=force, offline=scope.offline)
+                                                            force_refresh=force, offline=scope.offline, deep=deep)
     return statuses
 
 
@@ -424,21 +424,25 @@ def _sweep(conn, env, project_ids, budget):
     return done, interrupted, left, state["rate"]
 
 
-def run_sync(conn, env, scope, history=False, budget=25):
-    """Sincroniza los tickets del alcance y después, según el modo: las horas del periodo (sin `--history`) o el historial pendiente (con `--history`).
-
-    Sin `--history` los tickets se renuevan siempre (ignora el TTL: para eso se pide `sync`); con `--history` se usa el TTL normal, para no gastar el presupuesto de tasa en lo que ya está al día
-    antes de traer el historial (así cada ejecución avanza)."""
-    issues = {ident: status for ident, (status, _as_of) in _ensure_issues(conn, env, replace(scope, refresh=not history)).items()}
+def run_sync(conn, env, scope, history=False, budget=25, target="all", deep=False):
+    """Sincroniza los recursos del alcance según target ('all', 'tickets', 'hours', 'catalogs') con delta sync (RFC 0027)."""
+    issues = {}
     hours, swept = None, None
-    if history:
+    if target in ("all", "tickets"):
+        issues = {ident: status for ident, (status, _as_of) in _ensure_issues(conn, env, replace(scope, refresh=not history), deep=deep).items()}
+    if target == "catalogs":
+        for project in scope.projects:
+            _refresh_labels(conn, env, project.uuid)
+    if history and target in ("all", "tickets"):
         swept = _sweep(conn, env, [p.uuid for p in scope.projects], budget)
-    else:
+    elif target in ("all", "hours") and not history:
         idents, period = [p.ident for p in scope.projects], scope.period
         try:
-            hours = sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"], filter_project=idents[0] if len(idents) == 1 else None)
+            hours = sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"],
+                                         filter_project=idents[0] if len(idents) == 1 else None, force=deep)
         except PlaneUnavailable:
             hours = None
-    complete = all(s in ("synced", "fresh") for s in issues.values()) and (swept is None or (swept[2] == 0 and not swept[1])) \
-        and (history or (hours is not None and not hours.unavailable and not hours.incomplete))
+    complete = (not issues or all(s in ("synced", "fresh") for s in issues.values())) \
+        and (swept is None or (swept[2] == 0 and not swept[1])) \
+        and (history or hours is None or (not hours.unavailable and not hours.incomplete))
     return SyncReport(issues, hours, swept, complete)

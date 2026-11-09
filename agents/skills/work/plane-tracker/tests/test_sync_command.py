@@ -110,6 +110,23 @@ class History(Base):
         self.assertEqual(doc["coverage"]["detail"]["history"], {"total": 3, "verified": 3})
         self.assertNotIn("history_partial", [n["code"] for n in doc["notes"]])
 
+    def test_sync_targets_granular(self):
+        # 1. sync tickets: solo tickets, sin horas
+        doc_tickets = self.sync("tickets")
+        self.assertEqual(doc_tickets["issues"], {"OMNIFY": "synced"})
+        self.assertNotIn("hours", doc_tickets)
+        wms = self.rows("SELECT * FROM sync_watermarks WHERE domain = 'tickets'")
+        self.assertGreaterEqual(len(wms), 1)
+
+        # 2. sync hours: solo horas, sin tickets
+        doc_hours = self.sync("hours")
+        self.assertEqual(doc_hours["issues"], {})
+        self.assertIn("hours", doc_hours)
+
+        # 3. sync catalogs
+        doc_cats = self.sync("catalogs")
+        self.assertTrue(doc_cats["complete"])
+
     def test_the_retired_list_flags_point_to_sync(self):
         got, out, err = self.sb.run(["list", "--involved", "--refresh-history", "--budget", "2"])
         self.assertEqual(got, 2)

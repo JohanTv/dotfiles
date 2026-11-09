@@ -10,11 +10,12 @@ import json
 import sys
 import urllib.error
 import urllib.parse
+from datetime import datetime
 
-from plane_cli import api, clock
+from plane_cli import api, clock, store_issues
 from plane_cli.api import PlaneUnavailable, api_request
 from plane_cli.errors import CliError
-from plane_cli.timeutil import age_text
+from plane_cli.timeutil import age_text, iso_utc
 
 ISSUES_TTL = 1800  # 30 minutos
 ISSUES_MAX_PAGES = 20
@@ -57,18 +58,33 @@ def _check_budget():
         raise RateBudgetExhausted()
 
 
-def _fetch_all_issues(base_url, api_key, workspace, project_id):
-    """(tickets, total_count del servidor o None, recortado). Un error HTTP definitivo se lanza como HTTPError; el presupuesto agotado, como RateBudgetExhausted."""
+def _fetch_all_issues(base_url, api_key, workspace, project_id, cutoff_iso=None):
+    """(tickets, total_count del servidor o None, recortado).
+    Paginación ordenada por `-updated_at` con parada temprana si los tickets son anteriores a `cutoff_iso` (RFC 0027).
+    """
     results, cursor, total = [], None, None
     for _ in range(ISSUES_MAX_PAGES):
         _check_budget()
-        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?per_page=100&fields={ISSUE_FIELDS}"
+        order_clause = "order_by=-updated_at&" if cutoff_iso else ""
+        url = f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/issues/?{order_clause}per_page=100&fields={ISSUE_FIELDS}"
         if cursor:
             url += f"&cursor={urllib.parse.quote(cursor)}"
         data = api_request(url, api_key, raise_on_error=True)
-        results += data.get("results", [])
+        batch = data.get("results", [])
         total = data.get("total_count", total)
         cursor = data.get("next_cursor")
+        if cutoff_iso and batch:
+            past_cutoff = False
+            for iss in batch:
+                u_at = iss.get("updated_at")
+                if u_at and u_at < cutoff_iso:
+                    past_cutoff = True
+                    break
+                results.append(iss)
+            if past_cutoff:
+                return results, total, False
+        else:
+            results.extend(batch)
         if not data.get("next_page_results") or not cursor:
             return results, total, False
     return results, total, True
@@ -109,8 +125,8 @@ def _mark_stale(conn, project_id):
         conn.execute("UPDATE issue_sync SET stale = 1 WHERE project_id = ?", (project_id,))
 
 
-def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False, offline=False):
-    """Sincroniza los tickets del proyecto en SQLite (solo GET). Devuelve (estado, as_of) y nunca imprime ni termina el programa.
+def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False, offline=False, deep=False):
+    """Sincroniza los tickets del proyecto en SQLite (solo GET) con delta sync y marcas de agua (RFC 0027).
 
     Estados: `fresh` (vigente), `synced`, `stale` (se sirvió lo almacenado vencido: la red falló o se pidió --offline), `rate_limited` (se detuvo antes de
     agotar el presupuesto de tasa y se conserva lo almacenado), `forbidden` (403: el usuario no tiene acceso al proyecto) y `unavailable` (sin red ni datos).
@@ -121,11 +137,23 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
         expired = previous is not None and clock.timestamp() - previous >= ISSUES_TTL
         return ("unavailable" if previous is None else "stale" if expired and offline else "fresh"), previous
     now = clock.timestamp()
+
+    cutoff_iso = None
+    if not deep and not force_refresh:
+        wm = store_issues.get_watermark(conn, "tickets", project_id)
+        if wm and wm.get("server_high_watermark"):
+            try:
+                dt = datetime.fromisoformat(wm["server_high_watermark"].replace("Z", "+00:00"))
+                cutoff_epoch = dt.timestamp() - 600  # 10 min de tolerancia por clock skew
+                cutoff_iso = iso_utc(cutoff_epoch)
+            except Exception:
+                cutoff_iso = None
+
     try:
         _check_budget()
         state_items = api_request(f"{base_url.rstrip('/')}/api/v1/workspaces/{workspace}/projects/{project_id}/states/", api_key, raise_on_error=True).get("results", [])
         states_by_id = {s["id"]: (s["name"], s.get("group", "")) for s in state_items}
-        results, total, capped = _fetch_all_issues(base_url, api_key, workspace, project_id)
+        results, total, capped = _fetch_all_issues(base_url, api_key, workspace, project_id, cutoff_iso=cutoff_iso)
     except RateBudgetExhausted:
         if previous:
             _mark_stale(conn, project_id)
@@ -146,7 +174,8 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
             conn.execute("INSERT INTO states (id, project_id, name, slug, group_name, is_default, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
                          "ON CONFLICT(id) DO UPDATE SET name = excluded.name, slug = excluded.slug, group_name = excluded.group_name, is_default = excluded.is_default, "
                          "updated_at = excluded.updated_at", (st["id"], project_id, st["name"], st.get("slug") or st["name"].lower(), st.get("group", ""), 1 if st.get("default") else 0, now))
-        conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
+        if deep or cutoff_iso is None:
+            conn.execute("DELETE FROM issues_cache WHERE project_id = ?", (project_id,))
         for iss in results:
             seq = iss.get("sequence_id")
             if not seq:
@@ -156,17 +185,35 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
                 INSERT INTO issues_cache (id, sequence_id, ticket_id, project_id, title, state_name, state_group, priority, labels_csv, updated_at,
                                           created_at, completed_at, start_date, target_date, archived_at, assignees_json, created_by, plane_updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    sequence_id = excluded.sequence_id, ticket_id = excluded.ticket_id, project_id = excluded.project_id,
+                    title = excluded.title, state_name = excluded.state_name, state_group = excluded.state_group,
+                    priority = excluded.priority, labels_csv = excluded.labels_csv, updated_at = excluded.updated_at,
+                    created_at = excluded.created_at, completed_at = excluded.completed_at, start_date = excluded.start_date,
+                    target_date = excluded.target_date, archived_at = excluded.archived_at, assignees_json = excluded.assignees_json,
+                    created_by = excluded.created_by, plane_updated_at = excluded.plane_updated_at
             """, (iss["id"], seq, f"{project_ident}-{seq}", project_id, iss.get("name", ""), s_info[0], s_info[1], iss.get("priority", "none"),
                   ",".join(sorted({label_names[i] for i in (_ref_id(l) for l in iss.get("labels") or []) if i in label_names})), now,
                   iss.get("created_at"), iss.get("completed_at"), iss.get("start_date"), iss.get("target_date"), iss.get("archived_at"),
                   json.dumps(assignee_ids(iss)), _ref_id(iss.get("created_by")), iss.get("updated_at")))
-        conn.execute("DELETE FROM issues_fts;")
-        conn.execute("INSERT INTO issues_fts (ticket_id, title, labels_csv) SELECT ticket_id, title, labels_csv FROM issues_cache;")
+
+        high_wm = None
+        dates = [iss.get("updated_at") for iss in results if iss.get("updated_at")]
+        if dates:
+            high_wm = max(dates)
+        elif cutoff_iso:
+            high_wm = cutoff_iso
+        if high_wm:
+            store_issues.set_watermark(conn, "tickets", project_id, now, high_wm, status="synced",
+                                       items_synced=len(results), pages_fetched=1, duration_ms=0, updated_at=now)
+
+        local_count = conn.execute("SELECT COUNT(*) FROM issues_cache WHERE project_id = ?", (project_id,)).fetchone()[0]
+        effective_total = total if total is not None else local_count
         conn.execute("""
             INSERT INTO issue_sync (project_id, total_count, fetched, capped, stale, as_of) VALUES (?, ?, ?, ?, 0, ?)
             ON CONFLICT(project_id) DO UPDATE SET total_count = excluded.total_count, fetched = excluded.fetched, capped = excluded.capped,
                 stale = 0, as_of = excluded.as_of
-        """, (project_id, total, len(results), int(capped), now))
+        """, (project_id, effective_total, local_count, int(capped), now))
     return "synced", now
 
 
