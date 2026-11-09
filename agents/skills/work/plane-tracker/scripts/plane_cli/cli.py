@@ -143,8 +143,11 @@ def main(argv=None):
         if not api_key:
             raise CliError("env_missing", "Variable de entorno 'PLANE_API_KEY' (API Key de Plane) no configurada.",
                            hint="Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.")
-        workspace = os.environ.get("PLANE_WORKSPACE_SLUG", "teamprogra")
-        default_project_id = os.environ.get("PLANE_PROJECT_ID", "58371da4-cf62-4299-8fd4-99c1052b2eb3")
+        workspace = os.environ.get("PLANE_WORKSPACE_SLUG")
+        if not workspace:
+            raise CliError("env_missing", "Variable de entorno 'PLANE_WORKSPACE_SLUG' (Slug del workspace de Plane) no configurada.",
+                           hint="Defínela en ~/.zshrc.local o en tu entorno antes de ejecutar este script.")
+        default_project_id = os.environ.get("PLANE_PROJECT_ID")
 
         conn = get_db()
         init_db(conn)

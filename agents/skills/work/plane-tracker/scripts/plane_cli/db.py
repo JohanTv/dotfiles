@@ -125,7 +125,7 @@ def init_core_tables(conn):
             identifier TEXT PRIMARY KEY,
             project_id TEXT NOT NULL,
             name TEXT NOT NULL,
-            workspace TEXT NOT NULL DEFAULT 'teamprogra',
+            workspace TEXT NOT NULL DEFAULT '',
             updated_at REAL NOT NULL
         );
     """)
