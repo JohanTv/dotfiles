@@ -8,32 +8,27 @@ separado: uno caído o sin acceso (403) no aborta el resto y queda en la cobertu
 Lo que ya va en la cobertura no se repite por stderr: los avisos de datos vencidos de las capas bajas se silencian aquí.
 """
 
-import contextlib
-import io
-import os
-import sys
+import contextlib, io, os, sys
 from collections import namedtuple
 from dataclasses import dataclass, replace
 from typing import Callable
-
 import urllib.error
 
-from plane_cli import cache, clock
+from plane_cli import cache, clock, store_transitions, store_worklogs
 from plane_cli.api import PlaneUnavailable, api_request
+from plane_cli.assignments import sweep_history
 from plane_cli.cache import fail_no_cache, offline_issue, save_snapshot
-from plane_cli.outbox import open_keys
-from plane_cli.worklog import check_worklogs, extract_metadata_from_comment, find_metadata_block
 from plane_cli.coverage import Coverage
 from plane_cli.errors import CliError
 from plane_cli.flow import build_ticket_flow, fetch_transitions, flow_to_json, transitions_fresh
+from plane_cli.outbox import open_keys
 from plane_cli.resolve import (PROJECTS_TTL, get_actor_uuid, get_labels_map, get_members_map, get_projects_map, get_states_map, known_actor,
                                resolve_issue, resolve_issue_by_label, resolve_project_and_seq)
-from plane_cli import store_transitions, store_worklogs
-from plane_cli.assignments import sweep_history
 from plane_cli.scope import ProjectRef
-from plane_cli.worklog_sync import REPORT_SYNC_TIMEOUT, SYNC_COOLDOWN, sync_remote_worklogs
 from plane_cli.timeutil import iso_z
 from plane_cli.vocabulary import GET_INCLUDES_COVERED
+from plane_cli.worklog import check_worklogs, extract_metadata_from_comment, find_metadata_block
+from plane_cli.worklog_sync import REPORT_SYNC_TIMEOUT, SYNC_COOLDOWN, sync_remote_worklogs
 
 Env = namedtuple("Env", "base_url api_key workspace default_project_id")
 
@@ -312,7 +307,7 @@ def ensure_hours(conn, env, scope):
     """
     idents, period = [p.ident for p in scope.projects], scope.period
     status = store_worklogs.hours_status(conn, idents, period["from"], period["to"])
-    now, synced, failed = clock.timestamp(), False, False
+    now, synced, failed, forbidden = clock.timestamp(), False, False, []
     offline = _offline(scope)
     need_sync = scope.refresh or not (status.verified and now - status.as_of <= SYNC_COOLDOWN)
     if not offline and need_sync:
@@ -320,17 +315,19 @@ def ensure_hours(conn, env, scope):
             res = sync_remote_worklogs(conn, env.base_url, env.api_key, env.workspace, period["from"], period["to"],
                                        filter_project=idents[0] if len(idents) == 1 else None, force=scope.refresh,
                                        timeout=REPORT_SYNC_TIMEOUT)
-            if res.unavailable:
-                failed = True
-            else:
-                synced = True
+            failed, synced = bool(res.unavailable), not res.unavailable
+            if res.forbidden:
+                forbidden = sorted(res.forbidden)
         except PlaneUnavailable:
             failed = True
         status = store_worklogs.hours_status(conn, idents, period["from"], period["to"])
     old = status.as_of is not None and clock.timestamp() - status.as_of > SYNC_COOLDOWN
+    detail = {"hours_verified": status.verified, "hours_scope": "synced" if status.verified else "local"}
+    if forbidden:
+        detail["forbidden"] = forbidden
     return Coverage(source="cache" if synced else "local", as_of=iso_z(status.as_of) if status.as_of else None,
                     age_s=int(clock.timestamp() - status.as_of) if status.as_of else None, stale=old and (failed or offline),
-                    detail={"hours_verified": status.verified, "hours_scope": "synced" if status.verified else "local"})
+                    detail=detail)
 
 
 # --- report flow: tickets del periodo y sus transiciones (mixto: tickets + actividades; viable sin conexión sobre lo almacenado) --------------------

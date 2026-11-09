@@ -239,8 +239,9 @@ def _enqueue(conn, draft, client_id):
         sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
     now = stamp()
     conn.execute("DELETE FROM outbox WHERE client_id = ? AND state = 'dropped'", (client_id,))
-    cursor = conn.execute("INSERT INTO outbox (client_id, ticket_ref, payload_json, wl_ticket_id, wl_track, wl_date, wl_start_time, created_at, updated_at) "
-                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (client_id, draft.ticket_label, payload, *key, now, now))
+    target_url = draft.base_url.rstrip("/") if draft.base_url else None
+    cursor = conn.execute("INSERT INTO outbox (client_id, ticket_ref, payload_json, wl_ticket_id, wl_track, wl_date, wl_start_time, created_at, updated_at, target_base_url, target_workspace) "
+                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (client_id, draft.ticket_label, payload, *key, now, now, target_url, draft.workspace))
     upsert_worklog(conn, entry)  # confirma también el INSERT anterior: ambas filas o ninguna
     return conn.execute("SELECT * FROM outbox WHERE id = ?", (cursor.lastrowid,)).fetchone(), dict(previous) if previous else None
 

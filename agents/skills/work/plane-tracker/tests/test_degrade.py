@@ -74,6 +74,17 @@ class Degrade(unittest.TestCase):
         self.assertEqual((doc["total"], doc["coverage"]["source"], doc["coverage"]["complete"]), (0, "mixed", False))
         self.assertIn("source_unavailable", [n["code"] for n in doc["notes"]], "sin tickets en caché ni red el flujo sale vacío y lo dice")
 
+    def test_report_time_with_403_on_one_project_records_forbidden(self):
+        issues_ops = r"/projects/%s/issues/$" % gs.P2
+        self.sb.fake.add_fault("GET", issues_ops, "status", 403)
+        code, out, err = self.run_cli("report", "time", "--all-projects", "--from", "2026-10-20", "--refresh", "--json")
+        self.assertEqual(code, 0, err)
+        doc = json.loads(out)
+        self.assertEqual(doc["coverage"]["complete"], False)
+        self.assertEqual(doc["coverage"]["detail"].get("forbidden"), ["OPS"])
+        notes = [n["code"] for n in doc["notes"]]
+        self.assertIn("source_forbidden", notes)
+
 
 if __name__ == "__main__":
     unittest.main()

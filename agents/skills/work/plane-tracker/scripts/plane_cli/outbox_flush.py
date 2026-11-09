@@ -85,6 +85,7 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
     """
     sleep = sleep or time.sleep
     result = {"sent": [], "failed": [], "skipped_old": 0, "busy": 0, "stopped": None, "unavailable": None}
+    mismatched = []
     _prepare(conn, retry_failed)
     if not probe_plane(base_url, api_key, force=True):
         offline = os.environ.get("PLANE_OFFLINE") == "1"
@@ -94,10 +95,21 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
     now = clock.timestamp()
     candidates = conn.execute("SELECT * FROM outbox WHERE state = 'pending' OR (state = 'sending' AND lease_until < ?) ORDER BY id", (now,)).fetchall()
     target_of = _target_resolver(conn, base_url, api_key, workspace, default_project_id)
+    current_url = base_url.rstrip("/")
     processed = 0
     for item in candidates:
         if _too_old(item, include_old):
             result["skipped_old"] += 1
+            continue
+        t_url = item["target_base_url"] if "target_base_url" in item.keys() else None
+        t_ws = item["target_workspace"] if "target_workspace" in item.keys() else None
+        if (t_url and t_url.rstrip("/") != current_url) or (t_ws and t_ws != workspace):
+            mismatched.append({
+                "id": item["id"],
+                "ticket": item["ticket_ref"],
+                "target_instance": t_url,
+                "target_workspace": t_ws,
+            })
             continue
         if processed >= limit:
             break
@@ -119,6 +131,8 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
             break
         else:
             result["failed"].append({**info, "status": outcome[1], "error": f"HTTP {outcome[1]}: {outcome[2]}" if outcome[1] else outcome[2]})
+    if mismatched:
+        result["mismatched"] = mismatched
     return _finish(conn, result)
 
 

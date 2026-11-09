@@ -74,9 +74,11 @@ def init_outbox_tables(conn):
             attempts INTEGER NOT NULL DEFAULT 0,
             maybe_delivered INTEGER NOT NULL DEFAULT 0 CHECK (maybe_delivered IN (0,1)),
             last_error TEXT, plane_comment_id TEXT, lease_until REAL,
-            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sent_at TEXT
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sent_at TEXT,
+            target_base_url TEXT, target_workspace TEXT
         );
     """)
+    ensure_columns(conn, "outbox", {"target_base_url": "TEXT", "target_workspace": "TEXT"})
     conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_state ON outbox(state, id);")
     conn.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open

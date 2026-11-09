@@ -30,9 +30,15 @@ def _print_flush(result):
         print(f"✔ #{sent['id']} {sent['ticket']} publicado (comentario {sent['comment_id']}){HOW.get(sent['how'], '')}")
     for failed in result["failed"]:
         print(f"✖ #{failed['id']} {failed['ticket']} falló: {failed['error']}")
+    for mis in result.get("mismatched", []):
+        info = [p for p in (mis.get("target_instance"), mis.get("target_workspace")) if p]
+        target = " / ".join(info) if info else "otra instancia"
+        print(f"⚠ #{mis['id']} {mis['ticket']} omitido: pertenece a otra instancia/workspace ({target}).")
     parts = [f"{len(result['sent'])} publicado(s)", f"{result['failed_total']} fallido(s)", f"{result['pending']} pendiente(s)"]
     if result["skipped_old"]:
         parts.append(f"{result['skipped_old']} de más de {OUTBOX_MAX_AGE_DAYS} días omitido(s) (usa --include-old)")
+    if result.get("mismatched"):
+        parts.append(f"{len(result['mismatched'])} de otra instancia omitido(s)")
     print("Resumen: " + ", ".join(parts) + ".")
     if result["failed_total"]:
         print("Los fallidos siguen en la cola: revísalos con 'outbox list', reintenta con 'outbox flush --retry-failed' o descártalos con 'outbox drop'.")

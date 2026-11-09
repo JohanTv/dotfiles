@@ -44,6 +44,7 @@ class SyncResult:
     unchanged: int = 0           # tickets cuyos comentarios no se releyeron porque no cambiaron desde la última lectura
     unavailable: list = field(default_factory=list)   # PlaneUnavailable que cortaron la sincronización
     incomplete: set = field(default_factory=set)      # proyectos que quedaron a medias (presupuesto de tasa, 403, error de lectura)
+    forbidden: set = field(default_factory=set)       # proyectos que respondieron 403 (sin acceso)
     marked: dict = field(default_factory=dict)        # proyecto -> complete
 
 
@@ -239,7 +240,10 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
         if isinstance(state, tuple):
             result.unavailable.append(state[1])
             break
-        if state != "ok":
+        if state == "forbidden":
+            result.forbidden.add(ident)
+            result.incomplete.add(ident)
+        elif state != "ok":
             result.incomplete.add(ident)
         tasks += [(ident, project_id, issue) for issue in issues]
 
@@ -257,6 +261,9 @@ def sync_remote_worklogs(conn, base_url, api_key, workspace, date_from_str, date
                 comments, state = future.result()
                 if isinstance(state, tuple):
                     result.unavailable.append(state[1])
+                elif state == "forbidden":
+                    result.forbidden.add(ident)
+                    result.incomplete.add(ident)
                 elif state != "ok":
                     result.incomplete.add(ident)
                 _ingest(conn, ident, issue, comments, actor_uuid, result)

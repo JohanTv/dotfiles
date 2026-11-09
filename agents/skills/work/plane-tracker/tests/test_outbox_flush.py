@@ -265,6 +265,30 @@ class ListDropNotice(Base):
         data = json.loads(self.cli("health", "--json")[0])
         self.assertEqual(data["outbox"], {"pending": 1, "failed": 0})
 
+    def test_mismatched_target_instance_or_workspace_skipped(self):
+        self.queue("uno")
+        self.sql("UPDATE outbox SET target_workspace = 'other-workspace' WHERE id = 1")
+        out, _ = self.cli("outbox", "flush")
+        self.assertIn("omitido: pertenece a otra instancia/workspace", out)
+        self.assertIn("other-workspace", out)
+        self.assertIn("1 de otra instancia omitido(s)", out)
+        self.assertEqual(self.rows()[0]["state"], "pending")
+        self.assertEqual(self.stored(), [])
+
+        out_json, _ = self.cli("outbox", "flush", "--json")
+        data = json.loads(out_json)
+        self.assertEqual(len(data.get("mismatched", [])), 1)
+        self.assertEqual(data["mismatched"][0]["id"], 1)
+        self.assertEqual(data["mismatched"][0]["target_workspace"], "other-workspace")
+
+        # Test mismatched instance base url
+        self.sql("UPDATE outbox SET target_workspace = 'ws', target_base_url = 'https://other-instance.plane.so' WHERE id = 1")
+        out, _ = self.cli("outbox", "flush")
+        self.assertIn("omitido: pertenece a otra instancia/workspace", out)
+        self.assertIn("https://other-instance.plane.so", out)
+        self.assertEqual(self.rows()[0]["state"], "pending")
+        self.assertEqual(self.stored(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
