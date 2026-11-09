@@ -21,7 +21,7 @@
 | ID | Title | Status | Summary |
 | :--- | :--- | :--- | :--- |
 | 0005 | [Personal activity agenda view and backlog deferral tracking](rfcs/0005-personal-agenda-and-backlog.md) | proposed | Proposal for personal agenda reporting, tracking active load, overdue tickets, and documented backlog deferrals. |
-| 0006 | [Determine reliable data source for external standby and blockers](rfcs/0006-external-standby-datasource.md) | proposed | Proposal to either substantiate external blocker durations with verifiable state-transition telemetry or remove the synthetic standby row from time reports. |
+| 0006 | [Determine reliable data source for external standby and blockers](rfcs/0006-external-standby-datasource.md) | proposed | Proposal to unify external blocker visibility with agenda dashboards (RFC 0005) and report flow metrics instead of overloading comment telemetry. |
 | 0011 | [Multi-machine cache architecture and remote sync considerations](rfcs/0011-shared-cache-between-machines.md) | proposed | Evaluation of multi-machine state sharing, concluding to keep local SQLite caches synchronized via Plane API rather than introducing third-party databases. |
 | 0014 | [Contexts, profiles, and interchangeable task management sources](rfcs/0014-personal-and-work-contexts.md) | proposed | Deferred proposal exploring multi-profile isolation (personal vs corporate) and abstracting issue trackers (Plane, Linear, Markdown). |
 | 0021 | [Architectural model for queries, views, and JSON envelopes](rfcs/0021-query-and-view-read-architecture.md) | implemented | Architectural overhaul establishing layer separation, standardized envelope contracts, and fitness function safeguards (F1-F15). |
