@@ -119,8 +119,9 @@ def _comments(base_url, api_key, workspace, project_id, issue, timeout=None):
     except PlaneUnavailable as exc:
         return [], ("unavailable", exc)
     except urllib.error.HTTPError as exc:
+        code = exc.code
         exc.close()
-        return [], "error"
+        return [], "forbidden" if code in (401, 403) else "error"
 
 
 def _entry(ident, issue, comment, meta):

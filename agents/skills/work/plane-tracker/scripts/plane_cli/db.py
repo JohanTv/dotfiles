@@ -80,9 +80,10 @@ def init_outbox_tables(conn):
     """)
     ensure_columns(conn, "outbox", {"target_base_url": "TEXT", "target_workspace": "TEXT"})
     conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_state ON outbox(state, id);")
+    conn.execute("DROP INDEX IF EXISTS idx_outbox_wl_open;")
     conn.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open
-            ON outbox(wl_ticket_id, wl_track, wl_date, wl_start_time) WHERE state IN ('pending','sending','failed');
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open_ws
+            ON outbox(COALESCE(target_workspace, ''), wl_ticket_id, wl_track, wl_date, wl_start_time) WHERE state IN ('pending','sending','failed');
     """)
 
 

@@ -108,12 +108,12 @@ def is_json_mode(argv):
     return "--json" in argv
 
 
-def _warn_pending(args, conn):
+def _warn_pending(args, conn, base_url=None, workspace=None):
     """Aviso único por stderr de lo que sigue sin publicarse; los comandos `outbox` ya lo muestran."""
     if args is None or getattr(args, "command", None) == "outbox" or conn is None:
         return
     try:
-        notice = pending_notice(conn)
+        notice = pending_notice(conn, base_url=base_url, workspace=workspace)
     except sqlite3.Error:
         return
     if notice:
@@ -127,6 +127,8 @@ def main(argv=None):
     parser = build_parser()
     conn = None
     args = None
+    base_url = None
+    workspace = None
     try:
         hint = renamed.suggestion(argv, command_tree(parser))
         if hint:
@@ -172,5 +174,5 @@ def main(argv=None):
     finally:
         if conn is not None:
             if args is not None:
-                _warn_pending(args, conn)
+                _warn_pending(args, conn, base_url=base_url, workspace=workspace)
             conn.close()

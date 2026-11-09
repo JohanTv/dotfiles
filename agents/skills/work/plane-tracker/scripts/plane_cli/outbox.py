@@ -21,7 +21,7 @@ import urllib.error
 import urllib.parse
 from dataclasses import dataclass, field
 
-from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail
+from plane_cli.api import PlaneUnavailable, api_request, fail_http, http_detail, normalize_instance_url
 from plane_cli.worklog import extract_metadata_from_comment, replace_metadata_block, strip_metadata_block, upsert_worklog
 from plane_cli import clock
 from plane_cli.errors import CliError
@@ -229,7 +229,7 @@ def _enqueue(conn, draft, client_id):
     payload = json.dumps({"comment_html": draft.html, "external_source": EXTERNAL_SOURCE, "external_id": client_id}, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_TEXT_BYTES:
         fail("queue_full", f"el comentario supera el máximo de {MAX_TEXT_BYTES // 1024} KB.")
-    owner = conn.execute(f"SELECT id FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL}", key).fetchone()
+    owner = conn.execute(f"SELECT id FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL} AND (target_workspace IS NULL OR target_workspace = ?)", (*key, draft.workspace)).fetchone()
     if owner:
         fail("duplicate", f"Ya hay un registro en cola con ese ticket/track/fecha/inicio (#{owner['id']}). Publícalo con 'outbox flush' o descártalo con 'outbox drop {owner['id']}'.")
     if conn.execute(f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL}").fetchone()[0] >= MAX_OPEN_ITEMS:
@@ -239,7 +239,7 @@ def _enqueue(conn, draft, client_id):
         sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
     now = stamp()
     conn.execute("DELETE FROM outbox WHERE client_id = ? AND state = 'dropped'", (client_id,))
-    target_url = draft.base_url.rstrip("/") if draft.base_url else None
+    target_url = normalize_instance_url(draft.base_url) if draft.base_url else None
     cursor = conn.execute("INSERT INTO outbox (client_id, ticket_ref, payload_json, wl_ticket_id, wl_track, wl_date, wl_start_time, created_at, updated_at, target_base_url, target_workspace) "
                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (client_id, draft.ticket_label, payload, *key, now, now, target_url, draft.workspace))
     upsert_worklog(conn, entry)  # confirma también el INSERT anterior: ambas filas o ninguna
@@ -294,8 +294,11 @@ def publish_comment(conn, draft):
     fail_http(comments_url(draft.base_url, draft.workspace, draft.project_id, draft.issue["id"]), outcome[1], outcome[2])
 
 
-def owner_of(conn, ticket, track, date, start_time):
+def owner_of(conn, ticket, track, date, start_time, workspace=None):
     """El item abierto (pending, sending o failed) cuya fila provisional de worklogs tiene esta clave; None si no hay."""
+    if workspace:
+        return conn.execute(f"SELECT * FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL} AND (target_workspace IS NULL OR target_workspace = ?)",
+                            (ticket, track, date, start_time, workspace)).fetchone()
     return conn.execute(f"SELECT * FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL}", (ticket, track, date, start_time)).fetchone()
 
 
@@ -304,25 +307,35 @@ def open_keys(conn):
     return {tuple(r) for r in conn.execute(f"SELECT wl_ticket_id, wl_track, wl_date, wl_start_time FROM outbox WHERE {_OPEN_SQL}")}
 
 
-def count_open(conn, date_from, date_to, project=None, track=None):
-    """Items abiertos cuya fecha de worklog cae en el periodo (filtrables por proyecto y track)."""
+def count_open(conn, date_from, date_to, project=None, track=None, workspace=None):
+    """Items abiertos cuya fecha de worklog cae en el periodo (filtrables por proyecto, track y workspace)."""
     query, params = f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL} AND wl_date >= ? AND wl_date <= ?", [date_from, date_to]
     if project:
         query, params = query + " AND wl_ticket_id LIKE ?", params + [f"{project.upper()}-%"]
     if track:
         query, params = query + " AND wl_track = ?", params + [track]
+    if workspace:
+        query, params = query + " AND (target_workspace IS NULL OR target_workspace = ?)", params + [workspace]
     return conn.execute(query, params).fetchone()[0]
 
 
-def pending_counts(conn):
+def pending_counts(conn, base_url=None, workspace=None):
     """(pendientes de publicar, fallidos): los pendientes incluyen los que están en envío."""
-    row = conn.execute("SELECT SUM(state IN ('pending','sending')), SUM(state = 'failed') FROM outbox").fetchone()
+    where, params = [], []
+    if base_url:
+        where.append("(target_base_url IS NULL OR target_base_url = ?)")
+        params.append(normalize_instance_url(base_url))
+    if workspace:
+        where.append("(target_workspace IS NULL OR target_workspace = ?)")
+        params.append(workspace)
+    clause = f"WHERE {' AND '.join(where)}" if where else ""
+    row = conn.execute(f"SELECT SUM(state IN ('pending','sending')), SUM(state = 'failed') FROM outbox {clause}", params).fetchone()
     return row[0] or 0, row[1] or 0
 
 
-def pending_notice(conn):
+def pending_notice(conn, base_url=None, workspace=None):
     """Aviso de stderr con lo que queda por publicar; None si la cola está vacía."""
-    pending, failed = pending_counts(conn)
+    pending, failed = pending_counts(conn, base_url=base_url, workspace=workspace)
     if failed:
         return f"⏳ Outbox: {pending} pendiente(s) de publicar, {failed} fallido(s) (revisa: plane-tracker outbox list). Ejecuta: plane-tracker outbox flush"
     return f"⏳ Outbox: {pending} pendiente(s) de publicar. Ejecuta: plane-tracker outbox flush" if pending else None

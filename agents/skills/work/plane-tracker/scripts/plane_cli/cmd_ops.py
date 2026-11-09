@@ -60,7 +60,7 @@ def cmd_health(args, conn, base_url, api_key, workspace, default_project_id):
             continue
     summary = summarize_requests(records, clock.now() - timedelta(hours=args.hours))
     state = circuit.describe()
-    queue = pending_counts(conn)
+    queue = pending_counts(conn, base_url=base_url, workspace=workspace)
     if getattr(args, "json", False):
         print(json.dumps({**summary, "circuit": state, "outbox": {"pending": queue[0], "failed": queue[1]}}, indent=2, ensure_ascii=False))
         return

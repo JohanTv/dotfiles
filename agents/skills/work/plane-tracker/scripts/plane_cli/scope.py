@@ -37,6 +37,7 @@ class Scope:
     brief: bool = False
     track: str | None = None
     worker_type: str | None = None
+    workspace: str | None = None
 
     def to_dict(self, view):
         """El `scope` del sobre: solo las dimensiones de la vista, ya resueltas (`order` y `limit` siempre que la vista pagina)."""
@@ -130,4 +131,5 @@ def resolve_scope(args, catalogs, view):
                  period=_period(args, catalogs, view.defaults.get("period_days")) if "period" in view.dims else None, hours_author=hours_author,
                  track=getattr(args, "track", None), worker_type=getattr(args, "worker_type", None),
                  order=view.defaults["order"] if "order" in view.defaults else ORDER_TEXT if text else ORDER_RECENT, limit=limit, offline=bool(getattr(args, "offline", False)),
-                 refresh=bool(getattr(args, "refresh", False)), brief=bool(getattr(args, "brief", False)))
+                 refresh=bool(getattr(args, "refresh", False)), brief=bool(getattr(args, "brief", False)),
+                 workspace=getattr(catalogs, "workspace", None))

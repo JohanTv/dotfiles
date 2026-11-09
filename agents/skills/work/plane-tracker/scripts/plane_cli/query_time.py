@@ -61,7 +61,8 @@ def _notes(conn, scope, mine, unsigned, undeclared):
     if undeclared:
         notes.append({"code": "hours_defaulted", "text": f"{undeclared} registro(s) sin balde de capacidad declarado: van en `undeclared`, no en `deep_work`."})
     period = scope.period
-    pending = count_open(conn, period["from"], period["to"], idents[0] if len(idents) == 1 else None, scope.track)
+    ws = getattr(scope, "workspace", None)
+    pending = count_open(conn, period["from"], period["to"], idents[0] if len(idents) == 1 else None, scope.track, workspace=ws)
     if pending:
         notes.append({"code": "pending_unpublished", "text": f"{pending} registro(s) de este periodo siguen sin publicarse."})
     return tuple(notes)

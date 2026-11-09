@@ -15,7 +15,7 @@ import urllib.error
 from datetime import datetime, timedelta
 
 from plane_cli import circuit
-from plane_cli.api import PlaneUnavailable, api_request, http_detail, probe_plane
+from plane_cli.api import PlaneUnavailable, api_request, http_detail, normalize_instance_url, probe_plane
 from plane_cli.outbox import Rejected, deliver, pending_counts, stamp
 from plane_cli.resolve import resolve_issue, resolve_project_and_seq
 from plane_cli import clock
@@ -91,19 +91,19 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
         offline = os.environ.get("PLANE_OFFLINE") == "1"
         kind, since = (None, None) if offline else circuit.last_failure()
         result.update(stopped="unavailable", unavailable=PlaneUnavailable("offline" if offline else (kind or "unknown"), "no", since=since))
-        return _finish(conn, result)
+        return _finish(conn, result, base_url, workspace)
     now = clock.timestamp()
     candidates = conn.execute("SELECT * FROM outbox WHERE state = 'pending' OR (state = 'sending' AND lease_until < ?) ORDER BY id", (now,)).fetchall()
     target_of = _target_resolver(conn, base_url, api_key, workspace, default_project_id)
-    current_url = base_url.rstrip("/")
+    current_url = normalize_instance_url(base_url)
     processed = 0
     for item in candidates:
         if _too_old(item, include_old):
             result["skipped_old"] += 1
             continue
-        t_url = item["target_base_url"] if "target_base_url" in item.keys() else None
+        t_url = normalize_instance_url(item["target_base_url"]) if ("target_base_url" in item.keys() and item["target_base_url"]) else None
         t_ws = item["target_workspace"] if "target_workspace" in item.keys() else None
-        if (t_url and t_url.rstrip("/") != current_url) or (t_ws and t_ws != workspace):
+        if (t_url and t_url != current_url) or (t_ws and t_ws != workspace):
             mismatched.append({
                 "id": item["id"],
                 "ticket": item["ticket_ref"],
@@ -133,9 +133,9 @@ def flush_items(conn, base_url, api_key, workspace, default_project_id, limit=DE
             result["failed"].append({**info, "status": outcome[1], "error": f"HTTP {outcome[1]}: {outcome[2]}" if outcome[1] else outcome[2]})
     if mismatched:
         result["mismatched"] = mismatched
-    return _finish(conn, result)
+    return _finish(conn, result, base_url, workspace)
 
 
-def _finish(conn, result):
-    result["pending"], result["failed_total"] = pending_counts(conn)
+def _finish(conn, result, base_url=None, workspace=None):
+    result["pending"], result["failed_total"] = pending_counts(conn, base_url=base_url, workspace=workspace)
     return result

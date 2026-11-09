@@ -53,6 +53,14 @@ def log_request(method, url, status, elapsed_ms, attempt, error=None):
         pass
 
 
+def normalize_instance_url(url):
+    """Normaliza una URL base (esquema y host en minúsculas, sin barra final) según RFC 3986."""
+    if not url:
+        return ""
+    p = urllib.parse.urlsplit(url.strip())
+    return urllib.parse.urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path.rstrip("/"), "", ""))
+
+
 def _int_header(headers, name):
     try:
         return int(float(headers.get(name)))

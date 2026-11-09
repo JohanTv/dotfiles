@@ -38,7 +38,8 @@ def query(conn, scope, acq):
             rows.append({"ticket": label, "title": known[label]["title"], **flow_to_json(flow)})
     verified, total = store_transitions.history_coverage(conn, labels)
     cov = replace(acq, detail=dict(acq.detail, history={"verified": verified, "total": total}))  # 0 de 0 también es una comprobación: no hay nada que traer
-    pending = count_open(conn, period["from"], period["to"], idents[0] if len(idents) == 1 else None, None)
+    ws = getattr(scope, "workspace", None)
+    pending = count_open(conn, period["from"], period["to"], idents[0] if len(idents) == 1 else None, None, workspace=ws)
     extra = ({"code": "pending_unpublished", "text": f"{pending} registro(s) de este periodo siguen sin publicarse."},) if pending else ()
     cov = settle(replace(cov, complete=complete_flow(cov)), extra)
     return Result(rows=rows, total=len(rows), coverage=cov, summary=flow_metrics.aggregate(flows), extra_notes=extra)

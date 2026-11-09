@@ -42,6 +42,7 @@ class Catalogs:
     stale: bool = False      # el catálogo de proyectos se sirvió vencido
     today: str = ""          # hoy en el calendario local (YYYY-MM-DD), para los periodos por defecto
     tz: str = ""             # desplazamiento de la zona local con que se interpretan los periodos (+HH:MM)
+    workspace: str = ""      # slug del workspace activo
 
 
 def _quiet(fn, *args, **kwargs):
@@ -94,7 +95,8 @@ def catalogs(conn, env, need_actor=False, local_fallback=False):
 
     offset = clock.now().astimezone().strftime("%z")
     return Catalogs(accessible, default, _actor(conn, env) if need_actor else None, member_names,
-                    stale=bool(oldest) and clock.timestamp() - oldest >= PROJECTS_TTL, today=clock.local_today().isoformat(), tz=f"{offset[:3]}:{offset[3:]}")
+                    stale=bool(oldest) and clock.timestamp() - oldest >= PROJECTS_TTL, today=clock.local_today().isoformat(), tz=f"{offset[:3]}:{offset[3:]}",
+                    workspace=env.workspace)
 
 
 def _outdated(conn, project_id):
