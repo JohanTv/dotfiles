@@ -18,6 +18,8 @@ Bienvenido a la especificación técnica y operativa del ecosistema de tracking 
    * Catálogo de 16 etiquetas en Omnify, 11 en OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
 6. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
    * Visión de alto rendimiento, arquetipos de ingeniería y diseño del dashboard personal.
+7. [🛡️ **Gobernanza y Principios de Diseño del CLI**](./CLI_DESIGN_GUARD.md)
+   * Los 6 invariantes arquitecturales (CQS, ortogonalidad, jerarquía sustantivo+verbo), protocolo de 5 filtros ("Antes de agregar un flag") y límites ratchet (<450 líneas).
 
 ---
 

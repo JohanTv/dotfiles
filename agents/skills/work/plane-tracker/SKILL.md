@@ -77,4 +77,4 @@ Reglas:
 
 ## 7. Documentación
 
-Detalle en `references/`: arquitectura y telemetría, living tickets/SDLC, protocolo de relevo, guía operativa, taxonomía y paraguas.
+Detalle en `references/`: arquitectura y telemetría, living tickets/SDLC, protocolo de relevo, guía operativa, taxonomía y paraguas, y gobernanza y principios de diseño del CLI (`references/CLI_DESIGN_GUARD.md`).
