@@ -21,6 +21,7 @@
   - No existe: Propón work item con título, prioridad, etiquetas y `--branch-slug`.
 - **Economía de Tokens en Consultas:**
   - *Descubrimiento:* `list --brief --json`.
+  - *Sincronización Selectiva:* Si se necesita refrescar tickets desde Plane, usa `plane-tracker sync tickets [-p PRJ]` (delta sync ligero, ~1s); nunca uses `plane-tracker sync` completo (que descarga 30 días de horas) para una consulta de tickets.
   - *Inspección inicial:* `plane-tracker get <TICKET>` (sin `--full`, truncado a 300 caracteres).
   - *Profunda:* Solo al trabajar activamente en él, invoca `--full --no-comments` o `--last 3`. No re-pidas datos ya en contexto.
 - **Consultas de Estado ("Revisa el Plane"):** Responde en **6-8 líneas máximo**: Ticket/Título/Estado, resumen del contrato, siguiente paso/stopper y advertencia de `coverage`.
