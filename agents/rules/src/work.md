@@ -1,43 +1,44 @@
-# Protocolo de Trabajo y Tracking TI (Work Context)
+# Work Protocol and IT Tracking (Work Context)
 
-### Ámbito y Fases (SDLC):
-- **Entorno:** Repositorios corporativos en `Code/` (`Omnify`, `Operaciones`, servicios satélite).
-- **Fases:** `[SPIKE]` (diagnóstico/forense), `[RFC]` (diseño/contratos), `[FEAT/FIX/INFRA]` (desarrollo/devops), `[QA]` (testing/validación).
+### Communication and SDLC Scope:
+- **User Language:** Always converse with the user in **Spanish** (conversational tone) unless explicitly instructed otherwise.
+- **Environment:** Corporate repositories in `Code/` (`Omnify`, `Operaciones`, satellite services).
+- **SDLC Phases:** `[SPIKE]` (diagnostic/investigation), `[RFC]` (design/contracts), `[FEAT/FIX/INFRA]` (development/devops), `[QA]` (testing/validation).
 
-### Telemetría y Registro en Plane:
-- **Skill:** Usa `plane-tracker`. Al finalizar sesión o hito, propón bitácora corta (≤700 caracteres, sin tablas ni JSON; ver `plane-tracker` §4) y publica solo tras OK.
-- **Toil y Reuniones:** Absorbe soporte ad-hoc y reuniones en los tickets paraguas semanales de `OPS`; nunca crees tickets <15 min.
+### Telemetry and Plane Tracking:
+- **Tool:** Use `plane-tracker`. At session end or milestone completion, propose a concise worklog entry (≤700 chars, no markdown tables, no raw JSON; see `plane-tracker` §4) and post only after explicit user confirmation.
+- **Toil & Meetings:** Absorb ad-hoc support and meetings into weekly umbrella tickets in `OPS`; never create tickets for tasks <15 min.
 
-### Convención de Ramas Git:
-- **Patrón Corporativo:** `{tipo}/{TICKET-ID}-{kebab-case-descripcion}` (ej: `feat/OMNIFY-175-campaign-validations`, `fix/OPS-44-mitigate-n8n`).
-  - Tipos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra`. Default: `OMNIFY-` (proyectos en `plane-tracker projects`).
-- **Iniciativas Multi-Repo:** Si cruza 2+ repos, no crees ramas sueltas; usa la skill `plane-worktree` en `.worktrees/{TICKET}-{slug}/`.
-- **Manejo de Ambigüedad:** Si no se menciona el ticket, pregunta antes de crear la rama.
-- **Personal / Sin Plane:** Usa formato estándar `{tipo}/{kebab-case-descripcion}`.
+### Git Branching Conventions:
+- **Corporate Pattern:** `{type}/{TICKET-ID}-{kebab-case-description}` (e.g. `feat/OMNIFY-175-campaign-validations`, `fix/OPS-44-mitigate-n8n`).
+  - Types: `spike`, `feat`, `fix`, `refactor`, `test`, `infra`. Default project: `OMNIFY-` (`plane-tracker projects`).
+- **Multi-Repo Initiatives:** When crossing 2+ repositories, do not create standalone branches; use `plane-worktree` in `.worktrees/{TICKET}-{slug}/`.
+- **Ambiguity:** If no ticket is specified, clarify with user before creating the branch.
+- **Personal / Non-Plane:** Standard `{type}/{kebab-case-description}`.
 
-### Momento Cero y Lectura Escalonada:
-- **Búsqueda Instantánea:** Ante una intención de trabajo, ejecuta `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json`. Solo concluye "no hay duplicado" si `coverage.complete` es `true`.
-  - Coincidente: Confirma y pasa a la rama respectiva (`feat/OMNIFY-XXX-...`).
-  - No existe: Propón work item con título, prioridad, etiquetas y `--branch-slug`.
-- **Economía de Tokens en Consultas:**
-  - *Descubrimiento:* `list --brief --json`.
-  - *Sincronización Selectiva:* Si se necesita refrescar tickets desde Plane, usa `plane-tracker sync tickets [-p PRJ]` (delta sync ligero, ~1s); nunca uses `plane-tracker sync` completo (que descarga 30 días de horas) para una consulta de tickets.
-  - *Inspección inicial:* `plane-tracker get <TICKET>` (sin `--full`, truncado a 300 caracteres).
-  - *Profunda:* Solo al trabajar activamente en él, invoca `--full --no-comments` o `--last 3`. No re-pidas datos ya en contexto.
-- **Consultas de Estado ("Revisa el Plane"):** Responde en **6-8 líneas máximo**: Ticket/Título/Estado, resumen del contrato, siguiente paso/stopper y advertencia de `coverage`.
-- **Informe del Día:** Ante resumen de jornada ("mi informe de hoy", "reporte del día"), ejecuta directo `plane-tracker report time --offline --all-projects` (<0.1s, SQLite). Presenta consolidado ejecutivo (reloj vs esfuerzo, AI Leverage) y cronología tabular.
+### Zero-Moment & Graduated Discovery:
+- **Instant Search:** On work intent, run `plane-tracker list --text "<intent>" --all-projects --limit 5 --brief --json`. Conclude "no duplicate" only if `coverage.complete` is `true`.
+  - Found: Confirm and switch to target branch (`feat/OMNIFY-XXX-...`).
+  - Not found: Propose ticket with title, priority, labels, and `--branch-slug`.
+- **Token Economy in CLI Queries:**
+  - *Discovery:* `list --brief --json`.
+  - *Selective Sync:* When refreshing tickets from Plane, use `plane-tracker sync tickets [-p PRJ]` (fast delta sync, ~1s); never use full `plane-tracker sync` (which pulls 30 days of hours) for ticket queries.
+  - *Initial Inspection:* `plane-tracker get <TICKET>` (without `--full`, truncated to 300 chars).
+  - *Deep Inspection:* Only when actively working on it, invoke `--full --no-comments` or `--last 3`. Never re-query data already in context.
+- **Status Queries ("Revisa el Plane"):** Respond in **6-8 lines maximum**: Ticket/Title/State, contract summary, next step/stopper, and coverage notice.
+- **Daily Report ("reporte del día"):** Run `plane-tracker report time --offline --all-projects` (<0.1s, SQLite). Present an executive summary (clock vs effort, AI Leverage) and a tabular chronological breakdown.
 
-### Estándar de Creación y Ciclo de Vida:
-- **Título y Etiquetas:** `[{FASE}] {Acción o resumen conciso en español}` (sin corchetes dobles). Mínimo 2 etiquetas: capa técnica (`backend`, `frontend`, `bd`, `infra`) y tipo (`bug`, `deuda-tecnica`, `seguridad`, `docs`); módulo si aplica (`plane-tracker labels`).
-- **Living Ticket Pattern (Regla de los 15 Minutos):**
-  - `< 15 min (Toil):` Absorbe en ticket paraguas semanal de `OPS`.
-  - `> 15 min:` Ticket formal. Descripción es el **contrato vivo** (≤200 palabras, pirámide invertida: Resumen primera línea, Causa, Solución en 2-3 viñetas, DoD `[ ]`).
-  - *Sin evidencia circunstancial:* Dumps SQL, tablas y snippets van en comentarios (`comment add`) o adjuntos (`attachment add`), nunca en la descripción. Si deriva de otro ticket, referencia origen sin duplicar texto.
-- **Tickets Paraguas Semanales (`OPS`, cadencia W{ISO_WEEK}):**
-  - Soporte: `Tareas Rápidas y Soporte - W{XX}` (`toil_support`).
-  - Coordinación: `Reuniones de Equipo y Acuerdos - W{XX}` (`coordination`).
-  - Fechas obligatorias: `--start-date` (lunes) y `--due-date` (domingo).
-  - Registro: `plane-tracker comment add <TICKET> --track "<tema>" --capacity "<balde>" --duration <min>`. Nunca estimes: pregunta duración real si fue fuera de sesión.
-- **Protocolo de Relevo Asíncrono (Task Handoff):**
-  - *Tomar ticket ajeno:* `plane-tracker get <TICKET>` para destilar avances y stoppers. Imputa horas a nombre propio.
-  - *Dejar tarea a medias:* Publica comentario de relevo (avance, rama/commit actual, pendientes inmediatos).
+### Creation Standards and Ticket Lifecycle:
+- **Title and Labels:** `[{PHASE}] {Concise action in Spanish}` (no nested brackets). Minimum 2 labels: technical layer (`backend`, `frontend`, `bd`, `infra`) and category (`bug`, `deuda-tecnica`, `seguridad`, `docs`); module label if applicable (`plane-tracker labels`).
+- **Living Ticket Pattern (15-Minute Rule):**
+  - `< 15 min (Toil):` Absorb into weekly `OPS` umbrella ticket.
+  - `> 15 min:` Formal ticket. Description serves as a **living contract** (≤200 words, inverted pyramid: line 1 summary, root cause, 2-3 solution bullets, DoD checkboxes `[ ]`).
+  - *No Circumstantial Evidence:* Raw SQL dumps, large tables, and code snippets belong in comments (`comment add`) or attachments (`attachment add`), never in ticket descriptions. If spawned from another issue, reference the source ID without duplicating text.
+- **Weekly Umbrella Tickets (`OPS`, W{ISO_WEEK} cadence):**
+  - Support: `Tareas Rápidas y Soporte - W{XX}` (`toil_support`).
+  - Coordination: `Reuniones de Equipo y Acuerdos - W{XX}` (`coordination`).
+  - Mandatory Dates: `--start-date` (Monday) and `--due-date` (Sunday).
+  - Time Logging: `plane-tracker comment add <TICKET> --track "<topic>" --capacity "<bucket>" --duration <min>`. Never guess: ask real duration if performed outside the session.
+- **Async Task Handoff Protocol:**
+  - *Taking Over:* Run `plane-tracker get <TICKET>` to distill progress and stoppers. Log hours under own identity.
+  - *Pausing / Handing Off:* Post a handoff comment detailing completed progress, current branch/commit, and immediate blockers.
