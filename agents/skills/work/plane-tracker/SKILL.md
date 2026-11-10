@@ -30,6 +30,7 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Guarda en SQLite local 
 | Tarea | Comando |
 | :--- | :--- |
 | **Buscar antes de crear** | `plane-tracker list --text "<intención>" --all-projects --limit 5 --brief --json` |
+| **Agenda personal** | `plane-tracker agenda [--brief] [--wip-limit N] [--stalled-days N] [--offline]` |
 | **Ver ticket** | `plane-tracker get T [--last N] [--history] [--include attachments,links \| --all]` |
 | **Listar tickets** | `plane-tracker list -p OMNIFY` |
 | **Mis tickets** | `plane-tracker list --mine\|--created\|--involved [--open] [--all-projects]` |

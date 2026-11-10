@@ -50,14 +50,19 @@ def expand_segments(rows):
     for row in rows:
         entry = dict(row)
         try:
-            segments = json.loads(entry.get("raw_payload") or "{}").get("segments")
-        except ValueError:
+            payload = json.loads(entry.get("raw_payload") or "{}")
+            segments = payload.get("segments") if isinstance(payload, dict) else None
+        except Exception:
             segments = None
-        if not segments:
+        if not isinstance(segments, list):
             out.append(entry)
             continue
         for idx, seg in enumerate(segments):
-            part = dict(entry, start_time=seg["start"], end_time=seg["end"], duration_minutes=seg["minutes"])
+            if not isinstance(seg, dict):
+                continue
+            part = dict(entry, start_time=seg.get("start") or entry.get("start_time"),
+                               end_time=seg.get("end") or entry.get("end_time"),
+                               duration_minutes=seg.get("minutes") or entry.get("duration_minutes") or 0)
             if idx:
                 part["notes"] = "(continuación)"
             out.append(part)

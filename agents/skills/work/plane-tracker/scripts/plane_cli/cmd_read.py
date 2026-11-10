@@ -51,6 +51,23 @@ def cmd_list(args, conn, base_url, api_key, workspace, default_project_id):
     emit(view, doc, getattr(args, "json", False))
 
 
+def cmd_agenda(args, conn, base_url, api_key, workspace, default_project_id):
+    """`agenda`: dashboard personal con WIP, bloqueos y cola de extracción."""
+    view = VIEWS["agenda"]
+    env = Env(base_url, api_key, workspace, default_project_id)
+    if args.offline:
+        os.environ["PLANE_OFFLINE"] = "1"
+    cats = catalogs(conn, env, need_actor=True)
+    scope = resolve_scope(args, cats, view)
+    acquisition = ensure(conn, env, view.name, scope, cats)
+    doc = build(view.name, scope.to_dict(view),
+                view.query(conn, scope, cats, acquisition,
+                           wip_limit=args.wip_limit,
+                           stalled_days=args.stalled_days),
+                verbose=args.verbose)
+    emit(view, doc, getattr(args, "json", False), **({} if getattr(args, "json", False) else {"brief": getattr(args, "brief", False)}))
+
+
 def _cache_only(args):
     if args.offline:
         os.environ["PLANE_OFFLINE"] = "1"  # --offline corta toda la red del proceso
@@ -105,6 +122,20 @@ def register_list(sub):
     add_scope_args(p_list, view.dims, view.controls, LIST_LIMIT)
     add_json_flag(p_list)
     p_list.set_defaults(handler=cmd_list)
+
+
+def register_agenda(sub):
+    view = VIEWS["agenda"]
+    p_agenda = sub.add_parser("agenda", help="Dashboard personal: WIP, bloqueos y cola de extracción",
+                              description="Dashboard operativo de foco personal: lista tickets en curso, alerta sobrecarga si superas el límite de WIP, "
+                                          "visibiliza impedimentos y destaca la siguiente prioridad. Lee de la caché local SQLite.")
+    add_scope_args(p_agenda, view.dims, view.controls)
+    p_agenda.add_argument("--wip-limit", type=positive_int, default=2, metavar="N",
+                          help="Límite recomendado de trabajo en curso (por defecto: 2)")
+    p_agenda.add_argument("--stalled-days", type=positive_int, default=3, metavar="N",
+                          help="Días sin cambios para considerar un ticket estancado (por defecto: 3)")
+    add_json_flag(p_agenda)
+    p_agenda.set_defaults(handler=cmd_agenda)
 
 
 def register_labels(sub):

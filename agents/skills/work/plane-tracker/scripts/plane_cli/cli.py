@@ -26,6 +26,7 @@ from plane_cli.outbox import pending_notice
 COMMANDS = (
     cmd_read.register_get,
     cmd_read.register_list,
+    cmd_read.register_agenda,
     cmd_tickets_write.register_create,
     cmd_tickets_write.register_update,
     cmd_delete.register_delete,

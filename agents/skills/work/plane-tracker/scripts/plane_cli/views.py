@@ -9,7 +9,7 @@ La firma de `query` depende de la vista (cada una consulta una fuente distinta);
 from dataclasses import dataclass, field
 from typing import Callable
 
-from plane_cli import (query_catalogs, query_check, query_flow, query_get, query_issues, query_misc, query_time, render_catalogs, render_check, render_flow, render_get,
+from plane_cli import (query_agenda, query_catalogs, query_check, query_flow, query_get, query_issues, query_misc, query_time, render_agenda, render_catalogs, render_check, render_flow, render_get,
                        render_issues, render_misc, render_time)
 
 LIST_LIMIT = 20
@@ -57,4 +57,8 @@ VIEWS = {
                  ("sync",), frozenset({"--history", "--budget", "--deep"})),
     "outbox list": View("outbox list", NONE, NONE, query_misc.outbox, render_misc.render_outbox, {"state": "open"}, "solo la cola local", ("outbox", "list"),
                         frozenset({"--all"})),
+    "agenda": View("agenda", frozenset({"projects"}), frozenset({"refresh", "offline", "brief", "verbose"}), query_agenda.query, render_agenda.render,
+                   {"projects": "all", "order": "role_rank,priority,-plane_updated_at"},
+                   "tickets de los proyectos accesibles del alcance (TTL 30 min; --refresh fuerza; --offline no toca la red)", ("agenda",),
+                   frozenset({"--wip-limit", "--stalled-days"})),
 }

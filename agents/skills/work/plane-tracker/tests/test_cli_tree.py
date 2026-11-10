@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from plane_cli.cli import build_parser, command_tree  # noqa: E402
 
 TREE = {
-    "get": (), "list": (), "create": (), "update": (), "delete": (),
+    "get": (), "list": (), "agenda": (), "create": (), "update": (), "delete": (),
     "comment": ("add", "edit", "delete"),
     "attachment": ("add", "list", "delete", "replace"),
     "link": ("add",),
@@ -98,7 +98,7 @@ class CommandTree(unittest.TestCase):
         walk(build_parser(), "")
         root = build_parser()
         root.prog = "plane.py"
-        self.assertLessEqual(len(root.format_help()) / 4, 280)
+        self.assertLessEqual(len(root.format_help()) / 4, 300)
 
     def test_retired_names_are_not_registered(self):
         names = set(command_tree(build_parser()))

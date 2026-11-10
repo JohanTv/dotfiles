@@ -24,7 +24,7 @@ COVERAGE_SOURCES = ("cache", "api", "snapshot", "local", "mixed")
 COVERAGE_KEYS = {"source": "str!", "as_of": "str?!", "age_s": "int?!", "stale": "bool!", "complete": "bool?!", "unavailable": "list!", "detail": "dict!"}
 # Claves conocidas de coverage.detail (por vista); las que alimentan notas derivadas están en coverage.py.
 DETAIL_KEYS = frozenset({"history", "text_fields", "hours_scope", "capped", "legacy", "forbidden", "rate_budget_exhausted", "assignment_snapshot",
-                         "count_mismatch", "hours_verified", "comments", "metadata_only", "include"})
+                         "count_mismatch", "hours_verified", "comments", "metadata_only", "include", "today", "wip_limit", "stalled_threshold_days"})
 NOTE_KEYS = {"code": "str!", "text": "str!", "hint": "str"}
 ERROR_KEYS = {"schema": "str!", "status": "str!", "code": "str!", "message": "str!", "hint": "str", "exit": "int!", "detail": "dict"}
 
@@ -53,6 +53,11 @@ FAMILIES = {
                     "minutes": "int?", "attempts": "int", "maybe_delivered": "bool", "last_error": "str?", "plane_comment_id": "str?",
                     "created_at": "str", "preview": "str"},
     "project": {"id": "str!", "identifier": "str!", "name": "str!"},
+    "agenda_item": {"ticket": "str!", "title": "str!", "state": "str!", "state_group": "str!", "priority": "str",
+                    "project": "str!", "section": "str!", "is_focus": "bool!", "focus_source": "str?",
+                    "days_since_update": "num!", "target_date": "str?", "is_overdue": "bool!", "is_stalled": "bool!",
+                    "dod_completed": "int?", "dod_total": "int?", "blocker_reason": "str?", "standby_days": "num?",
+                    "plane_updated_at": "str?"},
 }
 # Objetos anidados dentro de una fila: nombre del campo -> claves permitidas de cada elemento.
 NESTED = {"assignees": {"id", "name"}, "assignment_events": {"at", "kind", "user_id", "user_name"}, "comments": {"id", "author", "created_at", "text"},
@@ -67,13 +72,16 @@ SUMMARIES = {
     "flow_summary": {"tickets": "int", "completed": "int", "cancelled": "int", "open": "int", "excluded": "int", "n_lead": "int", "n_cycle": "int",
                      "median_lead_minutes": "num?", "median_cycle_minutes": "num?"},
     "check_summary": {"ok": "bool", "unreachable": "int", "checked": "list"},
+    "agenda_summary": {"wip_count": "int", "wip_limit": "int", "wip_exceeded": "bool", "stalled_count": "int", "overdue_count": "int",
+                       "blocked_count": "int", "pull_queue_count": "int", "logged_clock_minutes_week": "int", "logged_compute_minutes_week": "int",
+                       "ai_leverage_multiplier": "num", "active_focus_ticket": "str?"},
 }
 SUMMARY_ITEM_KEYS = {"key", "minutes"}  # elementos de by_day, by_project y by_capacity
 # vista -> (familia de filas, familia de resumen o None, lleva `scope`). `get` no lleva alcance: el alcance es un ticket, en `results`.
 VIEWS = {"list": ("ticket", None, True), "get": ("ticket_detail", None, False), "report time": ("hours", "hours_summary", True),
          "report flow": ("flow", "flow_summary", True), "worklog check": ("check", "check_summary", True), "labels": ("label", None, True),
          "projects": ("project", None, True), "whoami": ("whoami", None, False), "attachment list": ("attachment", None, False),
-         "outbox list": ("outbox_item", None, True)}
+         "outbox list": ("outbox_item", None, True), "agenda": ("agenda_item", "agenda_summary", True)}
 
 # Nombre de hoy -> nombre del contrato (columna "Sustituye a"), por familia. Sirve para validar el vocabulario contra los JSON reales (F4).
 REPLACES = {
@@ -114,6 +122,8 @@ NOTES = {
     "pending_unpublished": ("warn", "vista", None, "plane-tracker outbox flush"),
     "text_looks_like_id": ("info", "vista", None, "plane-tracker get <ticket>"),
     "include_not_covered": ("warn", "vista", None, "Por ahora get solo incluye attachments y links."),
+    "wip_exceeded": ("warn", "vista", None, "Concluye o pausa tareas antes de iniciar otras."),
+    "ticket_stalled": ("warn", "vista", None, "plane-tracker handoff o update --state Pausado."),
     "internal": ("warn", "envelope", None, "Informa el defecto."),
 }
 SEVERITY_ORDER = ("warn", "info")  # al ordenar notas, los avisos van antes que las informativas

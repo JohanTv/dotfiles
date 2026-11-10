@@ -125,8 +125,8 @@ def _ensure_issues(conn, env, scope, deep=False, delta=None):
 
 
 def ensure(conn, env, view_name, scope, cats):
-    """Cobertura de adquisición de la vista tras refrescar lo que su contrato declara (hoy solo `list`)."""
-    if view_name != "list":
+    """Cobertura de adquisición de la vista tras refrescar lo que su contrato declara (hoy `list` y `agenda`)."""
+    if view_name not in ("list", "agenda"):
         raise ValueError(f"adquisición no definida para la vista {view_name}")
     statuses = _ensure_issues(conn, env, scope)
     usable = {i for i, (st, as_of) in statuses.items() if as_of is not None and st != "forbidden"}

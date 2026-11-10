@@ -9,6 +9,7 @@ positional arguments:
   <comando>
     get         Ver un ticket con sus comentarios
     list        Listar y buscar tickets (caché)
+    agenda      Dashboard personal: WIP, bloqueos y cola de extracción
     create      Crear un ticket
     update      Editar título, descripción, estado y demás campos
     delete      Eliminar ticket (irreversible)
@@ -89,6 +90,35 @@ options:
   --brief               Filas breves: ticket, title, state, state_group y
                         project
   --verbose             Incluir las notas informativas
+  --json                Salida en JSON
+--- stderr ---
+
+
+$ plane.py agenda --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
+[exit 0]
+--- stdout ---
+usage: plane.py agenda [-h] [-p PROJECT] [--all-projects] [--refresh]
+                       [--offline] [--brief] [--verbose] [--wip-limit N]
+                       [--stalled-days N] [--json]
+
+Dashboard operativo de foco personal: lista tickets en curso, alerta
+sobrecarga si superas el límite de WIP, visibiliza impedimentos y destaca la
+siguiente prioridad. Lee de la caché local SQLite.
+
+options:
+  -h, --help            show this help message and exit
+  -p, --project PROJECT
+                        Identificador del proyecto (ej: OMNIFY, OPS)
+  --all-projects        Todos los proyectos accesibles del workspace
+  --refresh             Forzar la sincronización con Plane
+  --offline             No consultar Plane: solo lo local
+  --brief               Filas breves: ticket, title, state, state_group y
+                        project
+  --verbose             Incluir las notas informativas
+  --wip-limit N         Límite recomendado de trabajo en curso (por defecto:
+                        2)
+  --stalled-days N      Días sin cambios para considerar un ticket estancado
+                        (por defecto: 3)
   --json                Salida en JSON
 --- stderr ---
 

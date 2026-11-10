@@ -104,7 +104,8 @@ def sample_row(family):
 
 def sample_result(view, rows=1, **cov):
     family, summary_family, _ = voc.VIEWS[view]
-    summary = {k: ([] if voc.field_spec(v)[0] == "list" else (True if voc.field_spec(v)[0] == "bool" else 0)) for k, v in voc.SUMMARIES[summary_family].items()} if summary_family else None
+    kinds = {"str": "x", "int": 1, "num": 1.5, "bool": True, "list": [], "dict": {}}
+    summary = {k: kinds[voc.field_spec(v)[0]] for k, v in voc.SUMMARIES[summary_family].items()} if summary_family else None
     return cov_mod.Result(rows=[sample_row(family) for _ in range(rows)], total=rows, coverage=cov_mod.Coverage(source="cache", **cov), summary=summary)
 
 
@@ -115,10 +116,11 @@ def pending(fid, what):
 # vista -> argv de su comando (lo que F5, F6 y F7 recorren); `seed` prepara la caché de la vista y `attachment list` es una lectura de red (queda fuera de F5)
 VIEW_COMMANDS = {"list": ["list"], "get": ["get", "OMNIFY-1"], "labels": ["labels"], "projects": ["projects"], "whoami": ["whoami"],
                  "attachment list": ["attachment", "list", "OMNIFY-1"], "outbox list": ["outbox", "list"], "report time": ["report", "time", "--from", "2026-10-20"],
-                 "report flow": ["report", "flow", "--from", "2026-10-20"], "worklog check": ["worklog", "check", "--from", "2026-10-20"]}
+                 "report flow": ["report", "flow", "--from", "2026-10-20"], "worklog check": ["worklog", "check", "--from", "2026-10-20"],
+                 "agenda": ["agenda"]}
 NETWORK_VIEWS = {"attachment list", "worklog check"}  # auditorías de red por diseño: quedan fuera de F5 y de la parte sin conexión de F7
-SEED = {"report flow": [["report", "time", "--from", "2026-10-20"]]}  # lo que una vista necesita haber leído antes (el flujo parte de horas ya sincronizadas)
-CACHE_VIEWS = {"list", "get", "labels", "projects", "report time", "report flow"}  # vistas de caché: sobre una caché vencida dan stale y complete null
+SEED = {"report flow": [["report", "time", "--from", "2026-10-20"]], "agenda": [["list"]]}  # lo que una vista necesita haber leído antes
+CACHE_VIEWS = {"list", "get", "labels", "projects", "report time", "report flow", "agenda"}  # vistas de caché: sobre una caché vencida dan stale y complete null
 NON_DIMENSIONAL_FLAGS = {"-h", "--help", "--json"}  # flags que no son dimensiones ni controles (lista blanca de F2; cada vista declara además sus extra_flags)
 
 
@@ -220,7 +222,7 @@ class Architecture(unittest.TestCase):
     def test_f4_vocabulary_matches_the_stable_contract(self):
         expected_envelope_keys = {"schema", "view", "scope", "total", "count", "results", "summary", "coverage", "notes"}
         self.assertEqual(set(voc.ENVELOPE_KEYS), expected_envelope_keys)
-        expected_views = {"list", "get", "report time", "report flow", "worklog check", "labels", "projects", "whoami", "attachment list", "outbox list"}
+        expected_views = {"list", "get", "report time", "report flow", "worklog check", "labels", "projects", "whoami", "attachment list", "outbox list", "agenda"}
         self.assertEqual(set(voc.VIEWS), expected_views)
         self.assertEqual(voc.DIMENSIONS, frozenset({"text", "period", "projects", "state", "person"}))
         self.assertEqual(voc.CONTROLS, frozenset({"refresh", "offline", "verbose", "limit", "brief"}))
@@ -230,11 +232,11 @@ class Architecture(unittest.TestCase):
         self.assertEqual(set(voc.COVERAGE_KEYS), {"source", "as_of", "age_s", "stale", "complete", "unavailable", "detail"})
         self.assertEqual(set(voc.COVERAGE_SOURCES), {"cache", "api", "snapshot", "local", "mixed"})
         self.assertEqual(voc.ALWAYS_SHOWN, frozenset({"truncated", "text_looks_like_id"}))
-        self.assertEqual(set(voc.DETAIL_KEYS), {"metadata_only", "count_mismatch", "comments", "include", "rate_budget_exhausted", "history", "capped", "hours_verified", "assignment_snapshot", "text_fields", "legacy", "hours_scope", "forbidden"})
-        for fam in ("ticket", "ticket_detail", "hours", "flow", "check", "label", "project", "whoami", "attachment", "outbox_item"):
+        self.assertEqual(set(voc.DETAIL_KEYS), {"metadata_only", "count_mismatch", "comments", "include", "rate_budget_exhausted", "history", "capped", "hours_verified", "assignment_snapshot", "text_fields", "legacy", "hours_scope", "forbidden", "today", "wip_limit", "stalled_threshold_days"})
+        for fam in ("ticket", "ticket_detail", "hours", "flow", "check", "label", "project", "whoami", "attachment", "outbox_item", "agenda_item"):
             self.assertIn(fam, voc.FAMILIES)
             self.assertTrue(len(voc.FAMILIES[fam]) > 0)
-        for s in ("hours_summary", "flow_summary", "check_summary"):
+        for s in ("hours_summary", "flow_summary", "check_summary", "agenda_summary"):
             self.assertIn(s, voc.SUMMARIES)
         self.assertTrue(len(voc.NESTED) > 0)
 

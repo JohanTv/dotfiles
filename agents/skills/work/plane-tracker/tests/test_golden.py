@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import golden_support as gs  # noqa: E402
 
-ROOT_COMMANDS = ["get", "list", "create", "update", "delete", "sync", "handoff", "labels", "projects", "whoami", "health"]
+ROOT_COMMANDS = ["get", "list", "agenda", "create", "update", "delete", "sync", "handoff", "labels", "projects", "whoami", "health"]
 GROUPS = {"comment": ("add", "edit", "delete"), "attachment": ("add", "list", "delete", "replace"), "link": ("add",), "outbox": ("list", "flush", "drop"),
           "focus": ("set", "clear", "status"), "worklog": ("propose", "check"), "report": ("time", "flow")}
 HELP_PATHS = ([[c] for c in ROOT_COMMANDS] + [[g] for g in GROUPS] + [[g, v] for g, verbs in GROUPS.items() for v in verbs])
