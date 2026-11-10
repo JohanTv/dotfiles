@@ -49,6 +49,11 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Guarda en SQLite local 
 | **Diagnóstico** | `plane-tracker labels` · `plane-tracker projects` · `plane-tracker whoami` · `plane-tracker health` · `plane-tracker handoff` |
 
 - **Plane caído (exit 3):** Lecturas responden con SQLite local; `comment add` encola en outbox (`⏳ En cola`, exit 0). Al reconectar: `plane-tracker outbox flush`.
+- **Protocolo de sincronización (`sync`):**
+  - *Inicio de sesión / multi-máquina (tickets + horas semana):* `plane-tracker sync --week --all-projects` (atómico, delta sync).
+  - *Refresco rápido para consultar o buscar tickets:* `plane-tracker sync tickets [-p PRJ | --all-projects]` (~1s, sin horas).
+  - *Solo telemetría / worklogs recientes:* `plane-tracker sync hours --week [--all-projects]`.
+  - *Evitar `sync` sin periodo:* `plane-tracker sync` sin flags descarga 30 días de horas. Usar siempre `--week` o target específico.
 
 ## 4. Bitácora de cierre (corta, ≤ 700 caracteres)
 

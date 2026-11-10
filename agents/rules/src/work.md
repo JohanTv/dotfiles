@@ -22,7 +22,7 @@
   - Not found: Propose ticket with title, priority, labels, and `--branch-slug`.
 - **Token Economy in CLI Queries:**
   - *Discovery:* `list --brief --json`.
-  - *Selective Sync:* When refreshing tickets from Plane, use `plane-tracker sync tickets [-p PRJ]` (fast delta sync, ~1s); never use full `plane-tracker sync` (which pulls 30 days of hours) for ticket queries.
+  - *Selective Sync:* For ticket queries, use `plane-tracker sync tickets [-p PRJ]` (fast delta sync, ~1s). For general session/multi-machine sync (worklogs + tickets), use `plane-tracker sync --week --all-projects` (avoids 30-day default). Never use unconstrained `plane-tracker sync` without a period flag.
   - *Initial Inspection:* `plane-tracker get <TICKET>` (without `--full`, truncated to 300 chars).
   - *Deep Inspection:* Only when actively working on it, invoke `--full --no-comments` or `--last 3`. Never re-query data already in context.
 - **Status Queries ("Revisa el Plane"):** Respond in **6-8 lines maximum**: Ticket/Title/State, contract summary, next step/stopper, and coverage notice.
