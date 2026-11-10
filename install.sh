@@ -187,6 +187,7 @@ link_file "$DOTFILES_DIR/terminal/zellij" "$HOME/.config/zellij"
 # ------------------------------------------------------------------------------
 log_info "Configurando Zsh y temas..."
 link_file "$DOTFILES_DIR/shell/.zshrc" "$HOME/.zshrc"
+link_file "$DOTFILES_DIR/shell/.claude-profiles.zsh" "$HOME/.claude-profiles.zsh"
 
 # Crear .zshrc.local si no existe
 if [[ ! -f "$HOME/.zshrc.local" ]]; then
