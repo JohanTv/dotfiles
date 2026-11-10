@@ -1,7 +1,7 @@
 ---
 id: "0005"
 title: Personal activity agenda view and backlog deferral tracking
-status: proposed
+status: implemented
 created: 2026-10-31
 summary: Proposal for personal agenda reporting, tracking active load, overdue tickets, and documented backlog deferrals.
 ---

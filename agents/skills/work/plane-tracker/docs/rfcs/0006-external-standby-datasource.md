@@ -1,7 +1,7 @@
 ---
 id: "0006"
 title: Determine reliable data source for external standby and blockers
-status: proposed
+status: implemented
 created: 2026-10-31
 summary: Proposal to unify external blocker visibility with agenda dashboards (RFC 0005) and report flow metrics instead of overloading comment telemetry.
 ---

@@ -1,7 +1,7 @@
 ---
 id: "0026"
 title: Measuring time distribution against user-declared capacity plans
-status: accepted
+status: implemented
 created: 2026-11-03
 summary: Proposal to measure recorded time against user-configured engineering capacity targets (features, support, tech debt, learning, overhead).
 ---
