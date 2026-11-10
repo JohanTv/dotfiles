@@ -125,7 +125,7 @@ def _mark_stale(conn, project_id):
         conn.execute("UPDATE issue_sync SET stale = 1 WHERE project_id = ?", (project_id,))
 
 
-def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False, offline=False, deep=False):
+def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_ident, force_refresh=False, offline=False, deep=False, delta=None):
     """Sincroniza los tickets del proyecto en SQLite (solo GET) con delta sync y marcas de agua (RFC 0027).
 
     Estados: `fresh` (vigente), `synced`, `stale` (se sirvió lo almacenado vencido: la red falló o se pidió --offline), `rate_limited` (se detuvo antes de
@@ -138,8 +138,9 @@ def sync_project_issues(conn, base_url, api_key, workspace, project_id, project_
         return ("unavailable" if previous is None else "stale" if expired and offline else "fresh"), previous
     now = clock.timestamp()
 
+    use_delta = (delta is True) or (not deep and not force_refresh and delta is not False)
     cutoff_iso = None
-    if not deep and not force_refresh:
+    if use_delta and not deep:
         wm = store_issues.get_watermark(conn, "tickets", project_id)
         if wm and wm.get("server_high_watermark"):
             try:

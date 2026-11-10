@@ -12,7 +12,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 AGENTS = ("claude", "opencode", "agy")
-SESSION_ENV = {"claude": "CLAUDE_CODE_SESSION_ID", "opencode": "OPENCODE_SESSION_ID"}
+SESSION_ENV = {"claude": "CLAUDE_CODE_SESSION_ID", "opencode": "OPENCODE_SESSION_ID", "agy": "ANTIGRAVITY_CONVERSATION_ID"}
 
 CLAUDE_PROJECTS = os.path.expanduser("~/.claude/projects")
 OPENCODE_DB = os.path.expanduser("~/.local/share/opencode/opencode.db")
@@ -63,6 +63,8 @@ def detect_agent(env=None):
     for agent, var in SESSION_ENV.items():
         if env.get(var):
             return agent
+    if env.get("ANTIGRAVITY_AGENT"):
+        return "agy"
     return None
 
 

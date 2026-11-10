@@ -113,14 +113,14 @@ def _refresh_labels(conn, env, project_id):
         pass
 
 
-def _ensure_issues(conn, env, scope, deep=False):
+def _ensure_issues(conn, env, scope, deep=False, delta=None):
     statuses = {}
     for project in scope.projects:
         force = scope.refresh or _outdated(conn, project.uuid) or deep
         if not scope.offline and cache.needs_sync(conn, project.uuid, force) and cache._budget_ok():  # sin presupuesto no se pide ni lo accesorio
             _refresh_labels(conn, env, project.uuid)
         statuses[project.ident] = cache.sync_project_issues(conn, env.base_url, env.api_key, env.workspace, project.uuid, project.ident,
-                                                            force_refresh=force, offline=scope.offline, deep=deep)
+                                                            force_refresh=force, offline=scope.offline, deep=deep, delta=delta)
     return statuses
 
 
@@ -428,7 +428,7 @@ def run_sync(conn, env, scope, history=False, budget=25, target="all", deep=Fals
     issues = {}
     hours, swept = None, None
     if target in ("all", "tickets"):
-        issues = {ident: status for ident, (status, _as_of) in _ensure_issues(conn, env, replace(scope, refresh=not history), deep=deep).items()}
+        issues = {ident: status for ident, (status, _as_of) in _ensure_issues(conn, env, replace(scope, refresh=not history), deep=deep, delta=not deep).items()}
     if target == "catalogs":
         for project in scope.projects:
             _refresh_labels(conn, env, project.uuid)
