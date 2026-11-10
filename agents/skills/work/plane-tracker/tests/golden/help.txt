@@ -811,7 +811,7 @@ $ plane.py report time --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPAC
 usage: plane.py report time [-h] [-p PROJECT] [--all-projects] [--from FECHA]
                             [--to FECHA] [--week] [--refresh] [--offline]
                             [--verbose] [--track TRACK]
-                            [--worker-type WORKER_TYPE] [--json]
+                            [--worker-type WORKER_TYPE] [--plan SPEC] [--json]
 
 Horas del autor en el periodo (por defecto hoy) con Interval Merging;
 sincroniza con Plane por proyecto y periodo si falta o venció (5 min). Sin
@@ -832,6 +832,8 @@ options:
   --track TRACK         Filtrar por track (ej: main, subagent)
   --worker-type WORKER_TYPE
                         Filtrar por tipo de trabajador (human, subagent)
+  --plan SPEC           Plan de capacidad objetivo (ej:
+                        deep_work=50%,toil_support=20%,rest)
   --json                Salida en JSON
 --- stderr ---
 

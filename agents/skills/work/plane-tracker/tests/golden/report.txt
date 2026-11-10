@@ -79,7 +79,6 @@ notas: [General (10:00-11:00)]: Avance del formulario
 --------------------------------------------------------------------------------
 📊 Total día: 1h 30m reloj activa (OPS: 0h 45m | OMNIFY: 1h 00m)
 🚀 AI Leverage Multiplier: 1.17x (1h 45m de esfuerzo entregado en 1h 30m reloj)
-⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)
 
 ================================================================================
 --- stderr ---
@@ -99,7 +98,6 @@ notas: [Track: support (09:30-10:15)]: Soporte a usuarios
 
 --------------------------------------------------------------------------------
 📊 Total día: 0h 45m reloj activa (OPS: 0h 45m)
-⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)
 
 ================================================================================
 --- stderr ---

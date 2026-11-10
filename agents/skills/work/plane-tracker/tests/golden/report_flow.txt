@@ -12,7 +12,6 @@ notas: [General (15:00-16:00)]: Cierre del acortador
 
 --------------------------------------------------------------------------------
 📊 Total día: 1h 00m reloj activa (OMNIFY: 1h 00m)
-⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)
 
 ================================================================================
 --- stderr ---

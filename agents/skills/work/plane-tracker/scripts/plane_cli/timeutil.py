@@ -215,8 +215,6 @@ def render_day_block(date_obj, rows):
 
     if all_stoppers:
         lines.append(f"⏸️ Standby externo: {', '.join(all_stoppers)}")
-    else:
-        lines.append("⏸️ Standby externo: 0h 00m (Sin bloqueos reportados)")
 
     return "\n".join(lines)
 

@@ -46,7 +46,7 @@ VIEWS = {
     "report time": View("report time", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_time.query, render_time.render,
                         {"person": "hours_author", "projects": "all", "order": "date,start_time,ticket"},
                         "horas del autor en el periodo: sincronización por proyecto y periodo si falta o venció (5 min); --offline no toca la red", ("report", "time"),
-                        frozenset({"--track", "--worker-type"})),
+                        frozenset({"--track", "--worker-type", "--plan"})),
     "report flow": View("report flow", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_flow.query, render_flow.render,
                         {"projects": "all", "order": "ticket"}, "tickets del alcance y las transiciones de los tickets del periodo que falten o hayan cambiado (1 GET por ticket)",
                         ("report", "flow")),

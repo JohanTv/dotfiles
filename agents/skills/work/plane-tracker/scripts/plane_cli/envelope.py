@@ -57,6 +57,8 @@ def _summary_problems(summary, family):
         for key in ("by_day", "by_project", "by_capacity"):
             for i, item in enumerate(summary.get(key) or []):
                 problems += [f"summary.{key}[{i}]: clave fuera del vocabulario: {name}" for name in sorted(set(item) - vocabulary.SUMMARY_ITEM_KEYS)]
+        for i, item in enumerate(summary.get("capacity_variance") or []):
+            problems += [f"summary.capacity_variance[{i}]: clave fuera del vocabulario: {name}" for name in sorted(set(item) - vocabulary.CAPACITY_VARIANCE_KEYS)]
     return problems
 
 

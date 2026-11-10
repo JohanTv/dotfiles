@@ -50,6 +50,37 @@ def _week(doc, rows, first, last):
     lines += ["=" * 80, f"🏆 TOTAL SEMANA: {format_minutes(clock_minutes)} reloj activa ({projects})"]
     if compute > clock_minutes:
         lines.append(f"🚀 AI Leverage Multiplier: {round(compute / clock_minutes, 2) if clock_minutes > 0 else 1.0}x ({format_minutes(compute)} de esfuerzo total entregado)")
+
+    by_cap = summary.get("by_capacity") or []
+    if by_cap:
+        lines.append("\n🎯 DISTRIBUCIÓN POR CAPACIDAD:")
+        total_cap = sum(c["minutes"] for c in by_cap)
+        var_by_bucket = {v["bucket"]: v for v in summary.get("capacity_variance") or []}
+        for c in by_cap:
+            b_name = c["key"]
+            b_mins = c["minutes"]
+            pct = (b_mins / total_cap * 100.0) if total_cap > 0 else 0.0
+            plan_info = ""
+            if b_name == "undeclared":
+                if b_name in var_by_bucket:
+                    v = var_by_bucket[b_name]
+                    diff = v["variance_percent"]
+                    diff_str = f"+{diff:.1f}%" if diff >= 0 else f"{diff:.1f}%"
+                    plan_info = f" ⚠️ sin declarar [meta {v['target_percent']:.1f}% · {diff_str}]"
+                else:
+                    plan_info = " ⚠️ sin declarar"
+            elif b_name in var_by_bucket:
+                v = var_by_bucket[b_name]
+                diff = v["variance_percent"]
+                diff_str = f"+{diff:.1f}%" if diff >= 0 else f"{diff:.1f}%"
+                plan_info = f" [meta {v['target_percent']:.1f}% · {diff_str}]"
+            lines.append(f"  • {b_name:<18} {format_minutes(b_mins):>7} ({pct:5.1f}%){plan_info}")
+
+    if is_iso_week:
+        untracked = max(0, 2400 - clock_minutes)
+        if untracked > 0:
+            lines.append(f"\nℹ Tiempo no contabilizado: {format_minutes(untracked)} (base semana laboral 40h)")
+
     if stoppers:
         lines.append(f"⏸️ STANDBY TOTAL: {', '.join(stoppers)}")
     lines.append("=" * 80 + "\n")

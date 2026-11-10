@@ -68,7 +68,8 @@ GET_INCLUDES = ("attachments", "links", "relations", "children")
 GET_INCLUDES_COVERED = ("attachments", "links")
 # Agregados (`summary`) por familia de resumen. `report time` lleva listas de {key, minutes}; `undeclared` va en by_capacity, nunca sumado a deep_work.
 SUMMARIES = {
-    "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int"},
+    "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int",
+                      "capacity_variance": "list?"},
     "flow_summary": {"tickets": "int", "completed": "int", "cancelled": "int", "open": "int", "excluded": "int", "n_lead": "int", "n_cycle": "int",
                      "median_lead_minutes": "num?", "median_cycle_minutes": "num?"},
     "check_summary": {"ok": "bool", "unreachable": "int", "checked": "list"},
@@ -77,6 +78,16 @@ SUMMARIES = {
                        "ai_leverage_multiplier": "num", "active_focus_ticket": "str?"},
 }
 SUMMARY_ITEM_KEYS = {"key", "minutes"}  # elementos de by_day, by_project y by_capacity
+CAPACITY_VARIANCE_KEYS = {"bucket", "minutes", "actual_percent", "target_percent", "variance_percent"}
+CAPACITY_BUCKETS = ("deep_work", "toil_support", "coordination", "tech_debt_paydown", "tooling_dx", "research_rd", "undeclared")
+DEFAULT_CAPACITY_TARGETS = {
+    "deep_work": 50.0,
+    "toil_support": 20.0,
+    "coordination": 10.0,
+    "tech_debt_paydown": 10.0,
+    "tooling_dx": 5.0,
+    "research_rd": 5.0,
+}
 # vista -> (familia de filas, familia de resumen o None, lleva `scope`). `get` no lleva alcance: el alcance es un ticket, en `results`.
 VIEWS = {"list": ("ticket", None, True), "get": ("ticket_detail", None, False), "report time": ("hours", "hours_summary", True),
          "report flow": ("flow", "flow_summary", True), "worklog check": ("check", "check_summary", True), "labels": ("label", None, True),

@@ -30,7 +30,7 @@ def cmd_report_time(args, conn, base_url, api_key, workspace, default_project_id
     """`report time`: las horas del autor en el periodo (sincroniza por proyecto y periodo si hace falta); el texto es un render del mismo sobre que el JSON."""
     view = VIEWS["report time"]
     env, _cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=True)
-    doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_hours(conn, env, scope)), verbose=args.verbose)
+    doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_hours(conn, env, scope), plan=getattr(args, "plan", None)), verbose=args.verbose)
     emit(view, doc, getattr(args, "json", False))
 
 
@@ -62,6 +62,7 @@ def register_report_time(sub):
     add_scope_args(p, view.dims, view.controls)
     p.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
     p.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
+    p.add_argument("--plan", metavar="SPEC", help="Plan de capacidad objetivo (ej: deep_work=50%%,toil_support=20%%,rest)")
     add_json_flag(p)
     p.set_defaults(handler=cmd_report_time)
 
