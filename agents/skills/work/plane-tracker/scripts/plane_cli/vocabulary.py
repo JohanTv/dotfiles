@@ -34,7 +34,7 @@ _TICKET = {"ticket": "str!", "uuid": "str", "title": "str!", "state": "str!", "s
            "assignees": "list", "created_by": "str?", "labels": "list", "start_date": "str?", "target_date": "str?", "created_at": "str?",
            "completed_at": "str?", "plane_updated_at": "str?", "reasons": "list", "assignment_events": "list"}
 _FLOW = {"ticket": "str!", "title": "str", "outcome": "str!", "flags": "list", "created": "str?", "closed": "str?", "lead_minutes": "num?",
-         "cycle_active_minutes": "num?", "cycle_gross_minutes": "num?", "by_state_minutes": "dict", "effort_compute_minutes": "num?",
+         "cycle_active_minutes": "num?", "cycle_gross_minutes": "num?", "standby_minutes": "num?", "by_state_minutes": "dict", "effort_compute_minutes": "num?",
          "effort_clock_minutes": "num?", "worklogs": "int", "worklogs_before_created": "int", "worklogs_after_closed": "int",
          "effort_clock_over_cycle": "num?", "transitions": "list"}
 FAMILIES = {
@@ -71,7 +71,8 @@ SUMMARIES = {
     "hours_summary": {"by_day": "list", "by_project": "list", "by_capacity": "list", "effort_clock_minutes": "int", "effort_compute_minutes": "int",
                       "capacity_variance": "list?"},
     "flow_summary": {"tickets": "int", "completed": "int", "cancelled": "int", "open": "int", "excluded": "int", "n_lead": "int", "n_cycle": "int",
-                     "median_lead_minutes": "num?", "median_cycle_minutes": "num?"},
+                     "median_lead_minutes": "num?", "median_cycle_minutes": "num?",
+                     "total_standby_minutes": "num?", "tickets_with_standby": "int?", "median_standby_minutes": "num?"},
     "check_summary": {"ok": "bool", "unreachable": "int", "checked": "list"},
     "agenda_summary": {"wip_count": "int", "wip_limit": "int", "wip_exceeded": "bool", "stalled_count": "int", "overdue_count": "int",
                        "blocked_count": "int", "pull_queue_count": "int", "logged_clock_minutes_week": "int", "logged_compute_minutes_week": "int",

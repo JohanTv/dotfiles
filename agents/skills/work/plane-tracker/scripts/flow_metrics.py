@@ -15,8 +15,32 @@ MIN_MEANINGFUL_LEAD = timedelta(minutes=5)
 _UMBRELLA = re.compile(r"-\s*W\d{2}\s*$")
 
 
+STANDBY_NAMES = (
+    "pausado",
+    "pausada",
+    "paused",
+    "bloqueado",
+    "bloqueada",
+    "standby",
+    "pausa",
+    "en pausa",
+    "on hold",
+    "bloqueo",
+    "en espera",
+)
+
+
 def _norm(text):
-    return "".join(c for c in unicodedata.normalize("NFD", (text or "").lower()) if unicodedata.category(c) != "Mn")
+    return "".join(c for c in unicodedata.normalize("NFD", (text or "").strip().lower()) if unicodedata.category(c) != "Mn")
+
+
+def _is_standby(name):
+    norm = _norm(name)
+    if not norm:
+        return False
+    if norm in STANDBY_NAMES:
+        return True
+    return norm.startswith(("pausad", "bloquead", "paused", "standby", "on hold", "en pausa", "bloqueo", "en espera"))
 
 
 def _minutes(delta):
@@ -55,16 +79,46 @@ def union_minutes(intervals):
     return _minutes(total)
 
 
+def _sort_transitions(transitions):
+    """Ordena transiciones por timestamp UTC y encadenamiento causal (from_id -> to_id)."""
+    if not transitions:
+        return []
+    by_time = {}
+    for t in transitions:
+        by_time.setdefault(t["at"], []).append(t)
+    ordered = []
+    for at_val in sorted(by_time):
+        bucket = by_time[at_val]
+        if len(bucket) <= 1:
+            ordered.extend(bucket)
+            continue
+        bucket.sort(key=lambda item: 1 if item.get("from_id") != item.get("to_id") else 0)
+        to_ids = {item.get("to_id") for item in bucket if item.get("from_id") != item.get("to_id")}
+        firsts = [item for item in bucket if item.get("from_id") not in to_ids]
+        curr = firsts[0] if firsts else bucket[0]
+        chain = [curr]
+        remaining = [item for item in bucket if item is not curr]
+        while remaining:
+            nxt = next((item for item in remaining if item.get("from_id") == curr.get("to_id")), None)
+            if not nxt:
+                nxt = remaining[0]
+            chain.append(nxt)
+            remaining.remove(nxt)
+            curr = nxt
+        ordered.extend(chain)
+    return ordered
+
+
 def compute_flow(issue, transitions, states, worklogs, now):
     """issue: {name, created_at, completed_at, state}; transitions: [{at, from_id, to_id}] (at UTC);
     states: {id: {name, group}}; worklogs: [{date, start_time, end_time, duration_minutes}]."""
     created = issue["created_at"]
-    transitions = sorted(transitions, key=lambda t: t["at"])
+    transitions = _sort_transitions(transitions)
     current = states.get(issue.get("state"), {})
     flags = []
 
-    group = lambda sid: states.get(sid, {}).get("group", "?")
-    name_of = lambda sid: states.get(sid, {}).get("name", "?")
+    group = lambda sid: states.get(sid, {}).get("group") or "?"
+    name_of = lambda sid: states.get(sid, {}).get("name") or "?"
 
     # Segmentos (inicio, fin, state_id): el estado inicial sale del primer old_identifier.
     segments = []
@@ -95,14 +149,17 @@ def compute_flow(issue, transitions, states, worklogs, now):
     lead = max(lead_end - created, timedelta())
 
     by_state = {}
-    gross = active = timedelta()
+    gross = active = standby = timedelta()
     for start, end, sid in segments:
         span = max(end - start, timedelta())
         if span:
             by_state[name_of(sid)] = by_state.get(name_of(sid), timedelta()) + span
+        is_standby = _is_standby(name_of(sid))
+        if is_standby:
+            standby += span
         if group(sid) == "started":
             gross += span
-            if _norm(name_of(sid)) != "pausado":
+            if not is_standby:
                 active += span
     has_started = any(group(sid) == "started" for _, _, sid in segments)
     if not has_started:
@@ -136,6 +193,7 @@ def compute_flow(issue, transitions, states, worklogs, now):
         "lead_minutes": _minutes(lead),
         "cycle_active_minutes": cycle_active,
         "cycle_gross_minutes": _minutes(gross) if has_started else None,
+        "standby_minutes": _minutes(standby),
         "by_state_minutes": {k: _minutes(v) for k, v in by_state.items()},
         "effort_compute_minutes": compute,
         "effort_clock_minutes": clock,
@@ -155,6 +213,8 @@ def aggregate(flows):
     done = [f for f in flows if real(f)]
     leads = [f["lead_minutes"] for f in done]
     cycles = [f["cycle_active_minutes"] for f in done if f["cycle_active_minutes"] is not None]
+    standbys = [(f.get("standby_minutes") or 0.0) for f in flows if (f.get("standby_minutes") or 0.0) > 0]
+    total_standby = sum((f.get("standby_minutes") or 0.0) for f in flows)
     return {
         "tickets": len(flows),
         "completed": sum(f["outcome"] == "completed" for f in flows),
@@ -164,5 +224,8 @@ def aggregate(flows):
         "median_lead_minutes": statistics.median(leads) if leads else None,
         "n_cycle": len(cycles),
         "median_cycle_minutes": statistics.median(cycles) if cycles else None,
+        "total_standby_minutes": total_standby,
+        "tickets_with_standby": len(standbys),
+        "median_standby_minutes": statistics.median(standbys) if standbys else None,
         "excluded": len(flows) - len(done) - sum(f["outcome"] != "completed" for f in flows),
     }
