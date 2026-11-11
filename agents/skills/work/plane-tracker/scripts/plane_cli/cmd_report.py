@@ -31,7 +31,7 @@ def cmd_report_time(args, conn, base_url, api_key, workspace, default_project_id
     view = VIEWS["report time"]
     env, _cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=True)
     doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_hours(conn, env, scope), plan=getattr(args, "plan", None)), verbose=args.verbose)
-    emit(view, doc, getattr(args, "json", False))
+    emit(view, doc, getattr(args, "json", False), markdown=getattr(args, "markdown", False))
 
 
 def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id):
@@ -39,7 +39,7 @@ def cmd_report_flow(args, conn, base_url, api_key, workspace, default_project_id
     view = VIEWS["report flow"]
     env, cats, scope = _scope(args, conn, base_url, api_key, workspace, default_project_id, view, personal=False)
     doc = build(view.name, scope.to_dict(view), view.query(conn, scope, ensure_flow(conn, env, scope, cats)), verbose=args.verbose)
-    emit(view, doc, getattr(args, "json", False))
+    emit(view, doc, getattr(args, "json", False), markdown=getattr(args, "markdown", False))
 
 
 def cmd_worklog_check(args, conn, base_url, api_key, workspace, default_project_id):
@@ -63,6 +63,7 @@ def register_report_time(sub):
     p.add_argument("--track", help="Filtrar por track (ej: main, subagent)")
     p.add_argument("--worker-type", help="Filtrar por tipo de trabajador (human, subagent)")
     p.add_argument("--plan", metavar="SPEC", help="Plan de capacidad objetivo (ej: deep_work=50%%,toil_support=20%%,rest)")
+    p.add_argument("--markdown", action="store_true", help="Salida en formato Markdown")
     add_json_flag(p)
     p.set_defaults(handler=cmd_report_time)
 
@@ -73,6 +74,7 @@ def register_report_flow(sub):
                        description="Lead/cycle time, tiempo por estado y esfuerzo de los tickets con horas en el periodo o cerrados en él. Se calcula con lo almacenado: "
                                    "--refresh trae las transiciones que falten (1 GET por ticket) y --offline no consulta Plane.")
     add_scope_args(p, view.dims, view.controls)
+    p.add_argument("--markdown", action="store_true", help="Salida en formato Markdown")
     add_json_flag(p)
     p.set_defaults(handler=cmd_report_flow)
 

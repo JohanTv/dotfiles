@@ -99,7 +99,7 @@ $ plane.py agenda --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLU
 --- stdout ---
 usage: plane.py agenda [-h] [-p PROJECT] [--all-projects] [--refresh]
                        [--offline] [--brief] [--verbose] [--wip-limit N]
-                       [--stalled-days N] [--json]
+                       [--stalled-days N] [--markdown] [--json]
 
 Dashboard operativo de foco personal: lista tickets en curso, alerta
 sobrecarga si superas el límite de WIP, visibiliza impedimentos y destaca la
@@ -119,6 +119,7 @@ options:
                         2)
   --stalled-days N      Días sin cambios para considerar un ticket estancado
                         (por defecto: 3)
+  --markdown            Salida en formato Markdown
   --json                Salida en JSON
 --- stderr ---
 
@@ -811,7 +812,8 @@ $ plane.py report time --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPAC
 usage: plane.py report time [-h] [-p PROJECT] [--all-projects] [--from FECHA]
                             [--to FECHA] [--week] [--refresh] [--offline]
                             [--verbose] [--track TRACK]
-                            [--worker-type WORKER_TYPE] [--plan SPEC] [--json]
+                            [--worker-type WORKER_TYPE] [--plan SPEC]
+                            [--markdown] [--json]
 
 Horas del autor en el periodo (por defecto hoy) con Interval Merging;
 sincroniza con Plane por proyecto y periodo si falta o venció (5 min). Sin
@@ -834,6 +836,7 @@ options:
                         Filtrar por tipo de trabajador (human, subagent)
   --plan SPEC           Plan de capacidad objetivo (ej:
                         deep_work=50%,toil_support=20%,rest)
+  --markdown            Salida en formato Markdown
   --json                Salida en JSON
 --- stderr ---
 
@@ -843,7 +846,7 @@ $ plane.py report flow --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPAC
 --- stdout ---
 usage: plane.py report flow [-h] [-p PROJECT] [--all-projects] [--from FECHA]
                             [--to FECHA] [--week] [--refresh] [--offline]
-                            [--verbose] [--json]
+                            [--verbose] [--markdown] [--json]
 
 Lead/cycle time, tiempo por estado y esfuerzo de los tickets con horas en el
 periodo o cerrados en él. Se calcula con lo almacenado: --refresh trae las
@@ -860,6 +863,7 @@ options:
   --refresh             Forzar la sincronización con Plane
   --offline             No consultar Plane: solo lo local
   --verbose             Incluir las notas informativas
+  --markdown            Salida en formato Markdown
   --json                Salida en JSON
 --- stderr ---
 

@@ -46,10 +46,11 @@ VIEWS = {
     "report time": View("report time", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_time.query, render_time.render,
                         {"person": "hours_author", "projects": "all", "order": "date,start_time,ticket"},
                         "horas del autor en el periodo: sincronización por proyecto y periodo si falta o venció (5 min); --offline no toca la red", ("report", "time"),
-                        frozenset({"--track", "--worker-type", "--plan"})),
+                        frozenset({"--track", "--worker-type", "--plan", "--markdown"})),
     "report flow": View("report flow", frozenset({"projects", "period"}), frozenset({"refresh", "offline", "verbose"}), query_flow.query, render_flow.render,
                         {"projects": "all", "order": "ticket"}, "tickets del alcance y las transiciones de los tickets del periodo que falten o hayan cambiado (1 GET por ticket)",
-                        ("report", "flow")),
+                        ("report", "flow"),
+                        frozenset({"--markdown"})),
     "worklog check": View("worklog check", frozenset({"projects", "period"}), NONE, query_check.query, render_check.render, {"projects": "all", "order": "ticket,date,start_time"},
                           "siempre red: auditoría de los comentarios de cada ticket con registros locales", ("worklog", "check")),
     # `sync` no es una vista de lectura (escribe en la base local), pero comparte alcance y flags con ellas: sin consulta ni render propios (la salida de las escrituras es de la fase 8)
@@ -60,5 +61,5 @@ VIEWS = {
     "agenda": View("agenda", frozenset({"projects"}), frozenset({"refresh", "offline", "brief", "verbose"}), query_agenda.query, render_agenda.render,
                    {"projects": "all", "order": "role_rank,priority,-plane_updated_at"},
                    "tickets de los proyectos accesibles del alcance (TTL 30 min; --refresh fuerza; --offline no toca la red)", ("agenda",),
-                   frozenset({"--wip-limit", "--stalled-days"})),
+                   frozenset({"--wip-limit", "--stalled-days", "--markdown"})),
 }

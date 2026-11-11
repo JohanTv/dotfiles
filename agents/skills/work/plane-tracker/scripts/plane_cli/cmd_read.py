@@ -65,7 +65,7 @@ def cmd_agenda(args, conn, base_url, api_key, workspace, default_project_id):
                            wip_limit=args.wip_limit,
                            stalled_days=args.stalled_days),
                 verbose=args.verbose)
-    emit(view, doc, getattr(args, "json", False), **({} if getattr(args, "json", False) else {"brief": getattr(args, "brief", False)}))
+    emit(view, doc, getattr(args, "json", False), **({} if getattr(args, "json", False) else {"brief": getattr(args, "brief", False), "markdown": getattr(args, "markdown", False)}))
 
 
 def _cache_only(args):
@@ -134,6 +134,7 @@ def register_agenda(sub):
                           help="Límite recomendado de trabajo en curso (por defecto: 2)")
     p_agenda.add_argument("--stalled-days", type=positive_int, default=3, metavar="N",
                           help="Días sin cambios para considerar un ticket estancado (por defecto: 3)")
+    p_agenda.add_argument("--markdown", action="store_true", help="Salida en formato Markdown")
     add_json_flag(p_agenda)
     p_agenda.set_defaults(handler=cmd_agenda)
 

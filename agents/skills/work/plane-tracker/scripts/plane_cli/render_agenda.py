@@ -35,7 +35,85 @@ def _render_brief(doc):
     return "\n".join(lines) + "\n"
 
 
-def render(doc, brief=False):
+def _render_agenda_markdown(doc):
+    s = doc.get("summary") or {}
+    wip_cnt, wip_lim = s.get("wip_count", 0), s.get("wip_limit", 2)
+    wip_warn = " ⚠️ **LÍMITE EXCEDIDO**" if s.get("wip_exceeded") else ""
+    today_str = (doc.get("coverage", {}).get("detail", {}).get("today") or "")
+
+    lines = [f"# 🎯 Agenda Personal · {today_str}\n"]
+
+    clock_m = s.get("logged_clock_minutes_week", 0)
+    leverage = s.get("ai_leverage_multiplier", 1.0)
+    lines.append("### 📊 Estado y Capacidad Semanal\n")
+    lines.append(f"- **WIP:** {wip_cnt} / máx {wip_lim}{wip_warn}")
+    lines.append(f"- **Horas Semana:** `{format_minutes(clock_m)}` reloj activo (AI Leverage: `{leverage}x`)")
+    lines.append(f"- **Bloqueados:** {s.get('blocked_count', 0)} · **En Cola:** {s.get('pull_queue_count', 0)}\n")
+
+    active = [r for r in doc.get("results") or [] if r.get("section") in ("active_focus", "in_progress")]
+    lines.append(f"### 🔥 En Curso (WIP: {wip_cnt} / {wip_lim})\n")
+    if not active:
+        lines.append("*(Sin tareas en curso)*\n")
+    else:
+        lines.append("| Foco | Ticket | Prioridad | Título | Estado / Progreso |")
+        lines.append("| :---: | :--- | :---: | :--- | :--- |")
+        for r in active:
+            mark = "▶" if r.get("is_focus") else "•"
+            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
+            t_title = raw_title.replace("|", "\\|").strip()
+            sub = []
+            if r.get("is_focus"):
+                sub.append(f"En foco ({r.get('focus_source') or 'activo'})")
+            if r.get("is_stalled"):
+                sub.append(f"⚠️ Estancado ({r['days_since_update']}d)")
+            if r.get("is_overdue"):
+                sub.append("Vencido")
+            elif r.get("target_date") == today_str and today_str:
+                sub.append("Vence hoy")
+            if r.get("dod_total"):
+                sub.append(f"DoD: {r['dod_completed']}/{r['dod_total']}")
+            status_desc = " · ".join(sub) if sub else f"Activo hace {r.get('days_since_update', 0)}d"
+            lines.append(f"| {mark} | `{r['ticket']}` | {prio} | {t_title[:45]} | {status_desc} |")
+        lines.append("")
+
+    blocked = [r for r in doc.get("results") or [] if r.get("section") == "blocked"]
+    if blocked:
+        lines.append(f"### ⏸️ Bloqueados / Standby ({len(blocked)})\n")
+        lines.append("| Ticket | Prioridad | Título | Standby | Motivo de Bloqueo |")
+        lines.append("| :--- | :---: | :--- | :---: | :--- |")
+        for r in blocked:
+            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
+            t_title = raw_title.replace("|", "\\|").strip()
+            reason = (r.get("blocker_reason") or "En espera externa").replace("|", "\\|").strip()
+            lines.append(f"| `{r['ticket']}` | {prio} | {t_title[:40]} | {r['standby_days']}d | {reason[:50]} |")
+        lines.append("")
+
+    queue = [r for r in doc.get("results") or [] if r.get("section") == "pull_queue"]
+    if queue:
+        lines.append("### 📥 Próximas en Cola (Pull Queue)\n")
+        lines.append("| # | Ticket | Prioridad | Título |")
+        lines.append("| :---: | :--- | :---: | :--- |")
+        for i, r in enumerate(queue, 1):
+            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
+            t_title = raw_title.replace("|", "\\|").strip()
+            lines.append(f"| {i} | `{r['ticket']}` | {prio} | {t_title[:55]} |")
+        lines.append("")
+
+    notes = [f"> {'⚠' if vocabulary.NOTES.get(n['code'], ('warn',))[0] == 'warn' else 'ℹ'} {n['text']}" + (f" → {n['hint']}" if n.get("hint") else "") for n in (doc.get("notes") or [])]
+    if notes:
+        lines.append("### ℹ️ Observaciones\n")
+        lines.extend(notes)
+        lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def render(doc, brief=False, markdown=False):
+    if markdown:
+        return _render_agenda_markdown(doc)
     if brief or doc.get("scope", {}).get("brief"):
         return _render_brief(doc)
 
