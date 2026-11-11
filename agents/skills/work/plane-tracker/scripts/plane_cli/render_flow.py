@@ -8,6 +8,27 @@ from plane_cli import vocabulary
 from plane_cli.timeutil import format_span
 
 
+def _md_cell(text, max_len=None):
+    if text is None:
+        return ""
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    if max_len is not None and len(s) > max_len:
+        s = s[:max_len].rstrip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;")
+    s = s.replace("\\", "\\\\").replace("|", "\\|")
+    if s.count("`") % 2 != 0:
+        s = s.replace("`", "'")
+    return s
+
+
+def _md_code(text):
+    if text is None:
+        return "—"
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;").replace("\\", "\\\\").replace("|", "\\|").replace("`", "'")
+    return f"`{s}`"
+
+
 def _render_flow_markdown(doc):
     period = doc["scope"]["period"]
     lines = [f"# 🔁 Reporte de Flujo de Entrega (Lead & Cycle Time)\n",
@@ -20,13 +41,12 @@ def _render_flow_markdown(doc):
         lines.append("| Estado | Ticket | Título | Lead Time | Cycle Activo | Standby | Esfuerzo (Reloj / Cómputo) |")
         lines.append("| :---: | :--- | :--- | :---: | :---: | :---: | :---: |")
         for f in doc["results"]:
-            outcome = {"completed": "✔", "cancelled": "✖", "open": "…"}.get(f["outcome"], "?")
-            flags = f" `[{', '.join(f['flags'])}]`" if f["flags"] else ""
-            raw_title = f.get("title") or ""
-            t_title = raw_title.replace("|", "\\|").replace("\n", " ").strip()
-            standby_val = f"⏸ {format_span(f['standby_minutes'])}" if (f.get("standby_minutes") or 0.0) > 0 else "—"
-            effort_str = f"{format_span(f['effort_clock_minutes'])} / {format_span(f['effort_compute_minutes'])}"
-            lines.append(f"| {outcome} | `{f['ticket']}` | {t_title[:60]}{flags} | {format_span(f['lead_minutes'])} | {format_span(f['cycle_active_minutes'])} | {standby_val} | {effort_str} |")
+            outcome = {"completed": "✔", "cancelled": "✖", "open": "…"}.get(f.get("outcome"), "?")
+            flags = f" `[{', '.join(_md_cell(flag) for flag in f['flags'])}]`" if f.get("flags") else ""
+            t_title = _md_cell(f.get("title") or "", 60)
+            standby_val = f"⏸ {format_span(f.get('standby_minutes'))}" if (f.get("standby_minutes") or 0.0) > 0 else "—"
+            effort_str = f"{format_span(f.get('effort_clock_minutes'))} / {format_span(f.get('effort_compute_minutes'))}"
+            lines.append(f"| {outcome} | {_md_code(f['ticket'])} | {t_title}{flags} | {format_span(f.get('lead_minutes'))} | {format_span(f.get('cycle_active_minutes'))} | {standby_val} | {effort_str} |")
         lines.append("")
 
         agg = doc["summary"]
@@ -38,7 +58,7 @@ def _render_flow_markdown(doc):
             lines.append(f"- **Standby Total Acumulado:** `{format_span(agg['total_standby_minutes'])}` ({agg.get('tickets_with_standby') or 0} ticket(s) · Mediana: `{format_span(agg.get('median_standby_minutes') or 0)}`)")
         lines.append("")
 
-    notes = [f"> {'⚠' if vocabulary.NOTES[n['code']][0] == 'warn' else 'ℹ'} {n['text']}" + (f" → {n['hint']}" if n.get("hint") else "") for n in doc["notes"]]
+    notes = [f"> {'⚠' if vocabulary.NOTES.get(n['code'], ('warn',))[0] == 'warn' else 'ℹ'} {_md_cell(n['text'])}" + (f" → {_md_cell(n['hint'])}" if n.get("hint") else "") for n in (doc.get("notes") or [])]
     if notes:
         lines.append("### ℹ️ Observaciones\n")
         lines.extend(notes)

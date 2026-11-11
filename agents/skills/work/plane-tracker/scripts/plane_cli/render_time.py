@@ -26,7 +26,7 @@ def _today(cov, last):
 
 
 def _notes(doc):
-    return [f"  {'⚠' if vocabulary.NOTES[n['code']][0] == 'warn' else 'ℹ'} {n['text']}" + (f" → {n['hint']}" if n.get("hint") else "") for n in doc["notes"]]
+    return [f"  {'⚠' if vocabulary.NOTES.get(n['code'], ('warn',))[0] == 'warn' else 'ℹ'} {n['text']}" + (f" → {n['hint']}" if n.get("hint") else "") for n in doc["notes"]]
 
 
 def _week(doc, rows, first, last):
@@ -87,8 +87,25 @@ def _week(doc, rows, first, last):
     return lines
 
 
-def _md_cell(text):
-    return (str(text) if text is not None else "").replace("|", "\\|").replace("\n", " ").strip()
+def _md_cell(text, max_len=None):
+    if text is None:
+        return ""
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    if max_len is not None and len(s) > max_len:
+        s = s[:max_len].rstrip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;")
+    s = s.replace("\\", "\\\\").replace("|", "\\|")
+    if s.count("`") % 2 != 0:
+        s = s.replace("`", "'")
+    return s
+
+
+def _md_code(text):
+    if text is None:
+        return "—"
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;").replace("\\", "\\\\").replace("|", "\\|").replace("`", "'")
+    return f"`{s}`"
 
 
 def _render_time_markdown(doc):
@@ -141,7 +158,7 @@ def _render_time_markdown(doc):
             elif b_name == "undeclared":
                 meta_str = "0.0%"
                 diff_str = "⚠️ sin declarar"
-            lines.append(f"| `{_md_cell(b_name)}` | {format_minutes(b_mins)} | {pct:5.1f}% | {meta_str} | {diff_str} |")
+            lines.append(f"| {_md_code(b_name)} | {format_minutes(b_mins)} | {pct:5.1f}% | {meta_str} | {diff_str} |")
         lines.append("")
 
     day, shown_until = first, min(last, _today(doc["coverage"], last))
@@ -164,9 +181,9 @@ def _render_time_markdown(doc):
                 dur = format_minutes(r["duration_minutes"])
                 raw_payload = json.loads(r.get("raw_payload") or "{}")
                 b_name = raw_payload.get("capacity") or r.get("track") or "—"
-                t_title = _md_cell(r.get("issue_name") or "")
-                notes = _md_cell(r.get("notes") or "")
-                lines.append(f"| `{_md_cell(r['ticket_id'])}` | {t_title[:45]} | {horario} | {dur} | `{_md_cell(b_name)}` | {notes[:40]} |")
+                t_title = _md_cell(r.get("issue_name") or "", 45)
+                notes = _md_cell(r.get("notes") or "", 40)
+                lines.append(f"| {_md_code(r['ticket_id'])} | {t_title} | {horario} | {dur} | {_md_code(b_name)} | {notes} |")
             lines.append("")
     else:
         lines.append("### 📅 Desglose Diario de Actividades\n")
@@ -188,8 +205,8 @@ def _render_time_markdown(doc):
                     dur = format_minutes(r["duration_minutes"])
                     raw_payload = json.loads(r.get("raw_payload") or "{}")
                     b_name = raw_payload.get("capacity") or r.get("track") or "—"
-                    t_title = _md_cell(r.get("issue_name") or "")
-                    lines.append(f"| `{_md_cell(r['ticket_id'])}` | {t_title[:50]} | {horario} | {dur} | `{_md_cell(b_name)}` |")
+                    t_title = _md_cell(r.get("issue_name") or "", 50)
+                    lines.append(f"| {_md_code(r['ticket_id'])} | {t_title} | {horario} | {dur} | {_md_code(b_name)} |")
                 lines.append("")
             day += timedelta(days=1)
         if not has_days:
@@ -200,7 +217,7 @@ def _render_time_markdown(doc):
         lines.append("| Proyecto | Tiempo Reloj |")
         lines.append("| :--- | :---: |")
         for k, v in by_project.items():
-            lines.append(f"| `{_md_cell(k)}` | {format_minutes(v)} |")
+            lines.append(f"| {_md_code(k)} | {format_minutes(v)} |")
         lines.append("")
 
     if stoppers:

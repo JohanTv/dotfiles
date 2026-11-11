@@ -35,13 +35,35 @@ def _render_brief(doc):
     return "\n".join(lines) + "\n"
 
 
+def _md_cell(text, max_len=None):
+    if text is None:
+        return ""
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    if max_len is not None and len(s) > max_len:
+        s = s[:max_len].rstrip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;")
+    s = s.replace("\\", "\\\\").replace("|", "\\|")
+    if s.count("`") % 2 != 0:
+        s = s.replace("`", "'")
+    return s
+
+
+def _md_code(text):
+    if text is None:
+        return "—"
+    s = str(text).replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ").strip()
+    s = s.replace("<", "&lt;").replace(">", "&gt;").replace("\\", "\\\\").replace("|", "\\|").replace("`", "'")
+    return f"`{s}`"
+
+
 def _render_agenda_markdown(doc):
     s = doc.get("summary") or {}
     wip_cnt, wip_lim = s.get("wip_count", 0), s.get("wip_limit", 2)
     wip_warn = " ⚠️ **LÍMITE EXCEDIDO**" if s.get("wip_exceeded") else ""
     today_str = (doc.get("coverage", {}).get("detail", {}).get("today") or "")
 
-    lines = [f"# 🎯 Agenda Personal · {today_str}\n"]
+    title = f"# 🎯 Agenda Personal · {today_str}\n" if today_str else "# 🎯 Agenda Personal\n"
+    lines = [title]
 
     clock_m = s.get("logged_clock_minutes_week", 0)
     leverage = s.get("ai_leverage_multiplier", 1.0)
@@ -59,22 +81,22 @@ def _render_agenda_markdown(doc):
         lines.append("| :---: | :--- | :---: | :--- | :--- |")
         for r in active:
             mark = "▶" if r.get("is_focus") else "•"
-            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            prio = _md_code(r['priority'].upper()) if r.get("priority") else "—"
             raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
-            t_title = raw_title.replace("|", "\\|").strip()
+            t_title = _md_cell(raw_title, 45)
             sub = []
             if r.get("is_focus"):
                 sub.append(f"En foco ({r.get('focus_source') or 'activo'})")
             if r.get("is_stalled"):
-                sub.append(f"⚠️ Estancado ({r['days_since_update']}d)")
+                sub.append(f"⚠️ Estancado ({r.get('days_since_update', 0)}d)")
             if r.get("is_overdue"):
                 sub.append("Vencido")
             elif r.get("target_date") == today_str and today_str:
                 sub.append("Vence hoy")
             if r.get("dod_total"):
-                sub.append(f"DoD: {r['dod_completed']}/{r['dod_total']}")
-            status_desc = " · ".join(sub) if sub else f"Activo hace {r.get('days_since_update', 0)}d"
-            lines.append(f"| {mark} | `{r['ticket']}` | {prio} | {t_title[:45]} | {status_desc} |")
+                sub.append(f"DoD: {r.get('dod_completed', 0)}/{r.get('dod_total', 0)}")
+            status_desc = _md_cell(" · ".join(sub) if sub else f"Activo hace {r.get('days_since_update', 0)}d")
+            lines.append(f"| {mark} | {_md_code(r['ticket'])} | {prio} | {t_title} | {status_desc} |")
         lines.append("")
 
     blocked = [r for r in doc.get("results") or [] if r.get("section") == "blocked"]
@@ -83,11 +105,12 @@ def _render_agenda_markdown(doc):
         lines.append("| Ticket | Prioridad | Título | Standby | Motivo de Bloqueo |")
         lines.append("| :--- | :---: | :--- | :---: | :--- |")
         for r in blocked:
-            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            prio = _md_code(r['priority'].upper()) if r.get("priority") else "—"
             raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
-            t_title = raw_title.replace("|", "\\|").strip()
-            reason = (r.get("blocker_reason") or "En espera externa").replace("|", "\\|").strip()
-            lines.append(f"| `{r['ticket']}` | {prio} | {t_title[:40]} | {r['standby_days']}d | {reason[:50]} |")
+            t_title = _md_cell(raw_title, 40)
+            reason = _md_cell(r.get("blocker_reason") or "En espera externa", 50)
+            standby_days = f"{r.get('standby_days') or 0}d"
+            lines.append(f"| {_md_code(r['ticket'])} | {prio} | {t_title} | {standby_days} | {reason} |")
         lines.append("")
 
     queue = [r for r in doc.get("results") or [] if r.get("section") == "pull_queue"]
@@ -96,13 +119,13 @@ def _render_agenda_markdown(doc):
         lines.append("| # | Ticket | Prioridad | Título |")
         lines.append("| :---: | :--- | :---: | :--- |")
         for i, r in enumerate(queue, 1):
-            prio = f"`{r['priority'].upper()}`" if r.get("priority") else "—"
+            prio = _md_code(r['priority'].upper()) if r.get("priority") else "—"
             raw_title = (r.get("title") or "").splitlines()[0] if (r.get("title") or "").splitlines() else ""
-            t_title = raw_title.replace("|", "\\|").strip()
-            lines.append(f"| {i} | `{r['ticket']}` | {prio} | {t_title[:55]} |")
+            t_title = _md_cell(raw_title, 55)
+            lines.append(f"| {i} | {_md_code(r['ticket'])} | {prio} | {t_title} |")
         lines.append("")
 
-    notes = [f"> {'⚠' if vocabulary.NOTES.get(n['code'], ('warn',))[0] == 'warn' else 'ℹ'} {n['text']}" + (f" → {n['hint']}" if n.get("hint") else "") for n in (doc.get("notes") or [])]
+    notes = [f"> {'⚠' if vocabulary.NOTES.get(n['code'], ('warn',))[0] == 'warn' else 'ℹ'} {_md_cell(n['text'])}" + (f" → {_md_cell(n['hint'])}" if n.get("hint") else "") for n in (doc.get("notes") or [])]
     if notes:
         lines.append("### ℹ️ Observaciones\n")
         lines.extend(notes)
