@@ -460,7 +460,8 @@ options:
 $ plane.py comment add --help   [sin PLANE_BASE_URL,PLANE_API_KEY,PLANE_WORKSPACE_SLUG,PLANE_PROJECT_ID,PLANE_ACTOR_UUID]
 [exit 0]
 --- stdout ---
-usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
+usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--no-worklog]
+                            [--track TRACK]
                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
                             [--duration MIN] [--date YYYY-MM-DD]
@@ -479,6 +480,8 @@ options:
   -m, --message MESSAGE
                         Mensaje del comentario
   -f, --file FILE       Archivo con el contenido
+  --no-worklog          Publicar el comentario sin registrar telemetría ni
+                        imputar tiempo
   --track TRACK         Frente de trabajo (ej: main, subagent, review,
                         datepicker)
   --capacity, --capacity-bucket {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}

@@ -20,7 +20,7 @@ from plane_cli.outbox import Draft, publish_comment
 from plane_cli.proposal_store import consume_proposal, load_recent_proposal, save_proposal
 from plane_cli.proposals import NO_PROPOSAL_BUCKETS, build_proposal, current_session_id, print_proposal
 from plane_cli.resolve import get_project_identifier, known_actor, local_ticket_label, resolve_issue, resolve_project_and_seq
-from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, parse_date, reject_long_comment, reject_placeholders, requested_date, resolve_window, strip_metadata_block
+from plane_cli.worklog import derived_start, extract_metadata_from_comment, note_from, parse_date, recalculate_window_duration, reject_long_comment, reject_placeholders, requested_date, resolve_window, strip_metadata_block
 from plane_cli import clock, envelope, vocabulary
 
 
@@ -127,13 +127,59 @@ def _print_result(args, result, issue, ticket_label, duration):
             "outbox_id": result.outbox_id,
             "client_id": result.client_id,
             "issue": ticket_label,
-            "duration_minutes": duration,
             "reason": result.reason,
         }
+        if duration is not None:
+            doc["duration_minutes"] = duration
+        else:
+            doc["worklog"] = False
         print(envelope.dumps(doc))
     else:
-        print(f"⏳ En cola (#{result.outbox_id}): comentario para {ticket_label}, {duration} min. Plane no responde; el tiempo ya cuenta como registrado. "
-              "Publícalo con: plane-tracker outbox flush")
+        if duration is not None:
+            print(f"⏳ En cola (#{result.outbox_id}): comentario para {ticket_label}, {duration} min. Plane no responde; el tiempo ya cuenta como registrado. "
+                  "Publícalo con: plane-tracker outbox flush")
+        else:
+            print(f"⏳ En cola (#{result.outbox_id}): comentario para {ticket_label}. Plane no responde; el comentario quedó en cola. "
+                  "Publícalo con: plane-tracker outbox flush")
+
+
+def _check_no_worklog_conflicts(args):
+    conflicts = [flag for flag, val in (
+        ("--date", getattr(args, "date", None)),
+        ("--duration", getattr(args, "duration", None)),
+        ("--since", getattr(args, "since", None)),
+        ("--until", getattr(args, "until", None)),
+        ("--capacity", getattr(args, "capacity_bucket", None)),
+        ("--track", getattr(args, "track", None)),
+        ("--worker-type", getattr(args, "worker_type", None)),
+        ("--accept-proposal", getattr(args, "accept_proposal", False)),
+    ) if val]
+    if conflicts:
+        raise CliError("invalid_input", f"--no-worklog no se puede combinar con banderas de tiempo o capacidad ({', '.join(conflicts)}).")
+
+
+def _build_entry(ticket_label, track, issue, meta, now, duration, worker_type, capacity_bucket, conn, workspace):
+    return {
+        "id": None,
+        "ticket_id": ticket_label,
+        "track": track,
+        "issue_name": issue.get("name", ""),
+        "date": meta.get("date", now.strftime("%Y-%m-%d")),
+        "start_time": meta.get("start_time", derived_start(now, duration)),
+        "end_time": meta.get("end_time", now.strftime("%H:%M")),
+        "duration_minutes": duration,
+        "worker_type": worker_type,
+        "capacity_bucket": capacity_bucket,
+        "phase": meta.get("phase", "dev"),
+        "role": meta.get("role", "backend_engineer"),
+        "notes": meta.get("notes", issue.get("name", "")),
+        "stoppers": meta.get("stoppers", []),
+        "defaulted": [f for f in ("phase", "role", "notes") if f not in meta],
+        "plane_comment_id": None,
+        "created_at": now.isoformat(),
+        "author_id": known_actor(conn, workspace),
+        "raw_payload": meta
+    }
 
 
 def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
@@ -166,18 +212,31 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
     if unavailable is not None:
         issue = issue_stub(conn, project_id, seq_id, uuid_ref, issue_ref)
 
-    meta = extract_metadata_from_comment(content)
-    # Ventana real del trabajo: --date/--since/--until mandan sobre la hora de publicación (defecto 0001).
-    if getattr(args, "date", None):
-        day = requested_date(args.date)
+    no_worklog = getattr(args, "no_worklog", False)
+    if no_worklog:
+        _check_no_worklog_conflicts(args)
+        duration = None
+        proposal = None
     else:
-        day = (parse_date(meta.get("date")) if meta else None) or clock.local_today()
-    since, until = getattr(args, "since", None), getattr(args, "until", None)
-    declared = getattr(args, "duration", None) or (meta.get("duration_minutes") or meta.get("duration_net_minutes") if meta else None)
-    win = resolve_window(since, until, declared, day)
-    duration, proposal = _resolve_duration(args, conn, meta, issue_ref, win[2] if win else None)
-    if duration is None:
-        return 1
+        meta = extract_metadata_from_comment(content)
+        # Ventana real del trabajo: --date/--since/--until mandan sobre la hora de publicación (defecto 0001).
+        if getattr(args, "date", None):
+            day = requested_date(args.date)
+        else:
+            day = (parse_date(meta.get("date")) if meta else None) or clock.local_today()
+        since, until = getattr(args, "since", None), getattr(args, "until", None)
+        declared = getattr(args, "duration", None) or (meta.get("duration_minutes") or meta.get("duration_net_minutes") if meta else None)
+        win = resolve_window(since, until, declared, day)
+        duration, proposal = _resolve_duration(args, conn, meta, issue_ref, win[2] if win else None)
+        if duration is None:
+            return 1
+
+        # Defecto 0031: en días pasados se exige ventana explícita si la duración es manual (sin propuesta)
+        if day < clock.local_today() and win is None and not proposal:
+            if not (meta and (meta.get("start_time") or meta.get("end_time"))):
+                raise CliError("invalid_input",
+                               f"Para registrar trabajo de un día anterior ({day}) debes indicar la ventana horaria con --since o --until.",
+                               hint=f"Ej: --date {day} --since 10:00 --duration {duration}")
 
     # Convertir Markdown → HTML si el contenido no viene ya como HTML. El bloque oculto se quita antes: el conversor
     # lo escaparía y quedaría visible; publish_comment inserta el real.
@@ -196,6 +255,14 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         ticket_label = f"{proj_ident}-{seq_label}" if proj_ident and seq_label else args.issue
     else:
         ticket_label = issue.get("ticket_id") or issue_ref
+
+    if no_worklog:
+        meta = {"schema_version": "2.2", "worklog": False}
+        entry = None
+        draft = Draft(base_url, api_key, workspace, project_id, issue, ticket_label, comment_html, meta, entry, unavailable, has_worklog=False)
+        result = publish_comment(conn, draft)
+        _print_result(args, result, issue, ticket_label, None)
+        return
 
     # Determinar track, worker_type y capacity_bucket (prioridad: flags de CLI -> metadata -> default)
     track = getattr(args, "track", None) or (meta.get("track") if meta else None) or "main"
@@ -223,10 +290,13 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
         meta["duration_minutes"] = duration
         # Horarios honestos: si la metadata no los trae, se derivan de la duración reportada
         meta.setdefault("date", now.strftime("%Y-%m-%d"))
-        meta.setdefault("end_time", now.strftime("%H:%M"))
-        if not meta.get("start_time"):
-            end_t = datetime.strptime(meta["end_time"], "%H:%M")
-            meta["start_time"] = derived_start(end_t, duration)
+        if meta.get("start_time") and not meta.get("end_time"):
+            meta["end_time"] = recalculate_window_duration(meta["start_time"], duration, day)
+        else:
+            meta.setdefault("end_time", now.strftime("%H:%M"))
+            if not meta.get("start_time"):
+                end_t = datetime.strptime(meta["end_time"], "%H:%M")
+                meta["start_time"] = derived_start(end_t, duration)
 
     _record_measurement(meta, args, proposal, worker_type)
     # La ventana declarada manda sobre la hora de publicación y sobre la del bloque de metadata.
@@ -238,27 +308,7 @@ def cmd_comment(args, conn, base_url, api_key, workspace, default_project_id):
 
     # El comentario viaja con su propia telemetría (bloque HTML oculto que Plane conserva): así las horas
     # sobreviven a la pérdida de la caché local y se pueden reconstruir con `report time --refresh`.
-    entry = {
-        "id": None,
-        "ticket_id": ticket_label,
-        "track": track,
-        "issue_name": issue.get("name", ""),
-        "date": meta.get("date", now.strftime("%Y-%m-%d")),
-        "start_time": meta.get("start_time", derived_start(now, duration)),
-        "end_time": meta.get("end_time", now.strftime("%H:%M")),
-        "duration_minutes": duration,
-        "worker_type": worker_type,
-        "capacity_bucket": capacity_bucket,
-        "phase": meta.get("phase", "dev"),
-        "role": meta.get("role", "backend_engineer"),
-        "notes": meta.get("notes", issue.get("name", "")),
-        "stoppers": meta.get("stoppers", []),
-        "defaulted": [f for f in ("phase", "role", "notes") if f not in meta],  # lo que no declaró el comentario y se completó con un valor por defecto (defecto 0022)
-        "plane_comment_id": None,
-        "created_at": now.isoformat(),
-        "author_id": known_actor(conn, workspace),
-        "raw_payload": meta
-    }
+    entry = _build_entry(ticket_label, track, issue, meta, now, duration, worker_type, capacity_bucket, conn, workspace)
     draft = Draft(base_url, api_key, workspace, project_id, issue, ticket_label, comment_html, meta, entry, unavailable)
     result = publish_comment(conn, draft)
     if proposal:
@@ -271,6 +321,8 @@ def register_comment_add(sub):
     p_comment.add_argument("issue", nargs="?", default=None, help="Ticket (ej: OMNIFY-162, OPS-44 o auto-detectado de Git)")
     p_comment.add_argument("-m", "--message", help="Mensaje del comentario")
     p_comment.add_argument("-f", "--file", help="Archivo con el contenido")
+    p_comment.add_argument("--no-worklog", action="store_true",
+                           help="Publicar el comentario sin registrar telemetría ni imputar tiempo")
     p_comment.add_argument("--track", help="Frente de trabajo (ej: main, subagent, review, datepicker)")
     p_comment.add_argument("--capacity", "--capacity-bucket", dest="capacity_bucket",
                            choices=["deep_work", "toil_support", "coordination", "tooling_dx", "research_rd", "tech_debt_paydown"],

@@ -50,6 +50,7 @@ class Draft:
     meta: dict
     entry: dict
     unavailable: object = None
+    has_worklog: bool = True
 
 
 @dataclass
@@ -72,10 +73,13 @@ def stamp():
     return clock.now().isoformat(timespec="seconds")
 
 
-def make_client_id(ticket_label, track, date, start_time, html):
+def make_client_id(ticket_label, track, date, start_time, html, has_worklog=True):
     """Identificador determinista del comentario: ticket, frente, inicio y texto visible (sin el bloque oculto)."""
     visible = hashlib.sha256(strip_metadata_block(html).strip().encode("utf-8")).hexdigest()
-    key = f"{ticket_label}|{track}|{date}|{start_time}|{visible}"
+    if has_worklog:
+        key = f"{ticket_label}|{track}|{date}|{start_time}|{visible}"
+    else:
+        key = f"{ticket_label}|no-worklog|{stamp()}|{visible}"
     return "pt-" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:20]
 
 
@@ -120,10 +124,11 @@ def release(conn, item_id, prev, exc):
 
 def mark_sent(conn, item, comment_id):
     """Item enviado: enlaza el id del comentario en el item y en la fila provisional de worklogs."""
+    has_wl = item["has_worklog"] if "has_worklog" in item.keys() else 1
     with conn:
         conn.execute("UPDATE outbox SET state = 'sent', plane_comment_id = ?, sent_at = ?, updated_at = ?, last_error = NULL, lease_until = NULL WHERE id = ?",
                      (comment_id, stamp(), stamp(), item["id"]))
-        if comment_id:
+        if comment_id and has_wl:
             conn.execute(f"UPDATE worklogs SET plane_comment_id = ? WHERE {_WORKLOG_KEY}", (comment_id, *_wl_params(item)))
 
 
@@ -214,35 +219,47 @@ def _rejected(conn, item, prev, status, detail):
 
 def discard_item(conn, item, previous=None):
     """Borra el item y su fila provisional (o restaura la fila de worklogs que existía antes)."""
+    has_wl = item["has_worklog"] if "has_worklog" in item.keys() else 1
     with conn:
         conn.execute("DELETE FROM outbox WHERE id = ?", (item["id"],))
-        conn.execute(f"DELETE FROM worklogs WHERE {_WORKLOG_KEY} AND plane_comment_id IS NULL", _wl_params(item))
-        if previous:
-            columns = list(previous)
-            conn.execute(f"INSERT OR REPLACE INTO worklogs ({','.join(columns)}) VALUES ({','.join('?' * len(columns))})", [previous[c] for c in columns])
+        if has_wl:
+            conn.execute(f"DELETE FROM worklogs WHERE {_WORKLOG_KEY} AND plane_comment_id IS NULL", _wl_params(item))
+            if previous:
+                columns = list(previous)
+                conn.execute(f"INSERT OR REPLACE INTO worklogs ({','.join(columns)}) VALUES ({','.join('?' * len(columns))})", [previous[c] for c in columns])
 
 
 def _enqueue(conn, draft, client_id):
     """Guarda el item `pending` y la fila provisional de worklogs en una sola transacción; devuelve (item, fila previa de worklogs)."""
+    has_wl = getattr(draft, "has_worklog", True)
     entry = draft.entry
-    key = (entry["ticket_id"], entry["track"], entry["date"], entry["start_time"])
+    if has_wl and entry:
+        key = (entry["ticket_id"], entry["track"], entry["date"], entry["start_time"])
+    else:
+        key = (draft.ticket_label, "", "", "")
     payload = json.dumps({"comment_html": draft.html, "external_source": EXTERNAL_SOURCE, "external_id": client_id}, ensure_ascii=False)
     if len(payload.encode("utf-8")) > MAX_TEXT_BYTES:
         fail("queue_full", f"el comentario supera el máximo de {MAX_TEXT_BYTES // 1024} KB.")
-    owner = conn.execute(f"SELECT id FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL} AND (target_workspace IS NULL OR target_workspace = ?)", (*key, draft.workspace)).fetchone()
-    if owner:
-        fail("duplicate", f"Ya hay un registro en cola con ese ticket/track/fecha/inicio (#{owner['id']}). Publícalo con 'outbox flush' o descártalo con 'outbox drop {owner['id']}'.")
+    if has_wl:
+        owner = conn.execute(f"SELECT id FROM outbox WHERE {_WL_KEY} AND {_OPEN_SQL} AND has_worklog = 1 AND (target_workspace IS NULL OR target_workspace = ?)", (*key, draft.workspace)).fetchone()
+        if owner:
+            fail("duplicate", f"Ya hay un registro en cola con ese ticket/track/fecha/inicio (#{owner['id']}). Publícalo con 'outbox flush' o descártalo con 'outbox drop {owner['id']}'.")
     if conn.execute(f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL}").fetchone()[0] >= MAX_OPEN_ITEMS:
         fail("queue_full", f"la cola ya tiene {MAX_OPEN_ITEMS} registros abiertos; publícalos con 'outbox flush' antes de añadir más.")
-    previous = conn.execute(f"SELECT * FROM worklogs WHERE {_WORKLOG_KEY}", key).fetchone()
-    if previous:
-        sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
+    previous = None
+    if has_wl:
+        previous = conn.execute(f"SELECT * FROM worklogs WHERE {_WORKLOG_KEY}", key).fetchone()
+        if previous:
+            sys.stderr.write("⚠ Ya existía un worklog local con el mismo ticket/track/fecha/inicio: se sobrescribe (el comentario anterior sigue en Plane).\n")
     now = stamp()
     conn.execute("DELETE FROM outbox WHERE client_id = ? AND state = 'dropped'", (client_id,))
     target_url = normalize_instance_url(draft.base_url) if draft.base_url else None
-    cursor = conn.execute("INSERT INTO outbox (client_id, ticket_ref, payload_json, wl_ticket_id, wl_track, wl_date, wl_start_time, created_at, updated_at, target_base_url, target_workspace) "
-                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (client_id, draft.ticket_label, payload, *key, now, now, target_url, draft.workspace))
-    upsert_worklog(conn, entry)  # confirma también el INSERT anterior: ambas filas o ninguna
+    cursor = conn.execute("INSERT INTO outbox (client_id, ticket_ref, payload_json, wl_ticket_id, wl_track, wl_date, wl_start_time, created_at, updated_at, target_base_url, target_workspace, has_worklog) "
+                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (client_id, draft.ticket_label, payload, *key, now, now, target_url, draft.workspace, 1 if has_wl else 0))
+    if has_wl and entry:
+        upsert_worklog(conn, entry)  # confirma también el INSERT anterior: ambas filas o ninguna
+    else:
+        conn.commit()
     return conn.execute("SELECT * FROM outbox WHERE id = ?", (cursor.lastrowid,)).fetchone(), dict(previous) if previous else None
 
 
@@ -257,7 +274,11 @@ def publish_comment(conn, draft):
     un fallo de disponibilidad deja el PlaneUnavailable sin encolar nada.
     """
     entry, meta = draft.entry, draft.meta
-    client_id = meta["client_id"] = make_client_id(entry["ticket_id"], entry["track"], entry["date"], entry["start_time"], draft.html)
+    has_wl = getattr(draft, "has_worklog", True)
+    if has_wl and entry:
+        client_id = meta["client_id"] = make_client_id(entry["ticket_id"], entry["track"], entry["date"], entry["start_time"], draft.html)
+    else:
+        client_id = meta["client_id"] = make_client_id(draft.ticket_label, "", "", "", draft.html, has_worklog=False)
     draft.html = replace_metadata_block(draft.html, meta)
     no_queue = os.environ.get("PLANE_NO_QUEUE") == "1"
     existing = conn.execute("SELECT * FROM outbox WHERE client_id = ?", (client_id,)).fetchone()
@@ -304,12 +325,12 @@ def owner_of(conn, ticket, track, date, start_time, workspace=None):
 
 def open_keys(conn):
     """{(ticket, track, fecha, inicio)} de las filas provisionales de los items abiertos."""
-    return {tuple(r) for r in conn.execute(f"SELECT wl_ticket_id, wl_track, wl_date, wl_start_time FROM outbox WHERE {_OPEN_SQL}")}
+    return {tuple(r) for r in conn.execute(f"SELECT wl_ticket_id, wl_track, wl_date, wl_start_time FROM outbox WHERE {_OPEN_SQL} AND (has_worklog = 1 OR has_worklog IS NULL)")}
 
 
 def count_open(conn, date_from, date_to, project=None, track=None, workspace=None):
     """Items abiertos cuya fecha de worklog cae en el periodo (filtrables por proyecto, track y workspace)."""
-    query, params = f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL} AND wl_date >= ? AND wl_date <= ?", [date_from, date_to]
+    query, params = f"SELECT COUNT(*) FROM outbox WHERE {_OPEN_SQL} AND (has_worklog = 1 OR has_worklog IS NULL) AND wl_date >= ? AND wl_date <= ?", [date_from, date_to]
     if project:
         query, params = query + " AND wl_ticket_id LIKE ?", params + [f"{project.upper()}-%"]
     if track:
@@ -352,8 +373,12 @@ def list_items(conn, include_all=False):
     for row in conn.execute(f"SELECT * FROM outbox {where} ORDER BY id"):
         html = json.loads(row["payload_json"]).get("comment_html", "")
         meta = extract_metadata_from_comment(html) or {}
-        items.append({"id": row["id"], "client_id": row["client_id"], "state": row["state"], "ticket": row["ticket_ref"], "track": row["wl_track"],
-                      "date": row["wl_date"], "start_time": row["wl_start_time"], "duration_minutes": meta.get("duration_minutes"),
+        has_wl = bool(row["has_worklog"]) if "has_worklog" in row.keys() else bool(meta.get("duration_minutes"))
+        items.append({"id": row["id"], "client_id": row["client_id"], "state": row["state"], "ticket": row["ticket_ref"],
+                      "track": row["wl_track"] if has_wl else "—",
+                      "date": row["wl_date"] if has_wl else "—",
+                      "start_time": row["wl_start_time"] if has_wl else "—",
+                      "duration_minutes": meta.get("duration_minutes"),
                       "attempts": row["attempts"], "maybe_delivered": bool(row["maybe_delivered"]), "last_error": row["last_error"],
                       "plane_comment_id": row["plane_comment_id"], "created_at": row["created_at"], "preview": _preview(html)})
     return items
@@ -368,8 +393,9 @@ def drop_item(conn, item_id, force=False, keep_worklog=False):
         fail("refused", f"el registro #{item_id} está en estado {item['state']}; solo se descartan los pendientes, en envío o fallidos.")
     if item["maybe_delivered"] and not force:
         fail("refused", f"el registro #{item_id} pudo haberse enviado. Puede que ya esté publicado en Plane; revisa el ticket {item['ticket_ref']} o descártalo igualmente con --force.")
+    has_wl = item["has_worklog"] if "has_worklog" in item.keys() else 1
     with conn:
         conn.execute("UPDATE outbox SET state = 'dropped', lease_until = NULL, updated_at = ? WHERE id = ?", (stamp(), item_id))
-        if not keep_worklog:
+        if not keep_worklog and has_wl:
             conn.execute(f"DELETE FROM worklogs WHERE {_WORKLOG_KEY} AND plane_comment_id IS NULL", _wl_params(item))
     return item

@@ -75,16 +75,23 @@ def init_outbox_tables(conn):
             maybe_delivered INTEGER NOT NULL DEFAULT 0 CHECK (maybe_delivered IN (0,1)),
             last_error TEXT, plane_comment_id TEXT, lease_until REAL,
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL, sent_at TEXT,
-            target_base_url TEXT, target_workspace TEXT
+            target_base_url TEXT, target_workspace TEXT,
+            has_worklog INTEGER NOT NULL DEFAULT 1
         );
     """)
-    ensure_columns(conn, "outbox", {"target_base_url": "TEXT", "target_workspace": "TEXT"})
+    ensure_columns(conn, "outbox", {"target_base_url": "TEXT", "target_workspace": "TEXT", "has_worklog": "INTEGER NOT NULL DEFAULT 1"})
     conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_state ON outbox(state, id);")
-    conn.execute("DROP INDEX IF EXISTS idx_outbox_wl_open;")
-    conn.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open_ws
-            ON outbox(COALESCE(target_workspace, ''), wl_ticket_id, wl_track, wl_date, wl_start_time) WHERE state IN ('pending','sending','failed');
-    """)
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_outbox_wl_open'").fetchone():
+        conn.execute("DROP INDEX idx_outbox_wl_open;")
+    idx_ws = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_outbox_wl_open_ws'").fetchone()
+    if not idx_ws or "has_worklog" not in (idx_ws[0] or ""):
+        if idx_ws:
+            conn.execute("DROP INDEX idx_outbox_wl_open_ws;")
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_wl_open_ws
+                ON outbox(COALESCE(target_workspace, ''), wl_ticket_id, wl_track, wl_date, wl_start_time)
+                WHERE state IN ('pending','sending','failed') AND has_worklog = 1;
+        """)
 
 
 def init_people_tables(conn):

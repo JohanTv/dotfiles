@@ -134,6 +134,34 @@ class Cli(unittest.TestCase):
         self.assertEqual((self.rows(), self.rows("worklogs")), ([], []))
         self.assertEqual(len(self.posts()), 1)
 
+    def test_no_worklog_queues_and_flushes_without_creating_worklog(self):
+        self.warm()
+        self.sb.write_circuit(opened_ago=5)
+        out, _ = self.cli("comment", "add", "OMNIFY-1", "-m", "nota sin telemetria", "--no-worklog")
+        self.assertIn("⏳ En cola (#1): comentario para OMNIFY-1. Plane no responde; el comentario quedó en cola.", out)
+        self.assertEqual(len(self.rows("outbox")), 1)
+        self.assertEqual(len(self.rows("worklogs")), 0)
+        self.assertEqual(self.rows("outbox")[0]["has_worklog"], 0)
+
+        # Múltiples comentarios sin worklog no colisionan en la cola
+        self.cli("comment", "add", "OMNIFY-1", "-m", "segunda nota", "--no-worklog")
+        self.assertEqual(len(self.rows("outbox")), 2)
+        self.assertEqual(len(self.rows("worklogs")), 0)
+
+        # outbox flush entrega ambos a Plane sin crear filas en worklogs
+        self.sb.write_circuit(opened_ago=None, consec=0)
+        self.cli("outbox", "flush")
+        self.assertEqual(len(self.rows("worklogs")), 0)
+        self.assertEqual(len(self.posts()), 2)
+
+    def test_no_worklog_conflicts_with_duration_flags(self):
+        _, err = self.cli("comment", "add", "OMNIFY-1", "-m", "x", "--no-worklog", "--duration", "10", code=1)
+        self.assertIn("--no-worklog no se puede combinar con banderas de tiempo", err)
+
+    def test_past_date_without_window_is_rejected(self):
+        _, err = self.cli("comment", "add", "OMNIFY-1", "-m", "x", "--date", "2026-10-20", "--duration", "30", code=1)
+        self.assertIn("Para registrar trabajo de un día anterior (2026-10-20) debes indicar la ventana horaria", err)
+
     def test_queued_time_still_counts_as_registered(self):
         sb = gs.Sandbox(with_session=True)
         self.addCleanup(sb.close)

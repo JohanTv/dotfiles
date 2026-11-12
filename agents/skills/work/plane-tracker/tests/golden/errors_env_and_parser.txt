@@ -60,7 +60,8 @@ $ plane.py comment add OMNIFY-1 --capacity nada
 --- stdout ---
 
 --- stderr ---
-usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--track TRACK]
+usage: plane.py comment add [-h] [-m MESSAGE] [-f FILE] [--no-worklog]
+                            [--track TRACK]
                             [--capacity {deep_work,toil_support,coordination,tooling_dx,research_rd,tech_debt_paydown}]
                             [--worker-type {human,subagent,agent:agy,agent:claude,agent:opencode}]
                             [--duration MIN] [--date YYYY-MM-DD]
