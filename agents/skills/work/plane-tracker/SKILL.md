@@ -37,6 +37,7 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Guarda en SQLite local 
 | **Actualizar ticket** | `plane-tracker update T --title "..." --description-file desc.md --state ... --priority ... --labels ...` |
 | **Crear ticket** | `plane-tracker create "<título>" [-p OPS] [--branch-slug SLUG] [--attach ARCH...]` |
 | **Publicar bitácora** | `plane-tracker comment add T -m "..." --capacity B --track X --worker-type agent:claude --accept-proposal` |
+| **Comentar sin horas** | `plane-tracker comment add T -m "..." --no-worklog` |
 | **Corregir comentario** | `plane-tracker comment edit T [--comment-id UUID] [-m ... \| --duration N \| --since HH:MM --until HH:MM]` |
 | **Borrar comentario** | `plane-tracker comment delete T [--comment-id UUID]` |
 | **Retirar ticket** | Por defecto `plane-tracker update T --state Cancelado` · Borrado: `plane-tracker delete T` (exige `--yes`) |
@@ -65,7 +66,7 @@ Un comentario por sesión. La primera línea es la nota del reporte. Formato en 
 
 Reglas:
 1. **Medición asistida:** Ejecuta `plane-tracker worklog propose T --capacity <balde>` (válido 30 min) y pide un solo OK ("¿Publico en Plane? 45 min, deep_work"). Con OK, publica con `--accept-proposal`.
-2. **Duración manual / toil:** Para `toil_support`, `coordination` o trabajo fuera de sesión, usa `--duration N` (pregunta los minutos; nunca estimes) o fija ventana con `--since HH:MM --until HH:MM` (y `--date YYYY-MM-DD`).
+2. **Duración manual / toil:** Para `toil_support`, `coordination` o trabajo fuera de sesión, usa `--duration N` (pregunta los minutos; nunca estimes) o fija ventana con `--since HH:MM --until HH:MM` (y `--date YYYY-MM-DD`). En fechas pasadas (`--date`), es obligatorio indicar ventana horaria (`--since` o `--until`). Para notas o coordinación sin registrar tiempo, usa `--no-worklog`.
 3. **Telemetría:** Nunca escribas el bloque metadata en Markdown; viaja automáticamente vía flags (`--track`, `--capacity`, `--worker-type`, `--duration`).
 4. **Correcciones:** Usa `plane-tracker comment edit` para corregir ventana o texto publicado; nunca publiques otro comentario solo para registrar tiempo.
 5. **Baldes (`--capacity`):** `deep_work` (default), `tooling_dx`, `research_rd`, `tech_debt_paydown`, `toil_support`, `coordination`.
