@@ -1,7 +1,7 @@
 """Telemetría de worklogs: bloque oculto de metadata en los comentarios, persistencia local y verificación.
 
 Expone: extract_metadata_from_comment(), worklog_metadata_block(), find_metadata_block(), strip_metadata_block(), replace_metadata_block(),
-corrected_metadata(), derived_start(), resolve_window(), requested_date(), parse_date(), upsert_worklog(), check_worklogs(),
+corrected_metadata(), derived_start(), resolve_window(), requested_date(), parse_date(), recalculate_window_duration(), upsert_worklog(), check_worklogs(),
 reject_placeholders(), reject_long_comment(), note_from(), PLACEHOLDER, MAX_COMMENT_CHARS.
 No hace: llamadas a Plane.
 """
@@ -247,6 +247,19 @@ def _hhmm(value, flag):
         return datetime.strptime(str(value), "%H:%M").time()
     except (TypeError, ValueError):
         raise CliError("invalid_input", f"{flag} debe ir en formato HH:MM (ej: {flag} 09:00).")
+
+
+def recalculate_window_duration(start_time_str, duration, work_date):
+    """Calcula el nuevo end_time dado start_time y la nueva duración, validando límites."""
+    if not start_time_str:
+        return None
+    start_dt = datetime.combine(work_date, _hhmm(start_time_str, "--start-time"))
+    new_end_dt = start_dt + timedelta(minutes=duration)
+    if new_end_dt.date() != work_date:
+        raise CliError("invalid_input", f"la nueva duración ({duration} min) desde {start_time_str} cruza la medianoche.")
+    if new_end_dt > clock.local_now():
+        raise CliError("invalid_input", f"la nueva duración ({duration} min) desde {start_time_str} termina en el futuro ({work_date} {new_end_dt.strftime('%H:%M')}): el tiempo se registra después de trabajarlo.")
+    return new_end_dt.strftime("%H:%M")
 
 
 PLACEHOLDER = "[COMPLETAR]"

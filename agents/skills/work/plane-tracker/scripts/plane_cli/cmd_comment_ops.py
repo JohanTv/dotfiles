@@ -25,6 +25,7 @@ from plane_cli.worklog import (
     find_metadata_block,
     note_from,
     parse_date,
+    recalculate_window_duration,
     reject_placeholders,
     replace_metadata_block,
     requested_date,
@@ -174,6 +175,10 @@ def cmd_comment_edit(args, conn, base_url, api_key, workspace, default_project_i
                 raise CliError("invalid_input", str(exc))
             if win:
                 meta["start_time"], meta["end_time"], meta["duration_minutes"] = win[0], win[1], win[2]
+            elif args.duration and args.duration != old_meta.get("duration_minutes"):
+                new_end = recalculate_window_duration(meta.get("start_time"), duration, day)
+                if new_end:
+                    meta["end_time"] = new_end
             if args.date:
                 meta["date"] = args.date
         else:

@@ -11,7 +11,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 from plane_cli import clock  # noqa: E402
 from plane_cli.errors import CliError  # noqa: E402
-from plane_cli.worklog import parse_date, requested_date, resolve_window  # noqa: E402
+from plane_cli.worklog import parse_date, recalculate_window_duration, requested_date, resolve_window  # noqa: E402
 
 AHORA = datetime(2026, 11, 2, 12, 0)  # lunes al mediodía: toda ventana pasada es válida y toda futura, no
 
@@ -81,6 +81,20 @@ class Window(unittest.TestCase):
         self.assertEqual(parse_date("2026-11-02"), datetime(2026, 11, 2).date())
         self.assertIsNone(parse_date("hoy"))
         self.assertIsNone(parse_date(None))
+
+    # --- recálculo de ventana (defecto 0032) -----------------------------------
+    def test_recalculate_window_duration_advances_end_time(self):
+        self.assertEqual(recalculate_window_duration("10:00", 45, datetime(2026, 10, 20).date()), "10:45")
+        self.assertEqual(recalculate_window_duration("09:00", 90, datetime(2026, 10, 20).date()), "10:30")
+
+    def test_recalculate_window_duration_crossing_midnight_is_rejected(self):
+        with self.assertRaisesRegex(CliError, "cruza la medianoche"):
+            recalculate_window_duration("23:30", 45, datetime(2026, 10, 20).date())
+
+    def test_recalculate_window_duration_into_future_is_rejected(self):
+        # AHORA es 2026-11-02 12:00
+        with self.assertRaisesRegex(CliError, "termina en el futuro"):
+            recalculate_window_duration("11:30", 45, AHORA.date())
 
 
 if __name__ == "__main__":
