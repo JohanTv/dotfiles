@@ -17,9 +17,12 @@
 - **Personal / Non-Plane:** Standard `{type}/{kebab-case-description}`.
 
 ### Zero-Moment & Graduated Discovery:
-- **Instant Search:** On work intent, run `plane-tracker list --text "<intent>" --all-projects --limit 5 --brief --json`. Conclude "no duplicate" only if `coverage.complete` is `true`.
-  - Found: Confirm and switch to target branch (`feat/OMNIFY-XXX-...`).
-  - Not found: Propose ticket with title, priority, labels, and `--branch-slug`.
+- **Contextual Trigger (No Speculative Search):**
+  - *Local Tooling / Dotfiles / Skills / CLI:* Scope is local; internal issues live in `docs/BACKLOG.md`. Never query or create Plane tickets.
+  - *Exploratory / Lazy Mode:* For architecture, spikes, logs, or conceptual code, advise directly. Do not query Plane or propose tickets unsolicited.
+  - *Corporate Work:* Run `plane-tracker list --text "<intent>" --all-projects --limit 5 --brief --json` ONLY on explicit triggers: ticket keys (`[A-Z]+-[0-9]+`), mentions ("Plane", "sprint"), corporate branches (`{type}/{TICKET-ID}-...`), or explicit intent to track formal work. Conclude "no duplicate" only if `coverage.complete` is `true`.
+    - Found: Confirm and switch to target branch (`feat/OMNIFY-XXX-...`).
+    - Not found: Propose ticket with title, priority, labels, and `--branch-slug`.
 - **Token Economy in CLI Queries:**
   - *Discovery:* `list --brief --json`.
   - *Selective Sync:* For ticket queries, use `plane-tracker sync tickets [-p PRJ]` (fast delta sync, ~1s). For general session/multi-machine sync (worklogs + tickets), use `plane-tracker sync --week --all-projects` (avoids 30-day default). Never use unconstrained `plane-tracker sync` without a period flag.

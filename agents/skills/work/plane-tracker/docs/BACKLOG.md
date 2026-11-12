@@ -9,7 +9,7 @@ Open technical considerations, pending defects, and deferred improvements for `p
 
 ## Deferred Enhancements
 
-- **0033 · Comments without a worklog:** every publication currently demands hours; without `--duration` and without measured evidence `comment add` only prints a proposal and exits. A `--no-worklog` flag would publish text-only comments while stating explicitly that no telemetry was recorded (see [P1](../principles.md) and [P2](../principles.md)).
+- **0033 · Comments without a worklog:** every publication currently demands hours; without `--duration` and without measured evidence `comment add` only prints a proposal and exits. A `--no-worklog` flag would publish text-only comments while stating explicitly that no telemetry was recorded (see [P1](./principles.md) and [P2](./principles.md)).
 - **0011 · Multi-Machine Cache Architecture:** Guidelines and workflow conventions for multi-workstation environments via Plane API delta sync ([RFC 0011](rfcs/0011-shared-cache-between-machines.md)).
 - **0014 · Personal and Work Contexts:** Profile isolation (`~/.config/plane-tracker/profiles/`) and interchangeable issue tracker adapters (Plane, Linear, Markdown) ([RFC 0014](rfcs/0014-personal-and-work-contexts.md)).
 

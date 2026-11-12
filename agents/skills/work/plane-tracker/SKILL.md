@@ -81,6 +81,13 @@ Reglas:
 - **Etiquetas (mínimo 2):** Capa técnica (`backend`, `frontend`, `bd`, `infra`) y tipo (`bug`, `deuda-tecnica`, `seguridad`, `docs`).
 - **Contrato vivo:** Descripción ≤ 200 palabras (Resumen, Causa, Solución, DoD `[ ]`). Detalle en `references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`.
 
-## 7. Documentación
+## 7. Documentación y Backlog
 
-Detalle en `references/`: arquitectura y telemetría, living tickets/SDLC, protocolo de relevo, guía operativa, taxonomía y paraguas, y gobernanza y principios de diseño del CLI (`references/CLI_DESIGN_GUARD.md`).
+- **Operación de Plane CE (Tickets corporativos y telemetría):**
+  - Guías operativas en `references/`: guía operativa (`references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md`), living tickets y SDLC (`references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`references/PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), taxonomía y paraguas (`references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`), arquitectura de caché y telemetría (`references/ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md`).
+- **Desarrollo y Mantenimiento Interno del CLI (`plane-tracker`):**
+  - Instrucciones para agentes de desarrollo: [`AGENTS.md`](./AGENTS.md) y arquitectura interna en [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+  - Backlog técnico interno (defectos conocidos, deuda técnica del CLI y mejoras postergadas): [`docs/BACKLOG.md`](./docs/BACKLOG.md).
+  - Registro de arquitectura y propuestas: [`docs/INDEX.md`](./docs/INDEX.md) (ADRs en `docs/decisions/` y RFCs en `docs/rfcs/`) y principios en [`docs/principles.md`](./docs/principles.md).
+  - Gobernanza y diseño del CLI: [`references/CLI_DESIGN_GUARD.md`](./references/CLI_DESIGN_GUARD.md).
+  - *Regla clave:* Nunca busques ni crees tickets en Plane CE para bugs o deuda interna del propio CLI; esos temas residen en `docs/BACKLOG.md`.

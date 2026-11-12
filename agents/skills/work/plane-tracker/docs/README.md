@@ -1,6 +1,10 @@
 # Development Documentation
 
-Engineering decisions and architectural proposals for `plane-tracker`. Agents do not load this folder during runtime. Operational usage guides reside in [`../references/`](../references/README.md).
+Engineering decisions, architectural proposals, and internal defect tracking for the `plane-tracker` CLI.
+
+> [!NOTE]
+> - **CLI Development & Maintenance:** When working on bugs, improvements, or architecture of `plane-tracker` itself, consult [`BACKLOG.md`](./BACKLOG.md) (pending defects, known issues, and deferred enhancements) and [`INDEX.md`](./INDEX.md) (ADRs, RFCs, and document status). See also [`../AGENTS.md`](../AGENTS.md) and [`principles.md`](./principles.md).
+> - **Operational Usage:** For day-to-day Plane CE operations and workflow guides (not CLI development), see [`../references/`](../references/README.md) and [`../SKILL.md`](../SKILL.md).
 
 - **Index with Document Status:** [INDEX.md](./INDEX.md) (generated).
 - **Design Principles:** [principles.md](./principles.md).
