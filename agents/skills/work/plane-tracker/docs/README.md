@@ -6,7 +6,7 @@ Engineering decisions and architectural proposals for `plane-tracker`. Agents do
 - **Design Principles:** [principles.md](./principles.md).
 - **Public Repository Boundaries:** [0007](./decisions/0007-instance-agnostic-documents.md).
 - **Resolved Bugs & Fixes:** [CHANGELOG.md](./CHANGELOG.md).
-- **Deferred Improvements:** [BACKLOG.md](./BACKLOG.md).
+- **Pending Defects & Deferred Improvements:** [BACKLOG.md](./BACKLOG.md).
 
 ## Categories
 
