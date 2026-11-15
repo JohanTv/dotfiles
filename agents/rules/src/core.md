@@ -9,6 +9,14 @@
    - Usa EXCLUSIVAMENTE `sd 'pattern' 'replacement' file`.
    - **REGLA NEGATIVA ESTRICTA:** Queda TERMINANTEMENTE PROHIBIDO el uso de `sed`, `awk` o `perl -pi` para editar archivos en el disco. Cualquier comando `sed -i` es una violación crítica de protocolo.
 
+### Integridad de Interfaces y Prohibición de Tool Escape (MANDATORIA):
+- **Principio de Caja Negra:** Queda TERMINANTEMENTE PROHIBIDO el acceso directo mediante clientes ad-hoc (`sqlite3`, `duckdb`, `psql`, `redis-cli`, etc.) a bases de datos internas, cachés locales (`~/.cache/*`) o archivos de estado privado de las herramientas del sistema, salvo instrucción explícita e inequívoca del usuario.
+- **Prohibición de Adivinación de Esquemas:** NUNCA ejecutes `.tables`, `.schema` ni queries exploratorios `SELECT` contra bases de datos que pertenezcan al runtime de una aplicación o skill.
+- **Manejo Determinista de Fallos:** Si un CLI o API falla, arroja un resultado inesperado o experimenta timeouts:
+  - DETÉN inmediatamente la ejecución.
+  - REPORTA con transparencia técnica el código de salida, el mensaje de error o la advertencia recibida.
+  - NUNCA intentes compensar el fallo haciendo ingeniería inversa o scraping de bajo nivel por terminal.
+
 ### Herramientas de Inspección y Búsqueda:
 - **Búsqueda de Texto/Código:** Usa siempre `rg` (`-S` smart-case, `-n` números de línea).
   - *Límites estrictos:* Usa `--max-columns 300` y limita resultados con `--max-count 50`. NO uses tuberías destructivas como `| head -n 50` que disparan errores `SIGPIPE` rotos.
