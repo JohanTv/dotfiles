@@ -143,7 +143,10 @@ sync-binaries:
 				chmod +x "$$b"; \
 				ln -sf "$$b" "$$HOME/.local/bin/$$(basename "$$b")"; \
 			fi \
-		done \
+		done; \
+		if [ -f "$$HOME/Code/allostasis/Makefile" ]; then \
+			$(MAKE) -C "$$HOME/Code/allostasis" install >/dev/null 2>&1 || true; \
+		fi; \
 	fi
 	@# 4. Poda segura de binarios obsoletos o inactivos
 	@for link in $$HOME/.local/bin/*; do \

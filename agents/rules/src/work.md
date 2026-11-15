@@ -6,13 +6,13 @@
 ### Convenciones de Ramas Git:
 - **Patrón Corporativo:** `{tipo}/{TICKET-ID}-{kebab-case-description}` (ej. `feat/OMNIFY-175-campaign-validations`, `fix/OPS-44-mitigate-n8n`).
   - Tipos válidos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra`. Prefijo por defecto: `OMNIFY-`.
-- **Iniciativas Multi-Repo:** Si la tarea cruza 2 o más repositorios, activa y utiliza la skill `plane-worktree` (`~/.agents/skills/plane-worktree/SKILL.md`).
+- **Iniciativas Multi-Repo:** Si la tarea cruza 2 o más repositorios, activa y utiliza la skill `plane-worktree` (`~/.agents/skills/plane-worktree/SKILL.md`) operando vía `alo-ws` o `plane-worktree`.
 - **Ambigüedad:** Si no se especifica un ticket para trabajo corporativo, consulta con el usuario antes de crear la rama.
 
 ### Determinación de Ámbito (Corporativo vs Local):
 - **Ámbito Corporativo (Plane / Tracker Obligatorio):**
   - Aplica cuando el workspace actual corresponde a repositorios corporativos o cuando el usuario menciona explícitamente tickets con clave (`[A-Z]+-[0-9]+`), "Plane" o "sprint".
-  - *Ejecución:* Consulta y opera a través de `plane-tracker` (o `allostasis`). Para comandos de telemetría, estándares de living tickets y reglas de paraguas semanales (`OPS`), consulta `~/.agents/skills/plane-tracker/SKILL.md`.
+  - *Ejecución:* Consulta y opera a través del CLI nativo de `allostasis` (`alo` / `plane-tracker`). Para comandos de telemetría, estándares de living tickets y reglas de paraguas semanales (`OPS`), consulta `~/.agents/skills/plane-tracker/SKILL.md`.
   - *Cierre de Hito/Sesión:* Al completar una tarea o finalizar la sesión, propón una bitácora concisa vía `plane-tracker` y solicita confirmación antes de enviarla.
 - **Ámbito Local / Herramientas Internas / Dotfiles:**
   - Aplica en `~/Code/dotfiles`, scripts locales, desarrollo interno de skills en `~/.agents/skills/` y tareas exploratorias aisladas.

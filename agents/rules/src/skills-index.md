@@ -4,8 +4,8 @@ Cuando una tarea coincida con el dominio de una habilidad disponible en `~/.agen
 
 | Habilidad (Skill) | Cuándo Activar (Triggers de Contexto) | Ruta del Procedimiento (Leer bajo demanda) |
 | :--- | :--- | :--- |
-| **`plane-tracker` / `allostasis`** | Operación de tickets, cambio de estados, registro de horas/bitácoras o consulta de sprint/agenda corporativa. | `~/.agents/skills/plane-tracker/SKILL.md` |
-| **`plane-worktree`** | Tareas que involucren 2 o más repositorios Git simultáneos asociados a un ticket corporativo. | `~/.agents/skills/plane-worktree/SKILL.md` |
+| **`plane-tracker` / `alo`** | Operación de tickets, cambio de estados, registro de horas/bitácoras o consulta de sprint/agenda corporativa. | `~/.agents/skills/plane-tracker/SKILL.md` |
+| **`plane-worktree` / `alo-ws`** | Tareas que involucren 2 o más repositorios Git simultáneos asociados a un ticket corporativo. | `~/.agents/skills/plane-worktree/SKILL.md` |
 | **`go-cli-tui`** | Diseño, arquitectura SOLID, dual-mode (headless IA vs Charm TUI), SQLite o pruebas de herramientas CLI en Go. | `~/.agents/skills/go-cli-tui/SKILL.md` |
 | **`dotfiles-sync`** | Diagnóstico de configuración del sistema, verificación de symlinks, auditoría con `dotfiles-doctor` o actualización de dotfiles. | `~/.agents/skills/dotfiles-sync/SKILL.md` |
 | **`find-session`** | Búsqueda o reanudación de sesiones y conversaciones anteriores de Claude Code, Gemini CLI o OpenCode. | `~/.agents/skills/find-session/SKILL.md` |
