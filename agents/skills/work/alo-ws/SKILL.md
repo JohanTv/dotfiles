@@ -1,12 +1,12 @@
 ---
-name: plane-worktree
+name: alo-ws
 description: >-
   Orquesta Git worktrees multi-repo por ticket en .worktrees/<TICKET>-<SLUG>/.
   Úsalo para crear entornos de 2+ repos (create/add), listar (list) o auditar/podar entornos terminados (audit/prune).
-  Soportado de forma nativa en Go vía `alo-ws`, `alo ws` o el relevo `plane-worktree`.
+  Soportado de forma nativa en Go vía `alo-ws` o `alo ws`.
 ---
 
-# Multi-Repo Worktree Orchestrator (`alo-ws` / `plane-worktree`)
+# Multi-Repo Worktree Orchestrator (`alo-ws` / `alo ws`)
 
 Gestión atómica y transaccional de espacios de trabajo multi-repositorio por ticket, respaldada por el motor nativo en Go de Allostasis (`alo-ws` / `alo ws`).
 
@@ -17,7 +17,7 @@ Gestión atómica y transaccional de espacios de trabajo multi-repositorio por t
 - **Fetch implícito:** `audit` y `prune` sincronizan `origin` en paralelo por repo único; usa `--no-fetch` para offline.
 - **Nomenclatura:** Contenedor `.worktrees/<TICKET>-<SLUG>/`, ramas `<type>/<TICKET>-<SLUG_REPO>` (`feat|fix|spike|refactor|test|infra`).
 
-## Comandos Nativos (Compatibles con `alo-ws`, `alo ws` y `plane-worktree`)
+## Comandos Nativos (`alo-ws` y `alo ws`)
 
 | Acción | Comando |
 | :--- | :--- |
@@ -28,5 +28,5 @@ Gestión atómica y transaccional de espacios de trabajo multi-repositorio por t
 | **Poda limpia** | `alo-ws prune --execute [--no-fetch]` (elimina worktrees y ramas 100% integrados y limpios) |
 | **Poda con respaldo** | `alo-ws prune [TARGET] --execute --include-stale` (genera `.tar.gz` antes de borrar cancelados/stale) |
 
-*Nota:* Los comandos `plane-worktree` y `alo ws` aceptan exactamente los mismos parámetros y banderas.
-Detalles avanzados y respaldos en [GUIA_OPERATIVA_WORKTREES.md](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-worktree/references/GUIA_OPERATIVA_WORKTREES.md).
+*Nota:* `alo-ws` y `alo ws` son completamente equivalentes y comparten los mismos parámetros y banderas.
+Detalles avanzados y respaldos en [GUIA_OPERATIVA_WORKTREES.md](file:///home/johantv/Code/dotfiles/agents/skills/work/alo-ws/references/GUIA_OPERATIVA_WORKTREES.md).

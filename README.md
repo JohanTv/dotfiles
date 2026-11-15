@@ -35,7 +35,7 @@ dotfiles/
 │   ├── skills/                 # Procedimientos y runbooks bajo demanda
 │   │   ├── common/             # Skills universales (find-session, dotfiles-sync)
 │   │   ├── desktop-linux/      # Skills exclusivas GNOME/X11 (wmctrl-focus)
-│   │   └── work/               # Skills de trabajo empresarial (plane-tracker)
+│   │   └── work/               # Skills de trabajo empresarial (alo, alo-ws)
 │   └── mcp/                    # Servidores Model Context Protocol (MCP)
 │       ├── gemini_mcp.json     # Integración global para Gemini CLI (agy)
 │       └── opencode.json       # Configuración global y MCP para OpenCode
@@ -54,7 +54,7 @@ dotfiles/
     ├── common/                 # Scripts universales (WSL + Ubuntu): find-session, dotfiles-doctor
     ├── desktop-linux/          # Scripts específicos de GNOME/X11: focus-alacritty, clip-copy, etc.
     ├── wsl/                    # Scripts exclusivos de WSL: shot (capturas vía Windows), clip-copy (portapapeles)
-    └── work/                   # Scripts de trabajo (perfil work): plane-tracker, plane-worktree
+    └── work/                   # Scripts y binarios de trabajo (perfil work)
 ```
 
 ---

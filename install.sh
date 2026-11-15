@@ -264,14 +264,10 @@ if [[ "$ACTIVE_PROFILE" == "work" && -d "$DOTFILES_DIR/bin/work" ]]; then
         if [[ -d "$ALLOSTASIS_DIR" && -f "$ALLOSTASIS_DIR/Makefile" ]]; then
             log_info "Compilando e instalando Allostasis desde $ALLOSTASIS_DIR..."
             make -C "$ALLOSTASIS_DIR" install >/dev/null 2>&1 || log_warn "No se pudo compilar Allostasis automáticamente."
-        elif ! command -v alo >/dev/null 2>&1 || ! command -v alo-ws >/dev/null 2>&1 || ! command -v plane-tracker-bin >/dev/null 2>&1; then
+        elif ! command -v alo >/dev/null 2>&1 || ! command -v alo-ws >/dev/null 2>&1; then
             log_info "Instalando Allostasis mediante 'go install github.com/allostasis/alo'..."
             go install github.com/allostasis/alo/cmd/alo@latest 2>/dev/null || true
             go install github.com/allostasis/alo/cmd/alo-ws@latest 2>/dev/null || true
-            go install github.com/allostasis/alo/cmd/plane-tracker@latest 2>/dev/null || true
-            if [[ -x "$HOME/go/bin/plane-tracker" ]]; then
-                cp "$HOME/go/bin/plane-tracker" "$HOME/.local/bin/plane-tracker-bin" 2>/dev/null || true
-            fi
             if [[ -x "$HOME/go/bin/alo" ]]; then
                 cp "$HOME/go/bin/alo" "$HOME/.local/bin/alo" 2>/dev/null || true
                 ln -sf "$HOME/.local/bin/alo" "$HOME/.local/bin/allostasis" 2>/dev/null || true

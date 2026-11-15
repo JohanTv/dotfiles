@@ -148,6 +148,8 @@ def build_managed_targets(wsl_active):
         work_bin = os.path.join(DOTFILES_DIR, "bin/work")
         if os.path.isdir(work_bin):
             for entry in sorted(os.listdir(work_bin)):
+                if entry.startswith("."):
+                    continue
                 full_p = os.path.join(work_bin, entry)
                 if os.path.isfile(full_p):
                     targets.append(("Binaries", f"~/.local/bin/{entry}", f"bin/work/{entry}", "always"))

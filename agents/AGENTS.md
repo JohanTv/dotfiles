@@ -21,7 +21,7 @@ agents/rules/
 | Archivo Fuente | Perfiles | Destino en Sistema | Propósito |
 | :--- | :---: | :--- | :--- |
 | `src/core.md` | Todos | `~/.gemini/GEMINI.md`<br>`~/.claude/CLAUDE.md`<br>`~/.config/opencode/AGENTS.md`<br>*(vía `dist/active-rules.md`)* | Herramientas primarias (`rg`, `fd`, `jq`, `sd`), Conventional Commits en inglés sin co-autor, exclusión de cachés y seguridad `.env`. |
-| `src/work.md` | `work` | *(mismos destinos)* | Clasificación de tareas en 4 fases (`Spike`, `RFC`, `Dev`, `QA`), uso de la skill `plane-tracker` y tickets paraguas. |
+| `src/work.md` | `work` | *(mismos destinos)* | Clasificación de tareas en 4 fases (`Spike`, `RFC`, `Dev`, `QA`), uso de la suite Allostasis (`alo`, `alo-ws`) y tickets paraguas. |
 | `src/personal.md` | `personal` | *(mismos destinos)* | Modo personal ligero sin sobrecarga de tracking corporativo. |
 
 ---
@@ -35,8 +35,8 @@ Procedimientos estandarizados (*runbooks*) que los agentes cargan **bajo demanda
 | **`find-session`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/find-session/SKILL.md`](skills/common/find-session/SKILL.md) | Localización instantánea de IDs de conversaciones previas en Gemini, Claude Code y OpenCode. |
 | **`dotfiles-sync`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/dotfiles-sync/SKILL.md`](skills/common/dotfiles-sync/SKILL.md) | Diagnóstico, auditoría de symlinks y detección de cambios locales con `dotfiles-doctor`. |
 | **`wmctrl-focus`** | `desktop-linux/` | 🐧 Desktop Linux<br>*(Ubuntu GNOME X11)* | [`skills/desktop-linux/wmctrl-focus/SKILL.md`](skills/desktop-linux/wmctrl-focus/SKILL.md) | Procedimiento estándar para crear atajos de enfoque de ventanas con `wmctrl`. |
-| **`plane-tracker`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/plane-tracker/SKILL.md`](skills/work/plane-tracker/SKILL.md) | Registro de bitácoras de sesión, tiempos en Plane vía API REST/SQLite y sincronización delta incremental (`sync tickets`, `sync hours`). |
-| **`plane-worktree`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/plane-worktree/SKILL.md`](skills/work/plane-worktree/SKILL.md) | Orquestación atómica de Git worktrees multi-repo por ticket, auditoría de merges y poda segura con respaldos `.tar.gz`. |
+| **`alo`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/alo/SKILL.md`](skills/work/alo/SKILL.md) | Registro de bitácoras de sesión, tiempos en Plane vía API REST/SQLite y sincronización delta incremental (`alo sync`). |
+| **`alo-ws`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/alo-ws/SKILL.md`](skills/work/alo-ws/SKILL.md) | Orquestación atómica de Git worktrees multi-repo por ticket, auditoría de merges y poda segura con respaldos `.tar.gz`. |
 
 ---
 
@@ -59,8 +59,8 @@ Integraciones del protocolo Model Context Protocol (MCP) disponibles globalmente
 Para compilar y alternar perfiles:
 
 ```bash
-make work       # Compila perfil corporativo (core + work) y activa plane-tracker
-make personal   # Compila perfil personal (core + personal) y poda plane-tracker
+make work       # Compila perfil corporativo (core + work) y activa alo y alo-ws
+make personal   # Compila perfil personal (core + personal) y poda alo y alo-ws
 make            # Recompila el perfil activo (.active-profile)
 make doctor     # Ejecuta auditoría completa de enlaces e integridad
 ```
