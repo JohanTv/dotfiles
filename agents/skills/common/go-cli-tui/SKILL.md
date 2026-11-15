@@ -5,7 +5,7 @@ description: Guía de arquitectura, diseño SOLID y patrones de desarrollo para 
 
 # Skill: Arquitectura de Sistemas CLI & TUI en Go (`go-cli-tui`)
 
-Esta habilidad condensa los estándares de ingeniería de software, arquitectura limpia (Hexagonal / Ports & Adapters) y patrones de diseño para construir herramientas de línea de comandos en **Go** que combinan **máxima ergonomía interactiva (TUI)** con **cero fricción para agentes autónomos de IA y scripts (Headless CLI)**.
+> **Naturaleza de esta Habilidad:** Esta guía constituye un **catálogo de recomendaciones, patrones de diseño y aspectos mínimos a considerar** para el desarrollo de herramientas de línea de comandos en Go. No busca imponer un sobre-diseño (*over-engineering*) ni una estructura dogmática innecesaria para utilidades pequeñas: su objetivo es visibilizar las decisiones críticas de arquitectura para que, según el escenario específico (desde un micro-CLI atómico hasta una estación de trabajo completa con base de datos local y TUI), se adopten gradualmente los patrones más pertinentes con solidez.
 
 ---
 
@@ -33,11 +33,15 @@ presenter.LaunchTUI(ctx, result)
 1. **SRP (Single Responsibility):**
    - El núcleo de negocio (dominio) desconoce si la salida será un JSON, una tabla o una ventana de Bubble Tea.
    - La capa de presentación (`presentation/`) solo traduce eventos; no contiene lógica de negocio ni cálculos matemáticos.
-2. **OCP (Open/Closed) & DIP (Dependency Inversion):**
-   - Las capacidades especializadas (como orquestadores de workspaces Git o adaptadores de trackers externos) se implementan como módulos enchufables (`CommandModule`). Pueden operar como subcomandos integrados en el binario principal o compilarse como subherramientas CLI independientes sin modificar el núcleo.
-3. **ISP (Interface Segregation):**
-   - **Regla Go:** Las interfaces pertenecen al paquete consumidor, no al paquete que las implementa.
+2. **OCP (Open/Closed):**
+   - Nuevos formatos de salida (Markdown, CSV, JSON) o nuevos subcomandos se agregan implementando nuevas estrategias o módulos enchufables (`CommandModule`) sin tener que modificar el núcleo existente.
+3. **LSP (Liskov Substitution):**
+   - Cualquier implementación de un puerto (por ejemplo, un `InMemoryStore` para pruebas y un `SQLiteStore` para producción) es 100% intercambiable sin alterar las garantías ni el comportamiento esperado por los casos de uso.
+4. **ISP (Interface Segregation):**
+   - **Regla Go:** Las interfaces pertenecen al paquete consumidor (donde se usan), no al paquete que las implementa.
    - Interfaces pequeñas y atómicas (1 a 3 métodos): `IssueReader`, `WorklogPusher`, `WorkspaceManager`.
+5. **DIP (Dependency Inversion):**
+   - Los casos de uso de alto nivel nunca importan directamente drivers de bajo nivel (`os/exec`, `database/sql`, `net/http`). Ambos dependen de abstracciones (puertos). La inyección y composición de dependencias se realiza exclusivamente en el arranque (`main.go` / `bootstrap`).
 
 ---
 
@@ -216,3 +220,58 @@ func EmitError(err error, detail ErrorDetail, exitCode int, jsonMode bool) {
 
 ### Resiliencia ante Panics en el Entrypoint (`SafeExecute`):
 Envolver la ejecución del CLI con un `recover()` defensivo para garantizar que un panic inesperado nunca escape como stack trace de texto plano cuando `--json` esté activo, emitiendo en su lugar un `code: "INTERNAL_PANIC"` con código de salida `70`.
+
+---
+
+## 7. Resiliencia Operativa y Ciclo de Vida (Aspectos Clave por Escenario)
+
+Dependiendo de si la herramienta realiza mutaciones en disco, maneja subprocesos externos o levanta una interfaz TUI interactiva, considera las siguientes recomendaciones técnicas:
+
+### A. Propagación de Contexto y Cancelación Graciosa (*Graceful Shutdown*)
+Si la herramienta realiza operaciones con estado (escrituras en SQLite, orquestación Git, transferencias de archivos), presionar `Ctrl+C` (`SIGINT`) o recibir `SIGTERM` no debe corromper los datos ni dejar bloqueos colgados (`.git/index.lock` o SQLite WAL abiertos):
+
+```go
+// En cmd/main.go:
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+
+if err := rootCmd.ExecuteContext(ctx); err != nil {
+    // Manejo de salida ordenada
+}
+```
+- Toda función de I/O, red o base de datos debe recibir `ctx context.Context`.
+- Si `ctx.Err() != nil`, abortar inmediatamente y disparar rutinas de *rollback* o *cleanup*.
+
+### B. Aislamiento y Control de Subprocesos Externos (`os/exec`)
+Al invocar comandos del sistema (como `git` o herramientas auxiliares), un timeout o cancelación debe terminar a toda la jerarquía de procesos para evitar procesos zombies o bloqueos residuales:
+
+```go
+cmd := exec.CommandContext(ctx, "git", args...)
+// En sistemas POSIX: aislar en su propio Process Group
+cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+// En caso de cancelación forzosa por timeout, matar el grupo completo:
+// syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+```
+
+### C. Seguridad en Mutaciones y Ergonomía (*Safe by Default & CQS*)
+- **Separación de Comandos y Consultas (CQS):** Una lectura (`get`, `list`, `search`, `status`) NUNCA debe producir efectos colaterales ni mutar el estado.
+- **Dry-Run por Defecto:** Cualquier operación destructiva (poda masiva de archivos, borrado de ramas, sobreescritura) debe simularse por defecto y exigir confirmación o banderas explícitas (`--execute`, `--force`, `--yes`).
+- **Jerarquía de Prevalencia de Configuración:**  
+  `Banderas CLI` > `Variables de Entorno` (`APP_*`) > `Archivo de Configuración` (`~/.config/app/config.json`) > `Valores por Defecto`.
+
+### D. TUI No Bloqueante en Bubble Tea (`tea.Cmd`)
+- **Regla Inquebrantable:** El método `Update(msg tea.Msg)` del bucle de Bubble Tea debe ser 100% síncrono y retornar de inmediato.
+- **I/O Asíncrono:** Cualquier consulta a base de datos, llamada de red o comando Git debe envolverse en un `tea.Cmd` para ejecutarse en una goroutine separada. De lo contrario, la interfaz se congelará, perdiendo la fluidez de 60 FPS y bloqueando los spinners de carga.
+
+---
+
+## 8. Matriz de Madurez y Mínimos Viables (Definition of Done)
+
+Para determinar qué tanto implementar según el escenario:
+
+| Nivel de Herramienta | Escenario Típico | Aspectos Mínimos Recomendados |
+| :--- | :--- | :--- |
+| **Nivel 1: Micro-CLI** | Filtro de texto, conversor rápido, script de utilidad | Flags estándar con `cobra`, salida limpia (`stdout`), códigos de salida POSIX estándar. |
+| **Nivel 2: CLI Intermedio / M2M** | Integraciones CI/CD, herramientas consumidas por Agentes de IA | Protocolo dual (`--json` con `ResponseEnvelope` canónico y auto-reparación), `SafeExecute` con `recover()`, sin secuencias ANSI en pipes. |
+| **Nivel 3: Estación Autónoma / TUI** | Herramientas con estado local, orquestadores Git, dashboards | Arquitectura Hexagonal completa, Pure-Go SQLite (`ncruces/go-sqlite3`), Graceful Shutdown, Charm TUI asíncrona, sandboxes de testing efímeros (`t.TempDir()`). |
