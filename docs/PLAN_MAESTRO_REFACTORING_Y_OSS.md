@@ -163,7 +163,27 @@ allostasis/
 ## 6. Entorno de Pruebas y Buenas Prácticas (Testing Harness)
 
 1. **Table-Driven Tests:** Tests parametrizados en Go para Klee Measure, Little's Law y transiciones de estado.
-2. **SQLite Efímero en Memoria (`file::memory:?cache=shared`):** Pruebas de integración de base de datos en <20ms sin residuo en disco.
+2. **SQLite Efímero en Memoria (`file:alo_shared_mem?mode=memory&cache=shared`):** Pruebas de integración de base de datos en <20ms con `SetMaxOpenConns(1)` sin residuo en disco.
 3. **Sandboxes Git Aislados (`t.TempDir()`):** Repositorios temporales para pruebas de worktree y `git merge-tree`.
 4. **Golden File Testing:** Verificación estricta de salidas `--json` para que las refactorizaciones nunca rompan a agentes de IA (Claude Code / Gemini).
 5. **Headless TUI Testing (`teatest`):** Simulación de pulsaciones de teclas en Bubble Tea de forma desatendida.
+
+---
+
+## 7. Protocolo de Errores para Agentes Autónomos de IA (Error Envelopes)
+
+Para evitar la pérdida de contexto y tracebacks crípticos que rompían la inferencia de agentes en herramientas tradicionales:
+- **Salida Estructurada Canónica (`ResponseEnvelope`):** Todo comando con `--json` emite un envelope determinista:
+  ```json
+  {
+    "ok": false,
+    "error": {
+      "code": "INVALID_ARGUMENT",
+      "message": "Duración de intervalo inválida: debe ser entero positivo",
+      "hint": "Usa 'alo log <TICKET> <MINUTOS>' con minutos enteros",
+      "recoverable": true
+    }
+  }
+  ```
+- **Sin Secuencias ANSI en Flujo JSON:** Se garantiza que `stderr` y `stdout` bajo `--json` no contengan códigos de color o cursor VT100 que rompan `json.Unmarshal`.
+- **Accionabilidad Automática:** El campo `hint` le proporciona al agente la sugerencia directa de autoreparación sin necesidad de inferir la solución por ensayo y error.
