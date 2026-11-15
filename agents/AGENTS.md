@@ -21,7 +21,7 @@ agents/rules/
 | Archivo Fuente | Perfiles | Destino en Sistema | Propósito |
 | :--- | :---: | :--- | :--- |
 | `src/core.md` | Todos | `~/.gemini/GEMINI.md`<br>`~/.claude/CLAUDE.md`<br>`~/.config/opencode/AGENTS.md`<br>*(vía `dist/active-rules.md`)* | Herramientas primarias (`rg`, `fd`, `jq`, `sd`), Conventional Commits en inglés sin co-autor, exclusión de cachés y seguridad `.env`. |
-| `src/work.md` | `work` | *(mismos destinos)* | Clasificación de tareas en 4 fases (`Spike`, `RFC`, `Dev`, `QA`), uso de la suite Allostasis (`alo`, `alo-ws`) y tickets paraguas. |
+| `src/work.md` | `work` | *(mismos destinos)* | Clasificación de tareas en 4 fases (`Spike`, `RFC`, `Dev`, `QA`), uso de la suite Allostasis (`alo`, `alo ws`) y tickets paraguas. |
 | `src/personal.md` | `personal` | *(mismos destinos)* | Modo personal ligero sin sobrecarga de tracking corporativo. |
 
 ---
@@ -59,8 +59,8 @@ Integraciones del protocolo Model Context Protocol (MCP) disponibles globalmente
 Para compilar y alternar perfiles:
 
 ```bash
-make work       # Compila perfil corporativo (core + work) y activa alo y alo-ws
-make personal   # Compila perfil personal (core + personal) y poda alo y alo-ws
+make work       # Compila perfil corporativo (core + work) y activa suite Allostasis (alo)
+make personal   # Compila perfil personal (core + personal) y poda suite Allostasis (alo)
 make            # Recompila el perfil activo (.active-profile)
 make doctor     # Ejecuta auditoría completa de enlaces e integridad
 ```

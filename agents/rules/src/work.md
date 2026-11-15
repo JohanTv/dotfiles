@@ -6,7 +6,7 @@
 ### Convenciones de Ramas Git:
 - **Patrón Corporativo:** `{tipo}/{TICKET-ID}-{kebab-case-description}` (ej. `feat/OMNIFY-175-campaign-validations`, `fix/OPS-44-mitigate-n8n`).
   - Tipos válidos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra`. Prefijo por defecto: `OMNIFY-`.
-- **Iniciativas Multi-Repo:** Si la tarea cruza 2 o más repositorios, activa y utiliza la skill `alo-ws` (`~/.agents/skills/alo-ws/SKILL.md`) operando vía `alo-ws` o `alo ws`.
+- **Iniciativas Multi-Repo:** Si la tarea cruza 2 o más repositorios, activa y utiliza la skill `alo-ws` (`~/.agents/skills/alo-ws/SKILL.md`) operando vía `alo ws`.
 - **Ambigüedad:** Si no se especifica un ticket para trabajo corporativo, consulta con el usuario antes de crear la rama.
 
 ### Determinación de Ámbito (Corporativo vs Local):
