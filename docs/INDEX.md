@@ -20,6 +20,13 @@
   - Aplicación estricta de SOLID (ISP con interfaces segregadas mínimas) y Bounded Contexts.
   - Doble despliegue del motor de workspaces: subcomando `alo ws` o binario standalone `alo-ws`.
 
+* 🛡️ **[`INFORME_AUDITORIA_ADVERSARIAL_Y_HARDENING.md`](INFORME_AUDITORIA_ADVERSARIAL_Y_HARDENING.md):**  
+  **Resultados de Pruebas de Estrés y Red Teaming Post-Implementación.**  
+  - Puntuación de robustez 9.9/10 tras remediación de Data Races en el reloj determinista (`sync.RWMutex`).
+  - Blindaje contra Path Traversal e inyección de flags en Git worktrees, con rollback atómico limpio.
+  - Sincronización concurrente de SQLite bajo WAL y DSN en memoria con pool serializado.
+  - Complejidad matemática $O(N \log N)$ de Klee Measure validada sobre 10,000 intervalos aleatorios en 152ms.
+
 * 🛡️ **[`ESTRATEGIA_VERIFICACION_Y_AUDITORIA_PREMORTEM.md`](ESTRATEGIA_VERIFICACION_Y_AUDITORIA_PREMORTEM.md):**  
   **Auditoría de Red Teaming y Pre-Mortem.**  
   - Análisis metodológico de por qué las pruebas de runtime (fuzzing/adversariales) no aplican a documentos.
