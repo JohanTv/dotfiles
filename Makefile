@@ -10,6 +10,7 @@ PROFILE ?= $(shell cat $(PROFILE_FILE) 2>/dev/null || echo $${DOTFILES_PROFILE:-
 DIST_DIR := $(DOTFILES_DIR)/agents/rules/dist
 ACTIVE_RULES := $(DIST_DIR)/active-rules.md
 CORE_RULES := $(DOTFILES_DIR)/agents/rules/src/core.md
+SKILLS_INDEX := $(DOTFILES_DIR)/agents/rules/src/skills-index.md
 PROFILE_RULES := $(DOTFILES_DIR)/agents/rules/src/$(PROFILE).md
 
 IS_WSL := $(shell grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null && echo true || echo false)
@@ -41,6 +42,7 @@ compile-rules:
 	@echo "" >> $(ACTIVE_RULES)
 	@cat $(CORE_RULES) >> $(ACTIVE_RULES)
 	@echo "" >> $(ACTIVE_RULES)
+	@if [ -f "$(SKILLS_INDEX)" ]; then cat $(SKILLS_INDEX) >> $(ACTIVE_RULES); echo "" >> $(ACTIVE_RULES); fi
 	@cat $(PROFILE_RULES) >> $(ACTIVE_RULES)
 	@chmod 444 $(ACTIVE_RULES)
 	@echo "✔ Reglas compiladas en $(ACTIVE_RULES) [modo solo lectura]"

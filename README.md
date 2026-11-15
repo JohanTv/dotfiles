@@ -23,6 +23,9 @@ dotfiles/
 ├── install.sh                  # Instalador idempotente y detector de SO (--tools: apt + Homebrew)
 ├── Brewfile                    # Herramientas CLI vía Homebrew (rg, sd, lazygit, lazydocker, zellij)
 ├── .gitignore                  # Protección contra secretos, dist/ y temporales
+├── docs/                       # 📚 Arquitectura, especificaciones y plan maestro (ver docs/INDEX.md)
+│   ├── INDEX.md                # Mapa general de especificaciones de Allostasis y Dotfiles
+│   └── PLAN_MAESTRO_REFACTORING_Y_OSS.md # Plan de implementación en 5 fases
 │
 ├── agents/                     # 🤖 Orquestación unificada de Agentes de IA
 │   ├── AGENTS.md               # Catálogo maestro y gobernanza de agentes
