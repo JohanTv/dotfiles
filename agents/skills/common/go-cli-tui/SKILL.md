@@ -101,7 +101,118 @@ app/
 ## 5. Estrategia y Entorno de Pruebas (Testing Harness)
 
 1. **Table-Driven Tests:** Obligatorios para todos los algoritmos del dominio (`domain/`), con pruebas parametrizadas en estructuras anónimas.
-2. **SQLite Efímero (`file::memory:?cache=shared`):** Pruebas de integración de base de datos ejecutadas en memoria RAM en <20ms por suite.
+2. **SQLite Efímero (`file:test_mem?mode=memory&cache=shared`):** Pruebas de integración de base de datos ejecutadas en memoria RAM en <20ms por suite fijando `SetMaxOpenConns(1)`.
 3. **Sandboxes Git Aislados (`t.TempDir()`):** Pruebas de mutación de ramas o worktrees ejecutadas exclusivamente dentro de directorios temporales gestionados por Go.
 4. **Golden File Testing para Agentes:** Pruebas que comparan la salida JSON del CLI contra plantillas en `testdata/golden/*.json` para garantizar que ningún cambio rompa los contratos de los LLMs.
 5. **Headless TUI Testing (`teatest`):** Uso de `github.com/charmbracelet/x/exp/teatest` para enviar mensajes y pulsaciones de teclas simuladas al bucle de Bubble Tea y verificar el modelo final sin abrir terminal interactiva.
+
+---
+
+## 6. Protocolo Canónico de Errores Estructurados para Agentes de IA (`ResponseEnvelope`)
+
+Para herramientas en modo dual (`--json`), la gestión de errores es una **interfaz de comunicación M2M (Máquina a Máquina)** entre el proceso Go y el planificador del Agente de IA (Claude Code, Gemini CLI, OpenCode):
+
+### Reglas Inquebrantables de la Salida Estructurada:
+1. **Canal Exclusivo `stdout`:**  
+   - En modo `--json`, **`stdout` es el único canal para el JSON Envelope** (tanto en éxito como en fallo).
+   - `stderr` debe permanecer en **silencio absoluto (0 bytes)** durante errores de validación y de negocio para no romper pipelines Unix (`$()`, `| jq`).
+2. **Sincronía de Códigos POSIX:**  
+   - Prohibido devolver código de salida `0` ante un error de negocio (`{"ok": false}`). El planificador del LLM interpretaría `0` como éxito.
+   - Retornar **código de salida != 0** junto con `"ok": false` en el payload JSON.
+3. **Campos de Auto-Reparación (Self-Healing Loop):**  
+   - `code`: Identificador inmutable en `SCREAMING_SNAKE_CASE`.
+   - `category`: `user_input` | `state_conflict` | `auth` | `upstream_service` | `internal`.
+   - `target`: Argumento, flag o entidad culpable exacta (ej. `--base`, `duration`).
+   - `hint`: Sugerencia concisa en lenguaje natural para que el modelo no tenga que consultar docs.
+   - `suggested_command`: Invocación corregida lista para ejecutarse en el siguiente turno.
+   - `recoverable`: Booleano que indica si un reintento tiene sentido o debe detenerse.
+
+### Estructura Canónica de Go (`internal/presentation/errors/envelope.go`):
+
+```go
+package errors
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+type ErrorCategory string
+
+const (
+	CategoryUserInput       ErrorCategory = "user_input"
+	CategoryStateConflict   ErrorCategory = "state_conflict"
+	CategoryAuth            ErrorCategory = "auth"
+	CategoryUpstreamService ErrorCategory = "upstream_service"
+	CategoryInternal        ErrorCategory = "internal"
+)
+
+// Códigos POSIX semánticos
+const (
+	ExitSuccess       = 0
+	ExitGeneralError  = 1
+	ExitUsageError    = 2
+	ExitAuthError     = 3
+	ExitNotFound      = 4
+	ExitTransientError= 5
+	ExitSoftwareError = 70 // EX_SOFTWARE
+)
+
+type ErrorDetail struct {
+	Code             string                 `json:"code"`
+	Category         ErrorCategory          `json:"category"`
+	Message          string                 `json:"message"`
+	Target           string                 `json:"target,omitempty"`
+	Hint             string                 `json:"hint,omitempty"`
+	SuggestedCommand string                 `json:"suggested_command,omitempty"`
+	Recoverable      bool                   `json:"recoverable"`
+	Context          map[string]interface{} `json:"context,omitempty"`
+}
+
+type ResponseEnvelope struct {
+	OK    bool         `json:"ok"`
+	Error *ErrorDetail `json:"error,omitempty"`
+	Data  interface{}  `json:"data,omitempty"`
+}
+
+// EmitError emite el error estructurado a stdout cuando jsonMode está activo
+func EmitError(err error, detail ErrorDetail, exitCode int, jsonMode bool) {
+	if exitCode == 0 {
+		exitCode = ExitGeneralError
+	}
+	if detail.Code == "" {
+		detail.Code = "EXECUTION_ERROR"
+	}
+	if detail.Category == "" {
+		detail.Category = CategoryUserInput
+	}
+	if detail.Message == "" && err != nil {
+		detail.Message = err.Error()
+	}
+
+	if jsonMode {
+		env := ResponseEnvelope{
+			OK:    false,
+			Error: &detail,
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(env)
+		os.Exit(exitCode)
+	}
+
+	// Salida interactiva para humanos por stderr
+	fmt.Fprintf(os.Stderr, "✖ Error [%s]: %s\n", detail.Code, detail.Message)
+	if detail.Hint != "" {
+		fmt.Fprintf(os.Stderr, "💡 Sugerencia: %s\n", detail.Hint)
+	}
+	if detail.SuggestedCommand != "" {
+		fmt.Fprintf(os.Stderr, "👉 Ejecuta: %s\n", detail.SuggestedCommand)
+	}
+	os.Exit(exitCode)
+}
+```
+
+### Resiliencia ante Panics en el Entrypoint (`SafeExecute`):
+Envolver la ejecución del CLI con un `recover()` defensivo para garantizar que un panic inesperado nunca escape como stack trace de texto plano cuando `--json` esté activo, emitiendo en su lugar un `code: "INTERNAL_PANIC"` con código de salida `70`.
