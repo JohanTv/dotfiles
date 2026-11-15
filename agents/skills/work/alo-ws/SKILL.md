@@ -20,7 +20,7 @@ Gestión atómica y transaccional de espacios de trabajo multi-repositorio por t
 
 | Acción | Comando |
 | :--- | :--- |
-| **Crear entorno** | `alo ws create <TICKET> <REPO1> <REPO2>... [--type feat] [--base dev]` |
+| **Crear entorno** | `alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]` |
 | **Listar** | `alo ws list [--dir .worktrees] [--json]` (inspecciona ramas y dirty/clean) |
 | **Auditar** | `alo ws audit [TARGET] [--no-fetch] [--json]` (detecta direct/squash merges en memoria y estado local) |
 | **Poda dry-run** | `alo ws prune [TARGET] [--no-fetch] [--json]` (simulación sin tocar disco por defecto) |

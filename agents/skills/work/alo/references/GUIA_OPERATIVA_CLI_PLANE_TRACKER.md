@@ -1,30 +1,30 @@
-# 🛠️ Guía Operativa del CLI `plane-tracker`
+# 🛠️ Guía Operativa del CLI `alo` (`alo ticket`)
 ## Manual de Comandos, Flags, Caché Local y Automatizaciones en Terminal
 
-**Binario:** `~/.local/bin/plane-tracker`  
-**Wrapper Dotfiles:** `Code/dotfiles/bin/common/plane-tracker`  
-**Motor Python:** `Code/dotfiles/agents/skills/work/plane-tracker/scripts/plane.py` (punto de entrada; el código está en `scripts/plane_cli/`)  
-**Caché Relacional:** `~/.cache/plane/worklogs.db` (SQLite3 WAL Mode)
+**Binario:** `~/.local/bin/alo`  
+**Wrapper Dotfiles:** `Code/dotfiles/bin/common/alo`  
+**Motor:** Motor nativo en Go de Allostasis (`alo`)  
+**Caché Relacional:** SQLite local en modo WAL (gestión interna)
 
 ---
 
 ## 0. Setup inicial (primera vez)
 
-Antes de ejecutar `plane-tracker`, verifica que las variables de entorno estén en `~/.zshrc.local`; si falta alguna, pídele los valores al usuario.
+Antes de ejecutar `alo`, verifica que las variables de entorno estén en `~/.zshrc.local`; si falta alguna, pídele los valores al usuario.
 
 ```bash
 export PLANE_BASE_URL="https://plane.tudominio.com"   # URL base de la instancia, sin barra final
 export PLANE_WORKSPACE="tu-workspace"                 # slug del workspace (visible en la URL)
 export PLANE_API_KEY="tu-api-key"                     # Plane → Perfil → API Tokens
 export PLANE_USERNAME="tu@email.com"                  # email o display_name: filtra tu reporte y no mezcla horas ajenas
-# export PLANE_ACTOR_UUID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # opcional y más robusto; obtenlo con `plane-tracker whoami`
+# export PLANE_ACTOR_UUID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"   # opcional y más robusto; obtenlo con `alo ticket whoami`
 ```
 
 Onboarding del agente (primera invocación o error de configuración):
 
-1. Verifica con `plane-tracker whoami 2>&1`.
+1. Verifica con `alo ticket whoami 2>&1`.
 2. Si falta una variable, pregunta la URL de la instancia, la API Key y el username o email en Plane.
-3. Escribe los valores en `~/.zshrc.local` (`echo 'export VAR=...' >> ~/.zshrc.local`), recarga con `source ~/.zshrc.local` y verifica con `plane-tracker whoami`.
+3. Escribe los valores en `~/.zshrc.local` (`echo 'export VAR=...' >> ~/.zshrc.local`), recarga con `source ~/.zshrc.local` y verifica con `alo ticket whoami`.
 4. Nunca expongas la API Key en logs, artefactos ni chat.
 
 ---
@@ -33,30 +33,30 @@ Onboarding del agente (primera invocación o error de configuración):
 
 ```bash
 # 1. Búsqueda en Momento Cero (caché local, título y etiquetas; incluye cerrados y cancelados)
-plane-tracker list --text "<términos de búsqueda>" --all-projects --limit 5 --brief --json
+alo ticket list --text "<términos de búsqueda>" --all-projects --limit 5 --brief --json
 
 # 2. Creación de ticket con sugerencia automática de rama Git
-plane-tracker create "[FEAT] Título descriptivo" -p OMNIFY --priority high --labels "backend,sms"
+alo ticket create "[FEAT] Título descriptivo" -p OMNIFY --priority high --labels "backend,sms"
 # (rechaza un título repetido de las últimas 24 h: --allow-duplicate lo permite)
 
 # 3. Consulta de detalles de ticket con notas de handoff y comentarios
-plane-tracker get <TICKET-ID>
+alo ticket get <TICKET-ID>
 
 # 4. Actualización de estado, prioridad, etiquetas o título
-plane-tracker update <TICKET-ID> --state "Progreso" --priority "urgent"
+alo ticket update <TICKET-ID> --state "Progreso" --priority "urgent"
 
 # 5. Publicación de bitácora corta (formato en SKILL.md §4; la CLI agrega la telemetría)
-plane-tracker comment add <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
+alo ticket comment add <TICKET-ID> -f /tmp/worklog.md --track "main" --duration 95
 
 # 6. Inspección de taxonomía de etiquetas del proyecto (< 2ms)
-plane-tracker labels [-p OMNIFY]
+alo ticket labels [-p OMNIFY]
 
 # 7. Listado de proyectos disponibles en el workspace
-plane-tracker projects
+alo projects
 
 # 8. Generador de reportes de actividad con Interval Merging de Klee
-plane-tracker report time
-plane-tracker report time --week
+alo report time
+alo report time --week
 ```
 
 ### Convenciones de nombrado
@@ -73,59 +73,56 @@ plane-tracker report time --week
 
 ## 2. Detalle de Comandos
 
-### `plane-tracker list` con filtros (mis tickets)
-Vista filtrada desde la caché local; funciona sin conexión y avisa de la antigüedad de los datos. Necesita saber quién eres (`PLANE_ACTOR_UUID` o `PLANE_USERNAME`; `whoami` lo comprueba).
+### `alo ticket list` con filtros (mis tickets)
+Vista filtrada desde la caché local; funciona sin conexión y avisa de la antigüedad de los datos. Necesita saber quién eres (`PLANE_ACTOR_UUID` o `PLANE_USERNAME`; `alo ticket whoami` lo comprueba).
 
 ```bash
-plane-tracker list --mine --open               # asignados a ti ahora (según la última sincronización), sin cerrados
-plane-tracker list --created --all-projects    # creados por ti, en todos los proyectos
-plane-tracker list --involved --open           # asignado, creador, con horas tuyas o asignado alguna vez, con la razón de cada uno
-plane-tracker sync --history --budget 25   # trae el historial de asignación y las transiciones de hasta 25 tickets pendientes (reanuda; no repite lo ya traído); luego `list --involved`
+alo ticket list --mine --open               # asignados a ti ahora (según la última sincronización), sin cerrados
+alo ticket list --created --all-projects    # creados por ti, en todos los proyectos
+alo ticket list --involved --open           # asignado, creador, con horas tuyas o asignado alguna vez, con la razón de cada uno
+alo sync                                    # sincroniza eventos diferidos y actualiza outbox
 ```
 *Qué NO afirma:* `--involved` muestra "Historial de asignación verificado en X de Y tickets": que un ticket no aparezca no prueba que nunca estuviste asignado. Las horas registradas salen solo de la base local de esta máquina. Detalle y límites en `docs/decisions/0019`.
 
-### A. `plane-tracker list --text` (Búsqueda Momento Cero)
-Permite saber si un requerimiento ya existe en Plane antes de codificar o duplicar tickets. `search` ya no existe: la búsqueda es `list --text`, que busca en **título y etiquetas** (no en la descripción), ordena por relevancia y se combina con cualquier otro filtro. Responde desde la caché local (refrescada por TTL de 30 min con solo GET).
+### A. `alo ticket list --text` (Búsqueda Momento Cero)
+Permite saber si un requerimiento ya existe en Plane antes de codificar o duplicar tickets. Búsqueda con `alo ticket search "<texto>"` o `alo ticket list --text`, que busca en **título y etiquetas**, ordena por relevancia y se combina con cualquier otro filtro. Responde desde la caché local.
 
 ```bash
 # Búsqueda en todos los proyectos accesibles, 5 filas breves, para un agente
-plane-tracker list --text "validaciones formulario" --all-projects --limit 5 --brief --json
+alo ticket list --text "validaciones formulario" --all-projects --limit 5 --brief --json
 
 # Solo un proyecto (ej: Operaciones) y solo lo abierto
-plane-tracker list --text "soporte ripley" -p OPS --open
+alo ticket list --text "soporte ripley" -p OPS --open
 
-# Forzar refresco desde Plane si se crearon tickets muy recientemente
-plane-tracker list --text "caddy" --refresh
+# Búsqueda tolerante directa
+alo ticket search "caddy" -p OPS
 
-# Solo lo local, sin red
-plane-tracker list --text "mcp" --offline
+# Salida estructurada
+alo ticket search "mcp" --json
 ```
 
-**Antes de concluir "no hay duplicado", lee `coverage`:** si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado no prueba ausencia. Un identificador como texto (`OMNIFY-12`) no se busca como ticket: usa `plane-tracker get OMNIFY-12` (con `--verbose` la nota `text_looks_like_id` lo recuerda).
+**Antes de concluir "no hay duplicado", lee `coverage`:** si `unavailable` no está vacío, `stale` es `true` o `complete` no es `true`, el resultado no prueba ausencia. Un identificador como texto (`OMNIFY-12`) no se busca como ticket: usa `alo ticket get OMNIFY-12` (con `--verbose` la nota `text_looks_like_id` lo recuerda).
 
 ---
 
-### B. `plane-tracker create` (Creación Estructurada)
+### B. `alo ticket create` (Creación Estructurada)
 Publica el issue en Plane, vincula las etiquetas locales, asigna el estado inicial y **genera la sugerencia de rama Git según la fase**.
 
 ```bash
 # Creación estándar en Omnify
-plane-tracker create "[FEAT] Validaciones de formulario de campaña SMS" \
+alo ticket create "[FEAT] Validaciones de formulario de campaña SMS" \
   --priority "high" \
-  --labels "frontend,sms,bug" \
   -d "Detalles del requerimiento..."
 
 # Creación de un Spike de diagnóstico
-plane-tracker create "[SPIKE] Análisis de deadlock en tabla SEM-MKT" \
-  --priority "urgent" \
-  --labels "backend,bd"
+alo ticket create "[SPIKE] Análisis de deadlock en tabla SEM-MKT" \
+  --priority "urgent"
 
 # Creación en otro proyecto con estado inicial específico
-plane-tracker create "Tareas Rápidas y Soporte - W44" \
+alo ticket create "Tareas Rápidas y Soporte - W44" \
   -p OPS \
   --state "Progreso" \
-  --priority "medium" \
-  --labels "externo,infra"
+  --priority "medium"
 ```
 
 #### Salida en Terminal:
@@ -139,60 +136,31 @@ plane-tracker create "Tareas Rápidas y Soporte - W44" \
 
 ---
 
-### C. `plane-tracker get` (Contexto de Relevo y Comentarios)
+### C. `alo ticket get` (Contexto de Relevo y Comentarios)
 Muestra la metadata, descripción del ticket y **extrae el historial cronológico de comentarios** para destilar el handoff.
 
 ```bash
 # Consultar ticket existente
-plane-tracker get OMNIFY-197
-plane-tracker get OPS-44
+alo ticket get OMNIFY-197
+alo ticket get OPS-44
 
 # Salida JSON para procesamiento por LLM (incluye state_name)
-plane-tracker get OMNIFY-197 --json
-
-# Control de tokens (por defecto se traen todos los comentarios, truncados a 300 caracteres)
-plane-tracker get OMNIFY-197 --no-comments --no-description  # solo metadata y estado
-plane-tracker get OMNIFY-197 --last 2                        # últimos 2 comentarios
-plane-tracker get OMNIFY-197 --full                          # sin truncar descripción ni comentarios
+alo ticket get OMNIFY-197 --json
 ```
 
 ---
 
-### C.1b Varios tickets en una misma sesión
+### C.1 Foco de sesión (`alo ticket focus`) y Telemetría (`alo log`)
 ```bash
-# Atribución automática por foco: avisa en qué ticket trabajas al cambiar de uno a otro
-plane-tracker focus set OMNIFY-205        # abre la marca (cierra la anterior)
-plane-tracker focus set OPS-13            # cambio de ticket
-plane-tracker focus status                # minutos atribuidos hoy por ticket y tiempo sin foco
-plane-tracker focus clear
-plane-tracker worklog propose OMNIFY-205  # solo cuenta los intervalos con foco en ese ticket
+# Atribución por foco de sesión
+alo ticket focus set OMNIFY-205        # abre la marca activa
+alo ticket focus set OPS-13            # cambio de ticket
+alo ticket focus status                # verifica el ticket activo
+alo ticket focus clear                 # cierra la marca
 
-# Reparto manual de lo medido (en un paso; cada parte se registra luego con su texto)
-plane-tracker worklog propose --split OMNIFY-205=60%,OPS-13=rest   # o 40m; suma exacta (mayor resto)
-plane-tracker comment add OMNIFY-205 -m "..." --accept-proposal
-plane-tracker comment add OPS-13 -m "..." --accept-proposal             # en cualquier orden
-
-# Ventana explícita (un solo día local; lo ya registrado de la sesión se excluye)
-plane-tracker worklog propose OMNIFY-205 --since 09:30 --until 11:00
-
-# Sesión de un día anterior (p. ej. el id que mostró Ctrl+C al cerrarla; `find-session -r -j` también lista ids)
-plane-tracker worklog propose OMNIFY-205 --agent opencode --session ses_xxxx --date 2026-10-28
-plane-tracker comment add OMNIFY-205 -m "..." --agent opencode --session ses_xxxx --accept-proposal
-```
-- La medición usa **tramos de actividad** (huecos de más de 10 min excluidos). Un worklog medido guarda `segments` (los tramos reales) para que el reloj por ticket y el reporte diario no usen un rango envolvente que pise a otro ticket.
-- **Nada se cuenta dos veces:** de cada propuesta se restan los worklogs de la sesión (medidos o declarados, por su intervalo real) y las propuestas pendientes de otros tickets. Con foco activo, un ticket sin marcas hoy no recibe propuesta (usa `--duration`). Las marcas son locales (no se reconstruyen con `report --refresh`); los segmentos sí viajan en el bloque oculto del comentario.
-- **Varias terminales o agentes:** cada propuesta pendiente pertenece a su sesión (`--accept-proposal` usa la de tu terminal y no adivina si hay varias). Claude Code resuelve su sesión solo (`$CLAUDE_CODE_SESSION_ID`); con OpenCode/agy, si hay más de una sesión reciente en el mismo directorio, indica `--session`. El tiempo en paralelo suma en *cómputo* y se une en *reloj* (AI Leverage).
-- `measured_by` distingue `proposal`, `proposal_split` y `declared`, con `attribution` (`session`, `focus`, `split`) y `window_override` si se usó `--since/--until`.
-
----
-
-### C.1 `plane-tracker worklog propose` (Duración medida)
-Mide la sesión del agente (solo timestamps, nunca contenido) y propone una duración sin registrar nada.
-
-```bash
-plane-tracker worklog propose OMNIFY-197 --worker-type agent:claude
-plane-tracker worklog propose OMNIFY-197 --agent opencode --session ses_xxxxxxxx   # sesión ambigua en el directorio
-plane-tracker comment add OMNIFY-197 -m "..." --accept-proposal                         # registra lo propuesto (30 min, un solo uso)
+# Registro de sesión en el ledger alostático
+alo log OMNIFY-205 60 "Desarrollo de validaciones de esquema" --bucket deep_work
+alo log OPS-13 40 "Soporte operativo a incidencias" --bucket toil_support
 ```
 *Fuentes:* Claude Code (transcript, `$CLAUDE_CODE_SESSION_ID`), OpenCode (`opencode.db`, solo `time_created`), Antigravity CLI (`conversation_summaries.db`, solo hitos; confianza baja). Las pausas de más de 10 min se descuentan de la medición neta.
 
@@ -200,10 +168,10 @@ plane-tracker comment add OMNIFY-197 -m "..." --accept-proposal                 
 
 ### C.2 Flujo del work item: tiempo abierto vs esfuerzo efectivo
 ```bash
-plane-tracker get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
-plane-tracker get OMNIFY-129 --include attachments,links   # adjuntos y enlaces (+1 GET cada uno; sin el flag no se leen)
-plane-tracker get OMNIFY-129 --all                # todo lo incluible hoy (attachments y links); relations y children avisan: aún no implementados
-plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas (con --offline, sobre lo almacenado)
+alo ticket get OMNIFY-129 --history            # lead/cycle time, tiempo por estado, esfuerzo y transiciones
+alo ticket get OMNIFY-129 --include attachments,links   # adjuntos y enlaces (+1 GET cada uno; sin el flag no se leen)
+alo ticket get OMNIFY-129 --all                # todo lo incluible hoy (attachments y links); relations y children avisan: aún no implementados
+alo report flow --week [-p OMNIFY]      # tabla por ticket del periodo + medianas (con --offline, sobre lo almacenado)
 ```
 - **Lead time** = `created_at` → cierre (`completed_at`; en cancelados, la transición a Cancelado). Abiertos: hasta hoy.
 - **Cycle time** = suma del tiempo en estados del grupo *started* (Progreso, Revisión, Pruebas); **Pausado se excluye del activo** y se muestra en el bruto. Reaperturas suman cada tramo.
@@ -217,15 +185,15 @@ plane-tracker report flow --week [-p OMNIFY]      # tabla por ticket del periodo
 
 ---
 
-### C.3 `plane-tracker link add` y `comment edit --embed-metadata`
+### C.3 `alo ticket link add` y `comment edit --embed-metadata`
 ```bash
-plane-tracker link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
-plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
-plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
-plane-tracker comment edit OMNIFY-205 --comment-id <uuid> --since 14:40 --until 18:20 [--date D]   # CORRIGE la ventana real: la duración pasa a ser la del intervalo
-plane-tracker comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
-plane-tracker comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
-plane-tracker delete OMNIFY-205 [--yes] [--discard-worklogs]                                         # elimina el ticket (irreversible); sin --yes solo muestra el alcance; con horas propias exige --discard-worklogs; con horas de otros se niega (ver docs 0018)
+alo ticket link add OMNIFY-205 https://github.com/org/repo/pull/23 --title "PR #23"   # panel de enlaces del work item (idempotente)
+alo ticket comment edit OMNIFY-205 --comment-id <uuid> --embed-metadata           # añade el bloque oculto de un comentario previo
+alo ticket comment edit OMNIFY-205 --comment-id <uuid> --duration 45 [--track T --capacity C]   # CORRIGE un worklog: reemplaza el bloque oculto y la fila local a la vez
+alo ticket comment edit OMNIFY-205 --comment-id <uuid> --since 14:40 --until 18:20 [--date D]   # CORRIGE la ventana real: la duración pasa a ser la del intervalo
+alo ticket comment edit OMNIFY-205 --comment-id <uuid> -m "nuevo texto"                         # edita el texto conservando la telemetría
+alo ticket comment delete OMNIFY-205 --comment-id <uuid>                                         # elimina comentario + worklog local
+alo ticket delete OMNIFY-205 [--yes] [--discard-worklogs]                                         # elimina el ticket (irreversible); sin --yes solo muestra el alcance; con horas propias exige --discard-worklogs; con horas de otros se niega (ver docs 0018)
 ```
 *Corregir un tiempo mal registrado:* nunca se edita solo la fila local, porque `report time --refresh` la reescribiría desde el bloque oculto del comentario. `comment edit --duration` parte del bloque existente (conserva sesión, fechas y tramos), cambia solo lo pedido, marca `measured_by.kind="corrected"` (con el tipo original en `was`), guarda `previous_duration_minutes` y `edited_at`, y actualiza bloque y fila juntos. **Para cambiar inicio y fin usa `--since/--until`** (con `--date` si el trabajo fue otro día): con los dos extremos la duración es la del intervalo; con uno solo se completa con `--duration` o con la duración ya registrada. Si el worklog tiene tramos medidos que no suman la nueva duración, pide `--force` (descarta los tramos; el rango inicio–fin sigue cubriendo la sesión para no recontarla).
 
@@ -235,132 +203,117 @@ Prefiere `link add` para PRs y documentos (queda estructurado y no notifica como
 
 ### C.4 Adjuntos y salud de la conexión
 ```bash
-plane-tracker attachment add OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
-plane-tracker attachment list OMNIFY-205 [--json]                 # lista los adjuntos (con su id)
-plane-tracker attachment delete OMNIFY-205 <id>                   # elimina un adjunto
-plane-tracker attachment replace OMNIFY-205 <id> nuevo.pdf        # "actualizar": sube el nuevo y, si salió bien, borra el anterior
-plane-tracker create "[FEAT] ..." --attach spec.pdf               # adjuntar al crear (se sube justo después; el ticket ya existe si falla)
-plane-tracker health [--hours 24] [--json]                        # latencia (p50/p95) y errores recientes de la API
+alo ticket attachment add OMNIFY-205 informe.pdf captura.png   # sube archivos (máx. 50 MB c/u); si falla no deja adjuntos huérfanos
+alo ticket attachment list OMNIFY-205 [--json]                 # lista los adjuntos (con su id)
+alo ticket attachment delete OMNIFY-205 <id>                   # elimina un adjunto
+alo ticket attachment replace OMNIFY-205 <id> nuevo.pdf        # "actualizar": sube el nuevo y, si salió bien, borra el anterior
+alo ticket create "[FEAT] ..." --attach spec.pdf               # adjuntar al crear (se sube justo después; el ticket ya existe si falla)
+alo health [--hours 24] [--json]                        # latencia (p50/p95) y errores recientes de la API
 ```
-Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la propia creación del ticket: ambos son pasos aparte. Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro JSONL (sin cuerpos ni cabeceras) en `~/.cache/plane/requests.log` (rota a 1 MB) con método, ruta, estado, milisegundos, intento y error; `health` lo resume para distinguir caídas de lentitud.
+Plane no permite editar un adjunto (solo confirmar su subida) ni subirlo en la propia creación del ticket: ambos son pasos aparte. Flujo de Plane: crear adjunto → POST firmado al almacenamiento → confirmar `is_uploaded`. Cada llamada a la API deja un registro interno para diagnosticar y distinguir caídas de lentitud mediante telemetría.
 
 ---
 
 ### C.5 Relevo y consistencia
 ```bash
-plane-tracker handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
-plane-tracker worklog check [--week | --from D [--to D]] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
+alo handoff [TICKET] [--base dev]   # borrador del Handoff Snapshot con hechos de git (no publica); ver PROTOCOLO_RELEVO §6
+alo worklog check [--week | --from D [--to D]] [-p OMNIFY] [--json]   # solo lectura: compara worklogs locales con sus comentarios
 ```
 `worklog check` informa por ticket: `duplicate` (varias filas para un comentario), `orphan` (el comentario ya no existe), `mismatch` (fecha, horas, duración, track, capacidad o tipo distintos entre fila y bloque), `missing_local` (comentario con telemetría sin fila local: usa `report --refresh`) y, como aviso, `no_block` (comentario sin telemetría, no reconstruible), `pending` (fila en cola de publicación) y `unlinked`. Sale con código 1 si hay inconsistencias.
 
 ---
 
 ### C.6 Plane caído: `outbox`
-Exit 3 significa que Plane no responde (circuito abierto, timeouts o `PLANE_OFFLINE=1`). Las lecturas responden con lo local y avisan su antigüedad; `comment add` guarda el comentario con su worklog y lo encola (exit 0, `⏳ En cola`); el resto de las escrituras falla con exit 3.
+Exit 3 significa que Plane no responde (circuito abierto, timeouts o `PLANE_OFFLINE=1`). Las lecturas responden con lo local y avisan su antigüedad; `alo log` registra localmente y encola para posterior entrega; el resto de las escrituras falla con exit 3.
 ```bash
-plane-tracker outbox list [--all] [--json]                         # registros abiertos con vista previa (nunca el texto completo)
-plane-tracker outbox flush [--limit N] [--include-old] [--retry-failed] [--json]   # publica en orden de creación
-plane-tracker outbox drop ID [--force] [--keep-worklog] [--json]   # descarta un registro y su worklog provisional
+alo outbox list [--all] [--json]                         # registros abiertos con vista previa (nunca el texto completo)
+alo sync [--limit N]                                     # procesa outbox y publica en orden de creación
+alo outbox drop ID [--force] [--keep-worklog] [--json]   # descarta un registro y su worklog provisional
 ```
-`flush` sondea Plane aunque el circuito esté en enfriamiento, se detiene ante el primer fallo de disponibilidad (exit 3), marca `failed` los rechazados (404, 400...) y sigue, y omite los de más de 7 días salvo `--include-old`. Un registro cuya entrega es dudosa se busca en Plane por su `client_id` antes de reenviarse; `drop` de uno así exige `--force`. Mientras haya registros sin publicar, cada comando lo avisa por stderr. `PLANE_NO_QUEUE=1` hace que `comment add` falle con exit 3 en lugar de encolar.
+`sync` sondea Plane aunque el circuito esté en enfriamiento, se detiene ante el primer fallo de disponibilidad (exit 3), marca `failed` los rechazados (404, 400...) y sigue.
 
 ---
 
-### D. `plane-tracker update` (Transiciones de Estado y Renombrado)
+### D. `alo ticket update` (Transiciones de Estado y Renombrado)
 Permite mover tickets entre columnas del Kanban y corregir su título sin abrir el navegador.
 
 ```bash
 # Mover a Progreso
-plane-tracker update OMNIFY-175 --state "Progreso"
+alo ticket update OMNIFY-175 --state "Progreso"
 
 # Renombrar el ticket (útil al cambiar de fase, ej. RFC → FEAT)
-plane-tracker update OMNIFY-175 --title "[FEAT] Validaciones de formulario en campañas SMS"
+alo ticket update OMNIFY-175 --title "[FEAT] Validaciones de formulario en campañas SMS"
 
 # Mover a Pruebas y cambiar prioridad
-plane-tracker update OMNIFY-175 --state "Pruebas" --priority "high"
+alo ticket update OMNIFY-175 --state "Pruebas" --priority "high"
 
 # Pausar por bloqueo externo
-plane-tracker update OMNIFY-175 --state "Pausado"
+alo ticket update OMNIFY-175 --state "Pausado"
 
 # Marcar como Completado
-plane-tracker update OMNIFY-175 --state "Completado"
+alo ticket update OMNIFY-175 --state "Completado"
 ```
 *Estados válidos:* `Backlog`, `Pendiente`, `Progreso`, `Pruebas`, `Revisión`, `Completado`, `Pausado`, `Cancelado`.
 
 ---
 
-### E. `plane-tracker comment add` (Bitácora Dual-Layer)
-Publica la bitácora de la sesión en el ticket y persiste el registro en SQLite local para los reportes diarios.
-
-> **Formato vigente:** texto corto (máx. 700 caracteres visibles, sin tablas ni JSON; `--long` solo para relevos o informes pedidos) y telemetría por flags (`--track`, `--capacity`, `--worker-type`, `--duration`). El bloque `PLANE_WORKLOG_METADATA` lo agrega la CLI; el agente no lo escribe. Reglas completas: `SKILL.md` §4.
-
-> ⚠️ **`--duration <minutos>` es obligatorio** si el contenido no incluye el bloque `PLANE_WORKLOG_METADATA` (donde puede ir como `duration_minutes` o `duration_net_minutes`). Sin esa fuente de duración el CLI **aborta antes de publicar**: la duración ya no se infiere ni se inventa. Si el hecho ocurrió fuera de la conversación del agente, pregúntale al usuario cuánto demoró antes de comentar.
-
-> ⏱️ **Ventana real (registro retroactivo):** `--since HH:MM --until HH:MM` fija inicio y fin y la duración sale del intervalo (`--duration`, si se pasa, debe coincidir); con un solo extremo hace falta `--duration`. `--date YYYY-MM-DD` pone el trabajo en otro día (nunca futuro). La ventana no puede terminar en el futuro: el tiempo se registra después de trabajarlo. Sin ventana, la hora de publicación sigue siendo el fin (así se registró antes del defecto 0001).
+### E. `alo log` / `alo ticket comment add` (Bitácora Dual-Layer)
+Registra la sesión y esfuerzo mediante `alo log`, o publica comentarios en el ticket:
 
 ```bash
-# Publicar archivo de bitácora
-plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --duration 95
+# Registrar sesión mediante alo log
+alo log OMNIFY-162 95 "Reconciliación de reportería SMS." --bucket deep_work
 
-# Con track y tipo de trabajador especificado
-plane-tracker comment add OMNIFY-162 -f /tmp/worklog.md --track "form-validations" --worker-type "subagent" --duration 45
+# Soporte operativo en ticket paraguas
+alo log OPS-44 35 "Atención a comercial sobre campaña #842." --bucket toil_support
 
-# Comentario rápido con mensaje en línea (ticket paraguas de OPS)
-plane-tracker comment add OPS-44 --track "soporte-ripley" --capacity "toil_support" --duration 35 -m "Atención a comercial sobre campaña #842."
-
-# Reunión retroactiva con su horario real: manda la ventana, no la publicación (defecto 0001)
-plane-tracker comment add OPS-23 --track "reuniones" --capacity "coordination" --since 09:00 --until 10:00 -m "Reunión con el área comercial sobre el TDR."
-
-# Trabajo de otro día con su intervalo completo
-plane-tracker comment add OMNIFY-162 --date 2026-10-30 --since 14:40 --until 18:20 --capacity "deep_work" -m "Reconciliación de reportería SMS."
+# Publicar comentario directo en ticket (si se requiere)
+alo ticket comment add OMNIFY-162 -f /tmp/worklog.md --duration 95
 ```
 
 ---
 
-### F. `plane-tracker report time` (Reporte Ejecutivo para Jefatura)
+### F. `alo report time` (Reporte Ejecutivo para Jefatura)
 Genera el consolidado diario o semanal utilizando la **Unión de Intervalos de Klee** para evitar duplicar horas en paralelo.
 
 ```bash
 # Reporte del día actual (formato para la jefatura a las 6:00 pm)
-plane-tracker report time
+alo report time
 
 # Reporte semanal (balance de sprint los viernes)
-plane-tracker report time --week
+alo report time --week
 
 # Filtrar por proyecto específico
-plane-tracker report time -p OMNIFY
+alo report time -p OMNIFY
 
 # Forzar sincronización remota previa
-plane-tracker report time --refresh
+alo report time --refresh
 
 # Vista de flujo (lead/cycle time y esfuerzo por ticket; no sincroniza, ignora --refresh)
-plane-tracker report flow --week
+alo report flow --week
 
 # Salida en JSON para paneles o visualizaciones
-plane-tracker report time --json
+alo report time --json
 ```
 
 ---
 
-### G. `plane-tracker labels` y `projects`
+### G. `alo ticket labels` y `projects`
 Inspección ultra-rápida de taxonomía viva desde SQLite.
 
 ```bash
 # Listar etiquetas de Omnify (< 2ms)
-plane-tracker labels
+alo ticket labels
 
 # Listar etiquetas de Operaciones
-plane-tracker labels -p OPS
-
-# Forzar refresco si se crearon etiquetas en la web
-plane-tracker labels --refresh
+alo ticket labels -p OPS
 
 # Listar proyectos cacheados en el workspace
-plane-tracker projects
+alo projects
 ```
 
 ---
 
-## 9. Orquestación Multi-Repo (`plane-worktree`)
+## 9. Orquestación Multi-Repo (`alo ws`)
 
-La orquestación de worktrees multi-repo, auditoría de merges (`git merge-tree`) y poda segura con respaldos automáticos se gestiona mediante la skill dedicada [`plane-worktree`](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-worktree/SKILL.md). Consulte su [guía operativa dedicada](file:///home/johantv/Code/dotfiles/agents/skills/work/plane-worktree/references/GUIA_OPERATIVA_WORKTREES.md).
+La orquestación de worktrees multi-repo, auditoría de merges (`git merge-tree`) y poda segura con respaldos automáticos se gestiona mediante la skill dedicada [`alo-ws`](file:///home/johantv/Code/dotfiles/agents/skills/work/alo-ws/SKILL.md). Consulte su [guía operativa dedicada](file:///home/johantv/Code/dotfiles/agents/skills/work/alo-ws/references/GUIA_OPERATIVA_WORKTREES.md).

@@ -1,17 +1,17 @@
-# Guía Operativa de Orquestación Multi-Repo (`plane-worktree`)
+# Guía Operativa de Orquestación Multi-Repo (`alo ws`)
 
-Esta guía complementa el `SKILL.md` de `plane-worktree` con el detalle procedural, casos de uso avanzados, resolución de conflictos y gestión de respaldos.
+Esta guía complementa el `SKILL.md` de `alo-ws` con el detalle procedural, casos de uso avanzados, resolución de conflictos y gestión de respaldos.
 
 ---
 
 ## 1. Ciclo de Vida de un Espacio de Trabajo Multi-Repo
 
-Cuando una iniciativa técnica (ej. `OMNIFY-238`) abarca más de un repositorio (ej. backend y detonador), no deben crearse ramas locales sueltas de forma manual. Se utiliza `plane-worktree` para generar un contenedor unificado en `.worktrees/`.
+Cuando una iniciativa técnica (ej. `OMNIFY-238`) abarca más de un repositorio (ej. backend y detonador), no deben crearse ramas locales sueltas de forma manual. Se utiliza `alo ws` para generar un contenedor unificado en `.worktrees/`.
 
-### Creación (`add`):
+### Creación (`create` / `add`):
 ```bash
 # Ejemplo: ticket OMNIFY-238 con backend y detonador
-plane-worktree add OMNIFY-238 operator-recovery omnify-backend omnify-detonador-sms --type feat --base dev
+alo ws create OMNIFY-238 operator-recovery omnify-backend omnify-detonador-sms --type feat --base dev
 ```
 
 #### Fases de Ejecución:
@@ -31,7 +31,7 @@ plane-worktree add OMNIFY-238 operator-recovery omnify-backend omnify-detonador-
 ### Reutilización de Ramas (`--reuse-branch`):
 Si necesitas retomar un trabajo previo donde la rama local ya contiene avances propios que aún no están en `origin/<base>`:
 ```bash
-plane-worktree add OMNIFY-238 operator-recovery omnify-backend --reuse-branch
+alo ws create OMNIFY-238 operator-recovery omnify-backend --reuse-branch
 ```
 
 ---
@@ -42,10 +42,10 @@ Permite obtener una vista consolidada de todos los contenedores y el estado de s
 
 ```bash
 # Vista formateada en terminal
-plane-worktree list
+alo ws list
 
 # Salida estructurada JSON para consumo de scripts/agentes
-plane-worktree list --json
+alo ws list --json
 ```
 
 Cada repositorio reporta:
@@ -65,13 +65,13 @@ Analiza la integrabilidad de cada worktree cruzando tres fuentes de verdad:
 
 ```bash
 # Auditar todos los contenedores (sincroniza origin automáticamente)
-plane-worktree audit
+alo ws audit
 
 # Auditar un contenedor o ticket específico
-plane-worktree audit OMNIFY-238
+alo ws audit OMNIFY-238
 
 # Auditoría rápida offline sin conexión de red
-plane-worktree audit --no-fetch
+alo ws audit --no-fetch
 ```
 
 ### Clasificación de Estados:
@@ -91,13 +91,13 @@ plane-worktree audit --no-fetch
 ### Modo Dry-Run (Por defecto):
 Muestra exactamente qué contenedores y ramas se eliminarían sin alterar nada en disco:
 ```bash
-plane-worktree prune
+alo ws prune
 ```
 
 ### Poda Segura de Contenedores 100% Integrados:
 Elimina únicamente worktrees y ramas que hayan sido integrados y estén completamente limpios:
 ```bash
-plane-worktree prune --execute
+alo ws prune --execute
 ```
 Acciones realizadas:
 1. Ejecuta `git worktree remove` en cada repositorio.
@@ -106,11 +106,11 @@ Acciones realizadas:
 4. Elimina la carpeta contenedora vacía en `.worktrees/`.
 
 ### Poda de Tickets Cancelados/Abandonados con Respaldo Automático (`--include-stale`):
-Si un ticket fue cancelado en Plane o quedó abandonado con archivos sin commitear, `plane-worktree` exige la bandera explícita `--include-stale`.
+Si un ticket fue cancelado en Plane o quedó abandonado con archivos sin commitear, `alo ws` exige la bandera explícita `--include-stale`.
 Antes de eliminar el contenedor, empaqueta automáticamente todo su contenido en un archivo comprimido `.tar.gz`:
 
 ```bash
-plane-worktree prune OMNIFY-123-cancelled --execute --include-stale
+alo ws prune OMNIFY-123-cancelled --execute --include-stale
 ```
 
 - **Ubicación del respaldo:** `~/.cache/plane/worktree-backups/<contenedor>-<timestamp>.tar.gz`
