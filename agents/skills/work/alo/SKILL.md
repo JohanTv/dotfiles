@@ -34,8 +34,9 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Almacenamiento local y 
 | **Auditoría de Carga (Toil)** | `alo load [--json]` |
 | **Gestionar Foco de Sesión** | `alo ticket focus set <TICKET-ID>` · `alo ticket focus clear` · `alo ticket focus status` |
 | **Buscar Tareas** | `alo ticket search "<texto>" [-p PROYECTO] [--limit N] [--json]` |
-| **Listar Tareas** | `alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [--limit N] [--brief] [--json]` |
+| **Listar Tareas** | `alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [--limit N] [--brief] [--refresh|--offline] [--verbose] [--json]` |
 | **Listar Proyectos** | `alo projects [--json]` · `alo ticket projects [--json]` |
+| **Listar Estados** | `alo states [-p PROYECTO] [--refresh] [--json]` · `alo ticket states [-p PROYECTO] [--refresh] [--json]` |
 | **Detalle de Tarea** | `alo ticket get <TICKET-ID> [--json]` |
 | **Crear Tarea** | `alo ticket create "<título>" [-p PROYECTO] [--priority Prioridad] [--state Estado] [--desc "Texto"] [--json]` |
 | **Actualizar Tarea** | `alo ticket update <TICKET-ID> [--state Estado] [--priority Prioridad] [--title "Título"] [--json]` |
