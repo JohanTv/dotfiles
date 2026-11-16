@@ -1,40 +1,39 @@
-# 📚 Suite de Documentación: Tracking, Telemetría y Plane CE v1.2.3
+# 📚 Suite de Referencias: Gobernanza, SDLC y Protocolos de Operación
 
-Bienvenido a la especificación técnica y operativa del ecosistema de tracking y telemetría de ingeniería de un equipo, diseñado para operar de forma transparente con **Plane CE v1.2.3** y asistentes de IA (**Antigravity CLI / agy**, **Claude Code**, **OpenCode**).
+Esta carpeta agrupa los protocolos operativos, taxonomías y directrices de gobernanza de software que utiliza el equipo y los asistentes de IA (**Antigravity CLI / agy**, **Claude Code**, **OpenCode**) operando a través de **Allostasis (`alo`)** y **Plane CE v1.2.3**.
 
 ---
 
-## 🗺️ Mapa de Documentos
+## 🗺️ Mapa de Protocolos y Guías
 
-1. [🏛️ **Arquitectura del Sistema de Tracking y Telemetría**](./ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md)
-   * Visión general, dual-layer pattern, SQLite3 WAL mode, Klee's Interval Merging y optimización de tokens.
-2. [🔄 **Protocolo de Living Tickets y Fases del SDLC**](./PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
-   * El ciclo de 4 fases (`[SPIKE]`, `[RFC]`, `[FEAT/FIX]`, `[QA]`), la regla de los 15 minutos y las 3 plantillas evolutivas para gestionar la incertidumbre.
-3. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](./PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
+1. [🔄 **Protocolo de Living Tickets y Fases del SDLC**](./PROTOCOLO_LIVING_TICKETS_Y_SDLC.md)
+   * El ciclo de 4 fases (`[SPIKE]`, `[RFC]`, `[FEAT/FIX]`, `[QA]`), la regla de los 15 minutos y las 3 plantillas evolutivas para gestionar la incertidumbre sin micro-tickets basura.
+2. [🤝 **Protocolo de Relevo Asíncrono de Tareas (Task Handoff)**](./PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md)
    * Cómo tomar tickets iniciados por otra persona del equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
-4. [🛠️ **Guía Operativa del CLI `plane-tracker`**](./GUIA_OPERATIVA_CLI_PLANE_TRACKER.md)
-   * Manual exhaustivo de comandos (`list`, `create`, `get`, `update`, `comment`, `labels`, `projects`, `report`) con flags, ejemplos y salidas JSON.
-5. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
-   * Catálogo de 16 etiquetas en Omnify, 11 en OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
-6. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
+3. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
+   * Catálogo de etiquetas en Omnify y OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
+4. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
    * Visión de alto rendimiento, arquetipos de ingeniería y diseño del dashboard personal.
-7. [🛡️ **Gobernanza y Principios de Diseño del CLI**](./CLI_DESIGN_GUARD.md)
-   * Los 6 invariantes arquitecturales (CQS, ortogonalidad, jerarquía sustantivo+verbo), protocolo de 5 filtros ("Antes de agregar un flag") y límites ratchet (<450 líneas).
+5. [🛡️ **Gobernanza y Principios de Diseño del CLI**](./CLI_DESIGN_GUARD.md)
+   * Los 6 invariantes arquitecturales (CQS, ortogonalidad, jerarquía sustantivo+verbo), protocolo de 5 filtros ("Antes de agregar un flag") y límites ratchet.
 
 ---
 
-## ⚡ Comandos Rápidos de Referencia
+## ⚡ Comandos Canónicos de Referencia en Allostasis (`alo`)
 
 ```bash
 # Momento Cero: búsqueda en la caché local (título y etiquetas)
-plane-tracker list --text "validaciones formulario" --all-projects --limit 5 --brief --json
+alo ticket search "validaciones formulario" --limit 5 --json
 
 # Crear ticket con sugerencia de rama según fase
-plane-tracker create "[FEAT] Validaciones de esquema SMS" -p OMNIFY --priority high --labels "backend,sms"
+alo ticket create "[FEAT] Validaciones de esquema SMS" -p OMNIFY --priority high --labels "backend,sms"
 
 # Inspeccionar ticket con comentarios y contexto del equipo
-plane-tracker get OMNIFY-197
+alo ticket get OMNIFY-197
 
-# Reporte para la jefatura a las 6:00 pm (Interval Merging de Klee)
-plane-tracker report time
+# Registrar sesión de trabajo rápido o soporte en un solo paso
+alo log OPS-44 15
+
+# Revisar carga cognitiva y tiempo neto libre de solapamientos (Klee)
+alo load
 ```
