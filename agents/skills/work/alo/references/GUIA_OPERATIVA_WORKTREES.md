@@ -1,6 +1,6 @@
 # Guía Operativa de Orquestación Multi-Repo (`alo ws`)
 
-Esta guía complementa el `SKILL.md` de `alo-ws` con el detalle procedural, casos de uso avanzados, resolución de conflictos y gestión de respaldos.
+Esta guía complementa el `SKILL.md` de `alo` con el detalle procedural, casos de uso avanzados, resolución de conflictos y gestión de respaldos para la suite de worktrees (`alo ws`).
 
 ---
 

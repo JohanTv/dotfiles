@@ -316,4 +316,4 @@ alo projects
 
 ## 9. Orquestación Multi-Repo (`alo ws`)
 
-La orquestación de worktrees multi-repo, auditoría de merges (`git merge-tree`) y poda segura con respaldos automáticos se gestiona mediante la skill dedicada [`alo-ws`](file:///home/johantv/Code/dotfiles/agents/skills/work/alo-ws/SKILL.md). Consulte su [guía operativa dedicada](file:///home/johantv/Code/dotfiles/agents/skills/work/alo-ws/references/GUIA_OPERATIVA_WORKTREES.md).
+La orquestación de worktrees multi-repo, auditoría de merges (`git merge-tree`) y poda segura con respaldos automáticos se gestiona mediante el subcomando integrado `alo ws`. Consulte su [guía operativa dedicada](file:///home/johantv/Code/dotfiles/agents/skills/work/alo/references/GUIA_OPERATIVA_WORKTREES.md).

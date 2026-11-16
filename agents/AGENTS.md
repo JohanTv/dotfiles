@@ -35,8 +35,7 @@ Procedimientos estandarizados (*runbooks*) que los agentes cargan **bajo demanda
 | **`find-session`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/find-session/SKILL.md`](skills/common/find-session/SKILL.md) | Localización instantánea de IDs de conversaciones previas en Gemini, Claude Code y OpenCode. |
 | **`dotfiles-sync`** | `common/` | 🌐 Universal<br>*(WSL + Ubuntu)* | [`skills/common/dotfiles-sync/SKILL.md`](skills/common/dotfiles-sync/SKILL.md) | Diagnóstico, auditoría de symlinks y detección de cambios locales con `dotfiles-doctor`. |
 | **`wmctrl-focus`** | `desktop-linux/` | 🐧 Desktop Linux<br>*(Ubuntu GNOME X11)* | [`skills/desktop-linux/wmctrl-focus/SKILL.md`](skills/desktop-linux/wmctrl-focus/SKILL.md) | Procedimiento estándar para crear atajos de enfoque de ventanas con `wmctrl`. |
-| **`alo`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/alo/SKILL.md`](skills/work/alo/SKILL.md) | Registro de bitácoras de sesión, tiempos en Plane vía API REST/SQLite y sincronización delta incremental (`alo sync`). |
-| **`alo-ws`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/alo-ws/SKILL.md`](skills/work/alo-ws/SKILL.md) | Orquestación atómica de Git worktrees multi-repo por ticket, auditoría de merges y poda segura con respaldos `.tar.gz`. |
+| **`alo`** | `work/` | 🏢 Solo Perfil Work<br>*(WSL + Ubuntu)* | [`skills/work/alo/SKILL.md`](skills/work/alo/SKILL.md) | Orquestación unificada Allostasis: tickets y telemetría en Plane, agenda, y gestión atómica de Git worktrees multi-repo (`alo ws`). |
 
 ---
 

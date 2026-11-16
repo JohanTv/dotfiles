@@ -1,6 +1,6 @@
 ---
 name: alo
-description: Orquestador soberano Allostasis (`alo`) para tickets, estados, etiquetas, agenda y bitácoras de sesión contra Plane CE. Úsalo al iniciar/cerrar tareas, registrar horas, cambiar estados o consultar tickets.
+description: Orquestador soberano Allostasis (`alo`) para tickets, estados, etiquetas, agenda, bitácoras de sesión contra Plane CE y orquestación atómica de Git worktrees multi-repo (`alo ws`). Úsalo al iniciar/cerrar tareas, registrar horas, cambiar estados, crear entornos de 2+ repos o podar worktrees.
 ---
 
 # Allostasis Session Tracker & Worklog Operator (`alo`)
@@ -43,6 +43,10 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Almacenamiento local y 
 | **Registrar Telemetría/Horas** | `alo log <TICKET-ID> <DURACION_MINUTOS> [NOTAS...] [--bucket <bucket>] [--json]` |
 | **Sincronizar Eventos y Outbox** | `alo sync [--limit N] [--json]` |
 | **Sincronizar Catálogo Plane** | `alo ticket sync` |
+| **Crear Entorno Multi-Repo** | `alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]` |
+| **Listar Entornos Activos** | `alo ws list [--dir .worktrees] [--json]` |
+| **Auditar Integración Git/Plane** | `alo ws audit [TARGET] [--no-fetch] [--json]` |
+| **Podar Worktrees Terminados** | `alo ws prune [--execute] [--include-stale] [--json]` |
 
 - **Modo Desconectado / Resiliencia:** Si Plane no responde, las operaciones se registran localmente. Al reconectar, ejecuta `alo sync` para procesar y vaciar los eventos pendientes del outbox diferido.
 - **Refresco de Tareas:** Para actualizar la copia local de tareas y proyectos desde Plane, ejecuta `alo ticket sync`.
@@ -85,3 +89,37 @@ Reglas:
   - Registro de arquitectura y propuestas: [`docs/INDEX.md`](./docs/INDEX.md) (ADRs en `docs/decisions/` y RFCs en `docs/rfcs/`) y principios en [`docs/principles.md`](./docs/principles.md).
   - Gobernanza y diseño del CLI: [`references/CLI_DESIGN_GUARD.md`](./references/CLI_DESIGN_GUARD.md).
   - *Regla clave:* Nunca busques ni crees tickets en Plane CE para bugs o deuda interna del propio CLI; esos temas residen en `docs/BACKLOG.md`.
+
+## 8. Orquestación de Git Worktrees Multi-Repo (`alo ws`)
+
+Gestión atómica y transaccional de espacios de trabajo multi-repositorio por ticket, respaldada por el motor nativo de Allostasis:
+
+### Invariantes:
+- **Raíz:** Requiere contenedor `.worktrees/` en la raíz del workspace (`mkdir -p .worktrees`).
+- **Atomicidad Transaccional:** Pre-flight valida repos, `origin/<base>` y ramas antes de tocar disco. Si uno falla, aborta y revierte sin residuos.
+- **Ramas locales:** Si una rama existe y divergió de `origin/<base>`, aborta salvo que se pase `--reuse-branch`.
+- **Fetch implícito:** `audit` y `prune` sincronizan `origin` en paralelo por repo único; usa `--no-fetch` para modo offline.
+- **Nomenclatura:** Contenedor `.worktrees/<TICKET>-<SLUG>/`, ramas `<type>/<TICKET>-<SLUG_REPO>` (`feat|fix|spike|refactor|test|infra`).
+
+### Comandos de Worktrees:
+```bash
+# Crear entorno multi-repo vinculado a un ticket
+alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]
+
+# Listar contenedores activos y estado de dirty/clean
+alo ws list [--json]
+
+# Auditar integrabilidad con Git y estado del ticket en Plane
+alo ws audit [TARGET] [--no-fetch] [--json]
+
+# Simular poda segura (dry-run por defecto)
+alo ws prune [--no-fetch]
+
+# Ejecutar poda limpia de ramas 100% integradas
+alo ws prune --execute
+
+# Podar tickets cancelados/abandonados con respaldo comprimido .tar.gz
+alo ws prune [TARGET] --execute --include-stale
+```
+
+Detalle procedural, resolución de conflictos y gestión de respaldos: 👉 [GUIA_OPERATIVA_WORKTREES.md](file:///home/johantv/Code/dotfiles/agents/skills/work/alo/references/GUIA_OPERATIVA_WORKTREES.md).

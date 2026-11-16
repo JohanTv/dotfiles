@@ -35,7 +35,7 @@ dotfiles/
 │   ├── skills/                 # Procedimientos y runbooks bajo demanda
 │   │   ├── common/             # Skills universales (find-session, dotfiles-sync)
 │   │   ├── desktop-linux/      # Skills exclusivas GNOME/X11 (wmctrl-focus)
-│   │   └── work/               # Skills de trabajo empresarial (alo, alo-ws)
+│   │   └── work/               # Skills de trabajo empresarial (alo: tickets y worktrees)
 │   └── mcp/                    # Servidores Model Context Protocol (MCP)
 │       ├── gemini_mcp.json     # Integración global para Gemini CLI (agy)
 │       └── opencode.json       # Configuración global y MCP para OpenCode
