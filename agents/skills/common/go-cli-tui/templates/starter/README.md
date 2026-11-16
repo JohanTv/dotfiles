@@ -19,4 +19,4 @@ make install     # Instala en ~/.local/bin/{{ .AppName }}
 ```
 
 ## Para Agentes de IA y Contribuidores
-Consulte [`AGENTS.md`](AGENTS.md) para las directrices de arquitectura, invariantes inquebrantables de código y el checklist de verificación antes de cada commit.
+Consulte [`AGENTS.md`](AGENTS.md) para las salvaguardas inmediatas y reglas de oro operativas para agentes de IA. Para la guía técnica exhaustiva de arquitectura interna y adaptadores, consulte [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
