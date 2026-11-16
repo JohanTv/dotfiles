@@ -34,9 +34,9 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Almacenamiento local y 
 | **Auditoría de Carga (Toil)** | `alo load [--json]` |
 | **Gestionar Foco de Sesión** | `alo ticket focus set <TICKET-ID>` · `alo ticket focus clear` · `alo ticket focus status` |
 | **Buscar Tareas** | `alo ticket search "<texto>" [-p PROYECTO] [--limit N] [--json]` |
-| **Listar Tareas** | `alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [--limit N] [--brief] [--refresh|--offline] [--verbose] [--json]` |
+| **Listar Tareas** | `alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [--limit N] [--brief] [--verbose] [--json]` |
 | **Listar Proyectos** | `alo projects [--json]` · `alo ticket projects [--json]` |
-| **Listar Estados** | `alo states [-p PROYECTO] [--refresh] [--json]` · `alo ticket states [-p PROYECTO] [--refresh] [--json]` |
+| **Listar Estados** | `alo states [-p PROYECTO] [--json]` · `alo ticket states [-p PROYECTO] [--json]` |
 | **Detalle de Tarea** | `alo ticket get <TICKET-ID> [--json]` |
 | **Crear Tarea** | `alo ticket create "<título>" [-p PROYECTO] [--priority Prioridad] [--state Estado] [--desc "Texto"] [--json]` |
 | **Actualizar Tarea** | `alo ticket update <TICKET-ID> [--state Estado] [--priority Prioridad] [--title "Título"] [--json]` |
@@ -44,7 +44,7 @@ Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Almacenamiento local y 
 | **Listar Etiquetas** | `alo ticket labels` |
 | **Registrar Telemetría/Horas** | `alo log <TICKET-ID> <DURACION_MINUTOS> [NOTAS...] [--bucket <bucket>] [--json]` |
 | **Sincronizar Eventos y Outbox** | `alo sync [--limit N] [--json]` |
-| **Sincronizar Catálogo Plane** | `alo ticket sync` |
+| **Sincronizar Catálogo Plane** | `alo ticket sync [-p PROYECTO] [--catalogs] [--all-projects]` |
 | **Crear Entorno Multi-Repo** | `alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]` |
 | **Listar Entornos Activos** | `alo ws list [--dir .worktrees] [--json]` |
 | **Auditar Integración Git/Plane** | `alo ws audit [TARGET] [--no-fetch] [--json]` |
