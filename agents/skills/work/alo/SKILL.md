@@ -12,7 +12,7 @@ Procedimiento operativo para Plane CE v1.2.3 y telemetría de horas mediante All
 > [!IMPORTANT]
 > **REGLA DE CARGA PEREZOSA:** NO leas la carpeta `references/` por defecto.
 > - Lee [`references/GOBERNANZA.md`](references/GOBERNANZA.md) **ÚNICAMENTE SI:**
->   1. Debes redactar la plantilla formal de investigación para un `[SPIKE]` complejo (Fase 1).
+>   1. Vas a crear o redactar la descripción de un ticket nuevo (`alo ticket create`) y requieres consultar las plantillas exhaustivas por fase (`[SPIKE]`, `[RFC]`, `[FEAT/FIX]`).
 >   2. El usuario pide auditar o abrir los tickets paraguas semanales `OPS` de la semana ISO `W{XX}`.
 >   3. Necesitas transferir un ticket ajeno o publicar un relevo formal de salida (`Handoff Snapshot`).
 
@@ -78,9 +78,16 @@ alo sync [--json]
      - **Stoppers / Próximo paso:** Siguiente acción inmediata sin perder el hilo."
      ```
 4. **Pirámide Invertida & Evidencias Declaradas:**
-   - Toda descripción (`alo ticket create --desc "..."`) debe estructurarse en pirámide invertida: **Resumen lead (1 línea)** $\rightarrow$ **Causa/Contexto técnico** $\rightarrow$ **Solución** $\rightarrow$ **Evidencias** $\rightarrow$ **DoD `[ ]`**.
-   - Cita siempre nombres exactos de componentes (`CampaignChipFloatingMenu`), PRs (`PR #265`) o endpoints (`/api/v1/...`).
-   - Declara explícitamente cualquier captura de pantalla (`screenshots/nombre.png`), enlace a Figma o payload en la sección `**Evidencias / Adjuntos:**`. Prohibido obligar al lector a adivinar o solicitar archivos a ciegas.
+   - Al crear o actualizar tickets (`alo ticket create "<título>" --desc "..."`), la descripción DEBE seguir el siguiente esqueleto canónico:
+     ```markdown
+     **Resumen:** [1 oración de intención completa y autosuficiente].
+     **Contexto & Causa:** [Componentes exactos, PR upstream o endpoints].
+     **Evidencias & Adjuntos:** [screenshots/*.png, enlace Figma, o "Ver comentario #1"].
+     **Solución:** [Primitivas, patrones, módulos o archivos destino].
+     **Criterio de Cierre:** [DoD [ ] para FEAT/FIX; Checklist/Veredicto para SPIKE/RFC].
+     ```
+   - Cita siempre identificadores técnicos reales (`CampaignChipFloatingMenu`, `PR #265`, etc.).
+   - Declara explícitamente cualquier evidencia visual o log en `**Evidencias & Adjuntos:**`. Prohibido obligar al lector a adivinar o solicitar archivos a ciegas. Detalle de plantillas en `references/GOBERNANZA.md`.
 
 ## 4. Git Worktrees Multi-Repo (`alo ws`)
 
