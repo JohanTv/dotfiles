@@ -5,118 +5,93 @@ description: Orquestador soberano Allostasis (`alo`) para tickets, estados, etiq
 
 # Allostasis Session Tracker & Worklog Operator (`alo`)
 
-Procedimiento para operar Plane CE v1.2.3 (Omnify / Operaciones) y registrar telemetría de horas mediante el motor en Go de Allostasis (`alo`). Directrices de gobernanza en [`references/`](references/README.md).
+Procedimiento operativo para Plane CE v1.2.3 y telemetría de horas mediante Allostasis (`alo`).
 
-## 0. Setup
+## 0. Disparadores de Carga Condicional (Lazy-Loading)
 
-Verifica la configuración y credenciales con `alo ticket whoami`. Si faltan variables de entorno, pide los valores al usuario (`PLANE_BASE_URL`, `PLANE_API_KEY`, `PLANE_WORKSPACE_SLUG`). Nunca expongas la API Key en logs ni chat.
+> [!IMPORTANT]
+> **REGLA DE CARGA PEREZOSA:** NO leas la carpeta `references/` por defecto.
+> - Lee [`references/GOBERNANZA.md`](references/GOBERNANZA.md) **ÚNICAMENTE SI:**
+>   1. Debes redactar la plantilla formal de investigación para un `[SPIKE]` complejo (Fase 1).
+>   2. El usuario pide auditar o abrir los tickets paraguas semanales `OPS` de la semana ISO `W{XX}`.
+>   3. Necesitas transferir un ticket ajeno o publicar un relevo formal de salida (`Handoff Snapshot`).
 
-## 1. Estados del ticket
+## 1. Setup y Principios Innegociables
 
-Transiciones deterministas vía `alo ticket update <TICKET-ID> --state <Estado>`:
-- `Pendiente` (sin iniciar) · `Progreso` (desarrollo/spike activo) · `Pruebas` (validando/tests) · `Revisión` (PR/staging esperando code review)
-- `Pausado` (stopper externo) · `Completado` (mergeado/producción) · `Backlog` (idea/deuda) · `Cancelado` (descartado)
+- **Diagnóstico:** `alo ticket whoami [--json]`. Si faltan credenciales, solicita al usuario `PLANE_BASE_URL`, `PLANE_API_KEY` y `PLANE_WORKSPACE_SLUG`. Nunca expongas secretos.
+- **Principio de Caja Negra:** El motor gestiona SQLite y caché internamente. Queda prohibido inspeccionar o consultar bases de datos locales por CLI.
+- **Salida Estructurada:** Usa siempre `--json` en automatizaciones para parseo determinista sin ruido en `stderr`.
+- **Aislamiento del Core:** NUNCA crees ni consultes tickets en Plane para bugs o refactorizaciones del propio CLI `alo` (pertenecen soberanamente al repositorio de `allostasis`).
 
-## 2. Proyectos y prioridades
+## 2. CLI de Operaciones (`alo`)
 
-- **Proyectos:** `OMNIFY` (código/plataformas), `OMNICANAL`, `OMNILEADS`, `CDP`, `OPS` (soporte y paraguas semanales; sin prefijo `[OPS]` en títulos).
-- **Prioridades:** `urgent` (caídas/seguridad), `high` (sprint/bloqueo), `medium` (estándar), `low`/`none` (deuda menor).
-- **Etiquetas:** `alo ticket labels` (mínimo 2: capa técnica + tipo). Taxonomía en `references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`.
+Prefijos detectados automáticamente (`OMNIFY-162`, `OPS-44`).
 
-## 3. Comandos Nativos (`alo`)
-
-Prefijos detectados por ticket (`OMNIFY-162`, `OPS-44`). Almacenamiento local y caché gestionados de forma interna e invisible por el motor de Allostasis (principio de caja negra).
-
-| Tarea | Comando |
-| :--- | :--- |
-| **Diagnóstico y Conexión** | `alo ticket whoami [--json]` |
-| **Agenda y Foco Activo** | `alo agenda [--json]` |
-| **Auditoría de Carga (Toil)** | `alo load [--json]` |
-| **Gestionar Foco de Sesión** | `alo ticket focus set <TICKET-ID>` · `alo ticket focus clear` · `alo ticket focus status` |
-| **Buscar Tareas** | `alo ticket search "<texto>" [-p PROYECTO] [--limit N] [--json]` |
-| **Listar Tareas** | `alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [--limit N] [--brief] [--verbose] [--json]` |
-| **Listar Proyectos** | `alo projects [--json]` · `alo ticket projects [--json]` |
-| **Listar Estados** | `alo states [-p PROYECTO] [--json]` · `alo ticket states [-p PROYECTO] [--json]` |
-| **Detalle de Tarea** | `alo ticket get <TICKET-ID> [--json]` |
-| **Crear Tarea** | `alo ticket create "<título>" [-p PROYECTO] [--priority Prioridad] [--state Estado] [--desc "Texto"] [--json]` |
-| **Actualizar Tarea** | `alo ticket update <TICKET-ID> [--state Estado] [--priority Prioridad] [--title "Título"] [--json]` |
-| **Eliminar Tarea** | `alo ticket delete <TICKET-ID> [--yes] [--discard-worklogs] [--json]` |
-| **Listar Etiquetas** | `alo ticket labels` |
-| **Registrar Telemetría/Horas** | `alo log <TICKET-ID> <DURACION_MINUTOS> [NOTAS...] [--bucket <bucket>] [--json]` |
-| **Sincronizar Eventos y Outbox** | `alo sync [--limit N] [--json]` |
-| **Sincronizar Catálogo Plane** | `alo ticket sync [-p PROYECTO] [--catalogs] [--all-projects]` |
-| **Crear Entorno Multi-Repo** | `alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]` |
-| **Listar Entornos Activos** | `alo ws list [--dir .worktrees] [--json]` |
-| **Auditar Integración Git/Plane** | `alo ws audit [TARGET] [--no-fetch] [--json]` |
-| **Podar Worktrees Terminados** | `alo ws prune [--execute] [--include-stale] [--json]` |
-
-- **Modo Desconectado / Resiliencia:** Si Plane no responde, las operaciones se registran localmente. Al reconectar, ejecuta `alo sync` para procesar y vaciar los eventos pendientes del outbox diferido.
-- **Refresco de Tareas:** Para actualizar la copia local de tareas y proyectos desde Plane, ejecuta `alo ticket sync`.
-
-## 4. Registro de Sesión y Telemetría
-
-Registra el esfuerzo de la sesión mediante el comando nativo `alo log`:
+### Tareas y Foco
 ```bash
-alo log <TICKET-ID> <DURACION_MINUTOS> "[NOTAS...]" --bucket <bucket>
+alo ticket search "<texto>" [-p PROYECTO] [--limit N] [--json]
+alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [-s ESTADOS] [--limit N] [--json]
+alo ticket get <TICKET-ID> [--json]
+alo ticket create "<título>" -p <PROYECTO> [--priority urgent|high|medium|low] [--state Estado] [--labels "a,b"] [--desc "Texto"] [--json]
+alo ticket update <TICKET-ID> [--state Estado] [--priority Prioridad] [--title "Título"] [--json]
+alo ticket focus [set <TICKET-ID> | clear | status]
+alo ticket labels [-p PROYECTO] [--json]
+alo ticket comment add <TICKET-ID> "<MENSAJE>" [--hours <float>] [--json]
 ```
 
-Reglas:
-1. **Duración en Minutos:** Indica los minutos exactos invertidos en la sesión (pregunta al usuario o mide el tiempo transcurrido; nunca inventes cifras).
-2. **Notas Estructuradas:** Breve resumen en 1 a 3 viñetas (Hecho, Evidencia/PR, Bloqueos).
-3. **Buckets de Capacidad (`--bucket`):**
-   - `deep_work` (por defecto): Desarrollo de funcionalidades, refactorización profunda o spikes.
-   - `toil_support`: Soporte reactivo, atención a incidencias o mantenimiento operativo.
-   - `coordination`: Reuniones, ceremonias de equipo o coordinación técnica.
-   - `standby`: Espera activa o bloqueos externos.
-4. **Sincronización:** Ejecuta `alo sync` para subir los eventos diferidos al servidor de Plane CE.
+- **Filtros Personales:**
+  - `--mine`: Tareas asignadas a ti como responsable.
+  - `--created`: Tareas creadas por ti.
+  - `--involved`: Tareas en las que estás involucrado (asignadas, creadas o con actividad/horas tuyas).
+- **Estados Válidos:** `Pendiente`, `Progreso`, `Pruebas`, `Revisión`, `Pausado`, `Completado`, `Backlog`, `Cancelado`.
+- **Proyectos Canónicos:** `OMNIFY` (desarrollo/plataformas), `OPS` (operaciones y soporte paraguas), `OMNICANAL`, `OMNILEADS`, `CDP`.
 
-## 5. Relevo entre Sesiones
+### Telemetría, Diagnóstico y Sincronización
+```bash
+# Registrar esfuerzo de sesión (minutos reales invertidos; nunca inventar)
+alo log <TICKET-ID> <MINUTOS> "[NOTAS]" --bucket <deep_work|toil_support|coordination|standby> [--json]
 
-- **Dejar Tarea en Pausa:** Si la tarea queda incompleta, actualiza el estado con `alo ticket update <TICKET-ID> --state Pausado`, libera el foco con `alo ticket focus clear` y registra el progreso con `alo log <TICKET-ID> <MINUTOS> "Relevo: <resumen de avance>"`.
-- **Retomar Tarea:** Consulta el detalle con `alo ticket get <TICKET-ID>`, marca el foco activo con `alo ticket focus set <TICKET-ID>` y actualiza el estado con `alo ticket update <TICKET-ID> --state Progreso`.
+# Diagnóstico de carga y agenda activa
+alo load [--json]    # Ratio de toil/soporte reactivo vs trabajo profundo
+alo agenda [--json]  # Focos y tareas activas del día
 
-## 6. Crear work items
+# Sincronización bidireccional (procesa outbox diferido y delta pull)
+alo sync [--json]
+```
 
-- **Título:** `[{FASE}] {acción o resumen conciso en español}` (`[SPIKE]`, `[RFC]`, `[FEAT]`, `[FIX]`, `[INFRA]`, `[QA]`, `[REFACTOR]`).
-- **Etiquetas (mínimo 2):** Capa técnica (`backend`, `frontend`, `bd`, `infra`) y tipo (`bug`, `deuda-tecnica`, `seguridad`, `docs`).
-- **Contrato vivo:** Descripción ≤ 200 palabras (Resumen, Causa, Solución, DoD `[ ]`). Detalle en `references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`.
+## 3. Reglas Corporativas de Gobernanza (Zero-Hop)
 
-## 7. Gobernanza Corporativa y Desarrollo del Core
+1. **Nomenclatura de Títulos (SDLC):**
+   - Formato obligatorio: `[{FASE}] {Acción concisa en español}`.
+   - Fases canónicas: `[SPIKE]`, `[RFC]`, `[FEAT]`, `[FIX]`, `[INFRA]`, `[QA]`, `[REFACTOR]`.
+   - *Etiquetas:* Mínimo 2 (`alo ticket labels`): Capa técnica (`backend`, `frontend`, `bd`, `infra`) + Tipo/Módulo (`bug`, `seguridad`, `sms`, `whatsapp`).
+2. **Regla de los 15 Minutos & Tickets Paraguas (`OPS`):**
+   - **< 15 min (Toil / Soporte Rápido / Dailies):** NO crear ticket en OMNIFY. Imputar al ticket paraguas semanal de `OPS` (`Soporte y Mantenimiento Ad-Hoc - W{XX}` o `Sincronización de Equipo - W{XX}`) vía `alo log OPS-XX <MINUTOS> --bucket toil_support|coordination`.
+   - **> 15 min (Trabajo Estructurado):** Crear ticket formal en `OMNIFY` con descripción estructurada (Resumen, Causa, Solución y DoD `[ ]`).
+3. **Pausa y Relevo Asíncrono (Handoff Snapshot):**
+   - Al pausar o transferir: transicionar a `Pausado`, liberar foco (`alo ticket focus clear`) y publicar comentario con:
+     ```bash
+     alo ticket comment add <ID> "### 🔄 Relevo de Tarea (Handoff Snapshot)
+     - **Avance realizado:** Resumen conciso de lo construido o diagnosticado.
+     - **Rama Git / Commit:** {tipo}/{TICKET-ID}-{kebab} @ {hash}.
+     - **Estado actual:** Componentes estables y verificados.
+     - **Stoppers / Próximo paso:** Siguiente acción inmediata sin perder el hilo."
+     ```
 
-- **Gobernanza Operativa de Plane CE:**
-  - Directrices vivas en [`references/`](references/README.md): Living tickets y ciclo SDLC (`PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), y taxonomía y tickets paraguas (`MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`).
-- **Desarrollo y Mantenimiento del Motor en Go (`allostasis`):**
-  - El código fuente, la arquitectura hexagonal, los RFCs/ADRs y las directrices de ingeniería (`AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`) residen de forma soberana en el repositorio del proyecto `allostasis`.
-  - *Regla de Aislamiento:* NUNCA busques, consultes ni crees tickets en Plane CE para bugs, deuda o refactorizaciones internas del propio CLI `alo`; esos temas pertenecen al repositorio de `allostasis`.
+## 4. Git Worktrees Multi-Repo (`alo ws`)
 
-## 8. Orquestación de Git Worktrees Multi-Repo (`alo ws`)
-
-Gestión atómica y transaccional de espacios de trabajo multi-repositorio por ticket, respaldada por el motor nativo de Allostasis:
+Gestión atómica y transaccional respaldada por Allostasis:
 
 ### Invariantes:
-- **Raíz:** Requiere contenedor `.worktrees/` en la raíz del workspace (`mkdir -p .worktrees`).
-- **Atomicidad Transaccional:** Pre-flight valida repos, `origin/<base>` y ramas antes de tocar disco. Si uno falla, aborta y revierte sin residuos.
-- **Ramas locales:** Si una rama existe y divergió de `origin/<base>`, aborta salvo que se pase `--reuse-branch`.
-- **Fetch implícito:** `audit` y `prune` sincronizan `origin` en paralelo por repo único; usa `--no-fetch` para modo offline.
-- **Nomenclatura:** Contenedor `.worktrees/<TICKET>-<SLUG>/`, ramas `<type>/<TICKET>-<SLUG_REPO>` (`feat|fix|spike|refactor|test|infra`).
+- **Directorio:** Requiere raíz `.worktrees/<TICKET>-<SLUG>/` (`mkdir -p .worktrees`).
+- **Atomicidad Transaccional:** Validación pre-flight (repos, `origin/<base>`, ramas). Si falla, aborta y revierte sin residuos en disco.
+- **Nomenclatura de Ramas:** `<type>/<TICKET>-<SLUG_REPO>` (`feat|fix|spike|refactor|test|infra`).
+- **Ramas Locales:** Si divergió de `origin/<base>`, aborta salvo indicación explícita.
 
-### Comandos de Worktrees:
+### Comandos:
 ```bash
-# Crear entorno multi-repo vinculado a un ticket
-alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base dev]
-
-# Listar contenedores activos y estado de dirty/clean
+alo ws create <TICKET-ID> [SLUG] <REPO1> [REPO2...] [--type feat] [--base main]
 alo ws list [--json]
-
-# Auditar integrabilidad con Git y estado del ticket en Plane
 alo ws audit [TARGET] [--no-fetch] [--json]
-
-# Simular poda segura (dry-run por defecto)
-alo ws prune [--no-fetch]
-
-# Ejecutar poda limpia de ramas 100% integradas
-alo ws prune --execute
-
-# Podar tickets cancelados/abandonados con respaldo comprimido .tar.gz
-alo ws prune [TARGET] --execute --include-stale
+alo ws prune [--execute] [--include-stale] [--no-fetch] [--json]
 ```
