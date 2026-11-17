@@ -11,30 +11,34 @@ Toda descripción de ticket en Plane CE (creada vía `alo ticket create --desc "
 ### Estructura Canónica Obligatoria:
 
 1. **Lead / Resumen (L1):** 1-2 oraciones que resumen el objetivo completo de manera autosuficiente (apto para vistas previas).
-2. **Contexto & Causa Raíz (L2):** Mención explícita de componentes UI, rutas de archivos, PRs, ramas o endpoints afectados (Zero-Hop Context).
+2. **Contexto & Causa / Síntoma (L2):** Componentes UI, rutas de archivos, PRs, ramas, endpoints o síntoma observado.
 3. **Evidencias & Adjuntos (Multimodal Handoff):** Rutas locales a capturas/grabaciones (`screenshots/...`) o enlaces externos (Figma, Sentry, Swagger).
-4. **Solución Propuesta (L3):** Enfoque arquitectónico, patrones, librerías o migraciones.
-5. **Criterios de Aceptación / DoD (L4):** Checklists binarios con formato falsable `[ ]`.
+4. **Solución / Opciones a Evaluar (L3):**
+   - Si la solución es conocida (`[FEAT/FIX]`): Enfoque arquitectónico, patrones o librerías.
+   - Si está en análisis o incertidumbre (`[SPIKE]`): **Opciones a evaluar** o **hipótesis preliminares** (prohibido inventar soluciones prematuras).
+5. **Criterios de Cierre (L4):** Checklists falsables `[ ]` (DoD para construcción; checklist de investigación o veredicto para spikes).
 
 ---
 
 ## 2. Plantillas Canónicas por Fase
 
-### Fase 1: Incertidumbre / Triage ([SPIKE] o Bug no aislado)
+### Fase 1: Incertidumbre / Triage ([SPIKE] o Análisis Pendiente)
 ```markdown
-**Resumen:** [Qué falla exactamente y bajo qué condiciones de frontera].
+**Resumen:** [Qué se investiga o analiza y qué se busca resolver].
 **Contexto & Síntoma:**
-- Módulo / Componente: `nombre_modulo` (ej. Webhook Detonador SMS)
-- Anomalía: [1 párrafo conciso con códigos o discrepancias clave].
+- Módulo / Canal: `omnify-whatsapp` vs `omnify-social-networks`
+- Antecedente: [Origen de la necesidad, ej. PR #265 o fallo observado al citar mensajes].
 **Evidencias & Adjuntos:**
-- Captura UI: `screenshots/2026-11-16_19-41-06.png` (o URL en Plane)
+- Captura UI / Diagrama: `screenshots/2026-11-16_19-41-14.png`
 - Trazas / Logs: Ver comentario #1 (evitar saturar la descripción)
-**Hipótesis Preliminares:**
-- [ ] Hipótesis A: [Posible causa]
-- [ ] Hipótesis B: [Posible causa]
-**Plan de Investigación (Checklist):**
-- [ ] Reproducir con payload en réplica local o tests.
-- [ ] Aislar línea o condición de carrera.
+**Opciones a Evaluar / Hipótesis:**
+- Opción A: [Implementaciones separadas por canal]
+- Opción B: [Abstracción común de conversación/mensaje unificado]
+- Opción C: [Adapter por canal sobre contrato único]
+**Criterio de Salida (Checklist de Investigación):**
+- [ ] Matriz de capacidades por canal documentada.
+- [ ] Inventario de lo reutilizable en backend/frontend.
+- [ ] Recomendación técnica con trade-offs (documento de diseño).
 ```
 
 ### Fase 2: Diseño y Solución ([RFC] o [FEAT/FIX])

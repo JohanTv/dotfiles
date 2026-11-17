@@ -81,11 +81,12 @@ alo sync [--json]
    - Al crear o actualizar tickets (`alo ticket create "<título>" --desc "..."`), la descripción DEBE seguir el siguiente esqueleto canónico:
      ```markdown
      **Resumen:** [1 oración de intención completa y autosuficiente].
-     **Contexto & Causa:** [Componentes exactos, PR upstream o endpoints].
+     **Contexto & Causa:** [Componentes exactos, PR upstream, endpoints o síntoma].
      **Evidencias & Adjuntos:** [screenshots/*.png, enlace Figma, o "Ver comentario #1"].
-     **Solución:** [Primitivas, patrones, módulos o archivos destino].
+     **Solución / Opciones a Evaluar:** [Solución si es conocida; Opciones o Hipótesis si está en análisis].
      **Criterio de Cierre:** [DoD [ ] para FEAT/FIX; Checklist/Veredicto para SPIKE/RFC].
      ```
+   - **Flexibilidad en Incertidumbre:** Si el ticket es un `[SPIKE]` o la causa no está aislada, NUNCA inventes una solución prematura; lista `**Opciones a Evaluar:**` o `**Hipótesis:**` (como en `OMNIFY-274`).
    - Cita siempre identificadores técnicos reales (`CampaignChipFloatingMenu`, `PR #265`, etc.).
    - Declara explícitamente cualquier evidencia visual o log en `**Evidencias & Adjuntos:**`. Prohibido obligar al lector a adivinar o solicitar archivos a ciegas. Detalle de plantillas en `references/GOBERNANZA.md`.
 
