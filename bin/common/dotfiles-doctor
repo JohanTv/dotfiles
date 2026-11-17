@@ -352,7 +352,7 @@ def relink_target(home_path, repo_rel_path):
 
 
 def audit_mcp_servers():
-    """Audits MCP servers in Gemini and Claude."""
+    """Audits MCP servers across Gemini, Claude, and OpenCode (On-Demand via mcp-toggle)."""
     mcp_results = []
     
     # Gemini
@@ -362,13 +362,13 @@ def audit_mcp_servers():
             with open(gemini_cfg, "r") as f:
                 data = json.load(f)
             servers = list(data.get("mcpServers", {}).keys())
-            has_chrome = "chrome-devtools" in servers
+            msg = f"Activos: {', '.join(servers)}" if servers else "Sesión limpia / bajo demanda vía mcp-toggle"
             mcp_results.append({
                 "agent": "Gemini CLI (agy)",
                 "config": "~/.gemini/config/mcp_config.json",
-                "ok": has_chrome,
+                "ok": True,
                 "servers": servers,
-                "message": "chrome-devtools registrado" if has_chrome else "Falta chrome-devtools"
+                "message": msg
             })
         except Exception as e:
             mcp_results.append({"agent": "Gemini CLI", "ok": False, "message": str(e)})
@@ -382,13 +382,13 @@ def audit_mcp_servers():
             with open(claude_cfg, "r") as f:
                 data = json.load(f)
             servers = list(data.get("mcpServers", {}).keys())
-            has_chrome = "chrome-devtools" in servers
+            msg = f"Activos: {', '.join(servers)}" if servers else "Sesión limpia / bajo demanda vía mcp-toggle"
             mcp_results.append({
                 "agent": "Claude Code",
                 "config": "~/.claude.json",
-                "ok": has_chrome,
+                "ok": True,
                 "servers": servers,
-                "message": "chrome-devtools registrado" if has_chrome else "Falta chrome-devtools"
+                "message": msg
             })
         except Exception as e:
             mcp_results.append({"agent": "Claude Code", "ok": False, "message": str(e)})
@@ -396,13 +396,20 @@ def audit_mcp_servers():
     # OpenCode
     opencode_cfg = os.path.expanduser("~/.config/opencode/opencode.json")
     if os.path.islink(opencode_cfg):
-        mcp_results.append({
-            "agent": "OpenCode",
-            "config": "~/.config/opencode/opencode.json",
-            "ok": True,
-            "servers": ["chrome-devtools"],
-            "message": "chrome-devtools enlazado vía dotfiles"
-        })
+        try:
+            with open(opencode_cfg, "r") as f:
+                data = json.load(f)
+            servers = list(data.get("mcp", {}).get("servers", {}).keys())
+            msg = f"Activos: {', '.join(servers)}" if servers else "Sesión limpia / bajo demanda vía mcp-toggle"
+            mcp_results.append({
+                "agent": "OpenCode",
+                "config": "~/.config/opencode/opencode.json",
+                "ok": True,
+                "servers": servers,
+                "message": msg
+            })
+        except Exception as e:
+            mcp_results.append({"agent": "OpenCode", "ok": False, "message": str(e)})
     else:
         mcp_results.append({"agent": "OpenCode", "ok": False, "message": "opencode.json no es symlink"})
 
@@ -581,7 +588,7 @@ def main():
                 print(f"    {RED}✖ {p:42}{RESET} {RED}{msg}{RESET}")
 
     # 3. MCP Servers
-    print(f"\n{BOLD}3. Servidores MCP Globales (Chrome DevTools):{RESET}")
+    print(f"\n{BOLD}3. Servidores MCP (Gestión Bajo Demanda vía mcp-toggle):{RESET}")
     for m in mcp_state:
         mark = f"{GREEN}✔" if m["ok"] else f"{RED}✖"
         print(f"   {mark}{RESET} {BOLD}{m['agent']:18}{RESET} {DIM}➔ {m['message']}{RESET}")

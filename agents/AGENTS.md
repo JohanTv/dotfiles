@@ -42,15 +42,18 @@ Procedimientos estandarizados (*runbooks*) que los agentes cargan **bajo demanda
 
 ## 3. Servidores MCP Globales (`mcp/`)
 
-Integraciones del protocolo Model Context Protocol (MCP) disponibles globalmente para los tres asistentes:
+Servidores MCP gestionados de forma soberana bajo demanda mediante `mcp-toggle`:
 
 | Servidor MCP | Comando / Transporte | Asistentes Compatibles | Propósito |
 | :--- | :--- | :--- | :--- |
 | **`chrome-devtools`** | `npx -y chrome-devtools-mcp` | Gemini CLI (`agy`)<br>Claude Code<br>OpenCode | Automatización de navegador, inspección de DOM, capturas y depuración web en vivo. |
+| **`shadcn-vue`** | `npx -y shadcn-vue@latest mcp` | Gemini CLI (`agy`)<br>Claude Code<br>OpenCode | Catálogo, componentes y auditoría de UI para Shadcn Vue. |
+| **`codegraph`** | `codegraph serve --mcp` | Claude Code<br>OpenCode<br>Gemini CLI (`agy`) | Indexación semántica y navegación de grafos de código. |
 
-* **Gemini:** Configurado en `~/.gemini/config/mcp_config.json` (fusionado desde [`mcp/gemini_mcp.json`](mcp/gemini_mcp.json)).
+* **Gestión Bajo Demanda:** Por defecto las sesiones nacen limpias (sin overhead de tokens ni procesos Node). Usa `mcp-toggle on <servidor>` para activar antes de una sesión, o `mcp-toggle off all` para desactivar.
 * **OpenCode:** Configurado en `~/.config/opencode/opencode.json` (enlazado a [`mcp/opencode.json`](mcp/opencode.json)).
-* **Claude Code:** Registrado en el ámbito de usuario en `~/.claude.json`.
+* **Gemini:** `~/.gemini/config/mcp_config.json`.
+* **Claude Code:** `~/.claude.json`.
 
 ---
 

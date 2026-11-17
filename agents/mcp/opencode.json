@@ -4,15 +4,6 @@
     "~/.config/opencode/AGENTS.md"
   ],
   "mcp": {
-    "servers": {
-      "chrome-devtools": {
-        "type": "local",
-        "command": [
-          "npx",
-          "-y",
-          "chrome-devtools-mcp"
-        ]
-      }
-    }
+    "servers": {}
   }
 }

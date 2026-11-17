@@ -151,29 +151,15 @@ log_info "Configurando y compilando reglas y skills de Agentes IA..."
 make -C "$DOTFILES_DIR" all
 
 # ------------------------------------------------------------------------------
-# 3. Configurar Servidores MCP Globales (Chrome DevTools)
+# 3. Configurar Servidores MCP (Gestión Bajo Demanda vía mcp-toggle)
 # ------------------------------------------------------------------------------
-log_info "Configurando servidores MCP globales (Chrome DevTools)..."
+log_info "Configurando infraestructura MCP bajo demanda..."
 
 link_file "$DOTFILES_DIR/agents/mcp/opencode.json" "$HOME/.config/opencode/opencode.json"
 
-if command -v jq >/dev/null 2>&1; then
-    # Gemini CLI (~/.gemini/config/mcp_config.json requiere fusión con jq para preservar servidores locales)
-    mkdir -p "$HOME/.gemini/config"
-    [[ ! -f "$HOME/.gemini/config/mcp_config.json" ]] && echo '{"mcpServers":{}}' > "$HOME/.gemini/config/mcp_config.json"
-    tmp_gemini=$(mktemp)
-    jq -s '.[0] * .[1]' "$HOME/.gemini/config/mcp_config.json" "$DOTFILES_DIR/agents/mcp/gemini_mcp.json" > "$tmp_gemini" && mv "$tmp_gemini" "$HOME/.gemini/config/mcp_config.json"
-    log_ok "chrome-devtools MCP registrado en ~/.gemini/config/mcp_config.json"
-
-    # Claude Code (~/.claude.json requiere fusión con jq para preservar estado local)
-    if [[ -f "$HOME/.claude.json" ]]; then
-        tmp_claude=$(mktemp)
-        jq '.mcpServers["chrome-devtools"] = {"type": "stdio", "command": "npx", "args": ["-y", "chrome-devtools-mcp"], "env": {}}' "$HOME/.claude.json" > "$tmp_claude" && mv "$tmp_claude" "$HOME/.claude.json"
-        log_ok "chrome-devtools MCP registrado en ~/.claude.json"
-    fi
-else
-    log_warn "jq no está instalado en el sistema. Se omitió la fusión de mcp_config.json y ~/.claude.json. Instala jq para registrar Chrome DevTools MCP automáticamente."
-fi
+mkdir -p "$HOME/.gemini/config"
+[[ ! -f "$HOME/.gemini/config/mcp_config.json" ]] && echo '{"mcpServers":{}}' > "$HOME/.gemini/config/mcp_config.json"
+log_ok "Infraestructura MCP lista (usa 'mcp-toggle on/off <server>' para activar bajo demanda)"
 
 # ------------------------------------------------------------------------------
 # 4. Enlazar Configuraciones de Terminal (Alacritty y Zellij)

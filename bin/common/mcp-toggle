@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""
+mcp-toggle — Gestor y conmutador bajo demanda de servidores MCP para agentes IA.
+Permite activar o desactivar servidores MCP (chrome-devtools, shadcn-vue, codegraph)
+en Gemini CLI (agy), Claude Code y OpenCode sin contaminar las sesiones globales.
+"""
+
+import argparse
+import json
+import os
+import sys
+
+# Rutas de configuración
+GEMINI_CONFIG = os.path.expanduser("~/.gemini/config/mcp_config.json")
+CLAUDE_CONFIG = os.path.expanduser("~/.claude.json")
+OPENCODE_CONFIG = os.path.expanduser("~/.config/opencode/opencode.json")
+
+# Catálogo canónico de servidores
+MCP_CATALOG = {
+    "chrome-devtools": {
+        "aliases": ["chrome", "chromedevtools", "chromeDevTools"],
+        "gemini_key": "chrome-devtools",
+        "gemini": {
+            "command": "npx",
+            "args": ["-y", "chrome-devtools-mcp"]
+        },
+        "claude_key": "chrome-devtools",
+        "claude": {
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "chrome-devtools-mcp"],
+            "env": {}
+        },
+        "opencode_key": "chrome-devtools",
+        "opencode": {
+            "type": "local",
+            "command": ["npx", "-y", "chrome-devtools-mcp"]
+        },
+        "desc": "Inspección de DOM, navegación, capturas y depuración web en vivo"
+    },
+    "shadcn-vue": {
+        "aliases": ["shadcn", "shadcnvue", "shadcnVue"],
+        "gemini_key": "shadcnVue",
+        "gemini": {
+            "command": "npx",
+            "args": ["-y", "shadcn-vue@latest", "mcp"]
+        },
+        "claude_key": "shadcn-vue",
+        "claude": {
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "shadcn-vue@latest", "mcp"],
+            "env": {}
+        },
+        "opencode_key": "shadcn-vue",
+        "opencode": {
+            "type": "local",
+            "command": ["npx", "-y", "shadcn-vue@latest", "mcp"]
+        },
+        "desc": "Catálogo, componentes y auditoría de UI para Shadcn Vue"
+    },
+    "codegraph": {
+        "aliases": ["graph"],
+        "gemini_key": "codegraph",
+        "gemini": {
+            "command": "codegraph",
+            "args": ["serve", "--mcp"]
+        },
+        "claude_key": "codegraph",
+        "claude": {
+            "type": "stdio",
+            "command": "codegraph",
+            "args": ["serve", "--mcp"]
+        },
+        "opencode_key": "codegraph",
+        "opencode": {
+            "type": "local",
+            "command": ["codegraph", "serve", "--mcp"]
+        },
+        "desc": "Indexación semántica y navegación de grafos de código"
+    }
+}
+
+# Colores ANSI
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+DIM = "\033[2m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
+
+def resolve_server(name: str):
+    """Resuelve un alias hacia la clave canónica del catálogo."""
+    name_clean = name.strip().lower()
+    for canon, data in MCP_CATALOG.items():
+        if canon.lower() == name_clean:
+            return canon
+        if name_clean in [a.lower() for a in data["aliases"]]:
+            return canon
+    return None
+
+
+def read_json(path):
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"{RED}Error leyendo {path}: {e}{RESET}", file=sys.stderr)
+        return {}
+
+
+def write_json(path, data):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        return True
+    except Exception as e:
+        print(f"{RED}Error escribiendo {path}: {e}{RESET}", file=sys.stderr)
+        return False
+
+
+def get_status():
+    """Inspecciona qué servidores están activos en cada asistente."""
+    status = {}
+    
+    # 1. Gemini
+    gemini_data = read_json(GEMINI_CONFIG)
+    gemini_servers = gemini_data.get("mcpServers", {})
+
+    # 2. Claude
+    claude_data = read_json(CLAUDE_CONFIG)
+    claude_servers = claude_data.get("mcpServers", {})
+
+    # 3. OpenCode
+    opencode_data = read_json(OPENCODE_CONFIG)
+    opencode_servers = opencode_data.get("mcp", {}).get("servers", {})
+
+    for canon, meta in MCP_CATALOG.items():
+        # Reconocer variantes (ej. camelCase o kebab-case)
+        gem_active = meta["gemini_key"] in gemini_servers or canon in gemini_servers or "chromeDevTools" in gemini_servers if canon == "chrome-devtools" else meta["gemini_key"] in gemini_servers
+        claude_active = meta["claude_key"] in claude_servers or canon in claude_servers
+        open_active = meta["opencode_key"] in opencode_servers or canon in opencode_servers
+
+        status[canon] = {
+            "desc": meta["desc"],
+            "gemini": gem_active,
+            "claude": claude_active,
+            "opencode": open_active,
+            "any": gem_active or claude_active or open_active,
+            "all": gem_active and claude_active and open_active,
+        }
+    return status
+
+
+def cmd_status(args):
+    st = get_status()
+    print(f"\n{BOLD}{CYAN}🔌 Gestor de Servidores MCP Bajo Demanda (mcp-toggle){RESET}\n")
+    print(f"{'SERVIDOR':<18} {'GEMINI':<10} {'CLAUDE':<10} {'OPENCODE':<10} {'DESCRIPCIÓN'}")
+    print("─" * 80)
+    for canon, data in st.items():
+        gem_s = f"{GREEN}ON{RESET}" if data["gemini"] else f"{DIM}off{RESET}"
+        cla_s = f"{GREEN}ON{RESET}" if data["claude"] else f"{DIM}off{RESET}"
+        opn_s = f"{GREEN}ON{RESET}" if data["opencode"] else f"{DIM}off{RESET}"
+        print(f"{BOLD}{canon:<18}{RESET} {gem_s:<19} {cla_s:<19} {opn_s:<19} {DIM}{data['desc']}{RESET}")
+    print("\n" + f"{DIM}Uso: mcp-toggle on <servidor> | mcp-toggle off <servidor> | mcp-toggle off all{RESET}\n")
+
+
+def cmd_on(args):
+    server = resolve_server(args.server)
+    if not server:
+        print(f"{RED}Error: Servidor desconocido '{args.server}'. Opciones: {', '.join(MCP_CATALOG.keys())}{RESET}")
+        sys.exit(1)
+
+    meta = MCP_CATALOG[server]
+    target_agents = [args.agent] if args.agent != "all" else ["gemini", "claude", "opencode"]
+
+    if "gemini" in target_agents:
+        data = read_json(GEMINI_CONFIG)
+        if "mcpServers" not in data:
+            data["mcpServers"] = {}
+        # Limpiar posibles variantes viejas (ej. camelCase)
+        if server == "chrome-devtools":
+            data["mcpServers"].pop("chromeDevTools", None)
+        data["mcpServers"][meta["gemini_key"]] = meta["gemini"]
+        write_json(GEMINI_CONFIG, data)
+
+    if "claude" in target_agents:
+        data = read_json(CLAUDE_CONFIG)
+        if "mcpServers" not in data:
+            data["mcpServers"] = {}
+        data["mcpServers"][meta["claude_key"]] = meta["claude"]
+        write_json(CLAUDE_CONFIG, data)
+
+    if "opencode" in target_agents:
+        data = read_json(OPENCODE_CONFIG)
+        if "mcp" not in data:
+            data["mcp"] = {}
+        if "servers" not in data["mcp"]:
+            data["mcp"]["servers"] = {}
+        data["mcp"]["servers"][meta["opencode_key"]] = meta["opencode"]
+        write_json(OPENCODE_CONFIG, data)
+
+    print(f"{GREEN}✔ Servidor '{server}' ACTIVADO para: {', '.join(target_agents)}{RESET}")
+
+
+def cmd_off(args):
+    target_agents = [args.agent] if args.agent != "all" else ["gemini", "claude", "opencode"]
+
+    if args.server.lower() == "all":
+        servers_to_off = list(MCP_CATALOG.keys())
+    else:
+        server = resolve_server(args.server)
+        if not server:
+            print(f"{RED}Error: Servidor desconocido '{args.server}'. Opciones: {', '.join(MCP_CATALOG.keys())} o 'all'{RESET}")
+            sys.exit(1)
+        servers_to_off = [server]
+
+    for s_name in servers_to_off:
+        meta = MCP_CATALOG[s_name]
+
+        if "gemini" in target_agents:
+            data = read_json(GEMINI_CONFIG)
+            if "mcpServers" in data:
+                data["mcpServers"].pop(meta["gemini_key"], None)
+                if s_name == "chrome-devtools":
+                    data["mcpServers"].pop("chromeDevTools", None)
+                if s_name == "shadcn-vue":
+                    data["mcpServers"].pop("shadcnVue", None)
+                write_json(GEMINI_CONFIG, data)
+
+        if "claude" in target_agents:
+            data = read_json(CLAUDE_CONFIG)
+            if "mcpServers" in data:
+                data["mcpServers"].pop(meta["claude_key"], None)
+                write_json(CLAUDE_CONFIG, data)
+
+        if "opencode" in target_agents:
+            data = read_json(OPENCODE_CONFIG)
+            if "mcp" in data and "servers" in data["mcp"]:
+                data["mcp"]["servers"].pop(meta["opencode_key"], None)
+                write_json(OPENCODE_CONFIG, data)
+
+    print(f"{YELLOW}✔ Servidor(es) desactivado(s) [{', '.join(servers_to_off)}] para: {', '.join(target_agents)}{RESET}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="mcp-toggle",
+        description="Gestor de conmutación bajo demanda de servidores MCP para agentes IA."
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    # status
+    p_status = subparsers.add_parser("status", help="Muestra el estado de los servidores MCP")
+    p_status.set_defaults(func=cmd_status)
+
+    # on
+    p_on = subparsers.add_parser("on", help="Activa un servidor MCP")
+    p_on.add_argument("server", help="Nombre del servidor (chrome-devtools, shadcn-vue, codegraph)")
+    p_on.add_argument("--agent", choices=["all", "gemini", "claude", "opencode"], default="all", help="Asistente destino")
+    p_on.set_defaults(func=cmd_on)
+
+    # off
+    p_off = subparsers.add_parser("off", help="Desactiva un servidor MCP (o 'all' para todos)")
+    p_off.add_argument("server", help="Nombre del servidor o 'all'")
+    p_off.add_argument("--agent", choices=["all", "gemini", "claude", "opencode"], default="all", help="Asistente destino")
+    p_off.set_defaults(func=cmd_off)
+
+    args = parser.parse_args()
+    if not args.command:
+        cmd_status(args)
+        return
+
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
