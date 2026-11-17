@@ -30,7 +30,7 @@ Prefijos detectados automáticamente (`OMNIFY-162`, `OPS-44`).
 ### Tareas y Foco
 ```bash
 alo ticket search "<texto>" [-p PROYECTO] [--limit N] [--json]
-alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--open] [-s ESTADOS] [--limit N] [--json]
+alo ticket list [-p PROYECTO] [--mine|--created|--involved] [--closed|--all] [-s ESTADOS] [--limit N] [--json]
 alo ticket get <TICKET-ID> [--json]
 alo ticket create "<título>" -p <PROYECTO> [--priority urgent|high|medium|low] [--state Estado] [--labels "a,b"] [--desc "Texto"] [--json]
 alo ticket update <TICKET-ID> [--state Estado] [--priority Prioridad] [--title "Título"] [--json]
@@ -39,10 +39,14 @@ alo ticket labels [-p PROYECTO] [--json]
 alo ticket comment add <TICKET-ID> "<MENSAJE>" [--hours <float>] [--json]
 ```
 
-- **Filtros Personales:**
+- **Filtros Personales & Modificadores de Estado:**
+  - `list` muestra por defecto solo **tareas abiertas** (*Open-by-Default*).
   - `--mine`: Tareas asignadas a ti como responsable.
   - `--created`: Tareas creadas por ti.
   - `--involved`: Tareas en las que estás involucrado (asignadas, creadas o con actividad/horas tuyas).
+  - `--closed`: Filtrar exclusivamente tareas cerradas (completadas o canceladas).
+  - `--all` / `--all-states`: Desactivar filtro de abiertas y mostrar todo el universo de tareas.
+  - `-s ESTADOS`: Filtro explícito de estado (ej. `-s Completado`); prevalece sobre el default de abiertas.
 - **Estados Válidos:** `Pendiente`, `Progreso`, `Pruebas`, `Revisión`, `Pausado`, `Completado`, `Backlog`, `Cancelado`.
 - **Proyectos Canónicos:** `OMNIFY` (desarrollo/plataformas), `OPS` (operaciones y soporte paraguas), `OMNICANAL`, `OMNILEADS`, `CDP`.
 
