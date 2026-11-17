@@ -25,7 +25,10 @@ make docs        # Sincroniza docs/INDEX.md tras crear o actualizar RFCs/ADRs
 3. **Aislamiento Hexagonal:**
    - `internal/domain/` tiene **cero dependencias externas** (solo biblioteca estándar de Go).
    - Queda terminantemente prohibido que un adaptador dependa o importe directamente a otro adaptador.
-4. **Blindaje Machine-to-Machine (`--json`):**
+4. **Aislamiento Hermético de Pruebas y Configuración:**
+   - La resolución de base de datos se realiza exclusivamente mediante `internal/config.ResolveDatabasePath`.
+   - Prohibido que pruebas de CLI o unitarias (`go test`) apunten o muten la base de datos de producción (`~/.cache/allostasis/allostasis.db`). Todo harness debe correr aislado en `t.TempDir()` o con variables de entorno de prueba.
+5. **Blindaje Machine-to-Machine (`--json`):**
    - Cuando se activa el flag `--json`, `stderr` debe permanecer en **0 bytes**. Ningún log, texto plano o traza puede contaminar `stderr`.
    - Toda salida debe emitirse por `stdout` serializada en JSON bajo el contrato `ResponseEnvelope`.
    - Códigos de salida POSIX estándar: `0` (éxito), `1` (fallo de dominio/ejecución), `2` (CLI usage), `3` (not found), `4` (conflicto/prerrequisito no cumplido).
