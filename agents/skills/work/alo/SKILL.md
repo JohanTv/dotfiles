@@ -77,6 +77,10 @@ alo sync [--json]
      - **Estado actual:** Componentes estables y verificados.
      - **Stoppers / Próximo paso:** Siguiente acción inmediata sin perder el hilo."
      ```
+4. **Pirámide Invertida & Evidencias Declaradas:**
+   - Toda descripción (`alo ticket create --desc "..."`) debe estructurarse en pirámide invertida: **Resumen lead (1 línea)** $\rightarrow$ **Causa/Contexto técnico** $\rightarrow$ **Solución** $\rightarrow$ **Evidencias** $\rightarrow$ **DoD `[ ]`**.
+   - Cita siempre nombres exactos de componentes (`CampaignChipFloatingMenu`), PRs (`PR #265`) o endpoints (`/api/v1/...`).
+   - Declara explícitamente cualquier captura de pantalla (`screenshots/nombre.png`), enlace a Figma o payload en la sección `**Evidencias / Adjuntos:**`. Prohibido obligar al lector a adivinar o solicitar archivos a ciegas.
 
 ## 4. Git Worktrees Multi-Repo (`alo ws`)
 
