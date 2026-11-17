@@ -5,11 +5,11 @@ description: Orquestador soberano Allostasis (`alo`) para tickets, estados, etiq
 
 # Allostasis Session Tracker & Worklog Operator (`alo`)
 
-Procedimiento para operar Plane CE v1.2.3 (Omnify / Operaciones) y registrar telemetría de horas mediante el motor en Go de Allostasis (`alo`). Detalle en `references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md`.
+Procedimiento para operar Plane CE v1.2.3 (Omnify / Operaciones) y registrar telemetría de horas mediante el motor en Go de Allostasis (`alo`). Directrices de gobernanza en [`references/`](references/README.md).
 
 ## 0. Setup
 
-Verifica la configuración y credenciales con `alo ticket whoami`. Si faltan variables de entorno, pide los valores al usuario (onboarding en `references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md` §0). Nunca expongas la API Key en logs ni chat.
+Verifica la configuración y credenciales con `alo ticket whoami`. Si faltan variables de entorno, pide los valores al usuario (`PLANE_BASE_URL`, `PLANE_API_KEY`, `PLANE_WORKSPACE_SLUG`). Nunca expongas la API Key en logs ni chat.
 
 ## 1. Estados del ticket
 
@@ -81,16 +81,14 @@ Reglas:
 - **Etiquetas (mínimo 2):** Capa técnica (`backend`, `frontend`, `bd`, `infra`) y tipo (`bug`, `deuda-tecnica`, `seguridad`, `docs`).
 - **Contrato vivo:** Descripción ≤ 200 palabras (Resumen, Causa, Solución, DoD `[ ]`). Detalle en `references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`.
 
-## 7. Documentación y Backlog
+## 7. Gobernanza Corporativa y Desarrollo del Core
 
-- **Operación de Plane CE (Tickets corporativos y telemetría):**
-  - Guías operativas en `references/`: guía operativa (`references/GUIA_OPERATIVA_CLI_PLANE_TRACKER.md`), living tickets y SDLC (`references/PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`references/PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), taxonomía y paraguas (`references/MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`), arquitectura de telemetría (`references/ARQUITECTURA_SISTEMA_TRACKING_Y_TELEMETRIA.md`).
-- **Desarrollo y Mantenimiento Interno del CLI (`alo`):**
-  - Instrucciones para agentes de desarrollo: [`AGENTS.md`](./AGENTS.md) y arquitectura interna en [`ARCHITECTURE.md`](./ARCHITECTURE.md).
-  - Backlog técnico interno: [`docs/BACKLOG.md`](./docs/BACKLOG.md).
-  - Registro de arquitectura y propuestas: [`docs/INDEX.md`](./docs/INDEX.md) (ADRs en `docs/decisions/` y RFCs en `docs/rfcs/`) y principios en [`docs/principles.md`](./docs/principles.md).
-  - Gobernanza y diseño del CLI: [`references/CLI_DESIGN_GUARD.md`](./references/CLI_DESIGN_GUARD.md).
-  - *Regla clave:* Nunca busques ni crees tickets en Plane CE para bugs o deuda interna del propio CLI; esos temas residen en `docs/BACKLOG.md`.
+- **Gobernanza Operativa de Plane CE:**
+  - Directrices vivas en [`references/`](references/README.md): Living tickets y ciclo SDLC (`PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), taxonomía y tickets paraguas (`MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`), y estrategia de capacidad (`ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md`).
+  - Gobernanza y diseño del CLI: [`CLI_DESIGN_GUARD.md`](references/CLI_DESIGN_GUARD.md).
+- **Desarrollo y Mantenimiento del Motor en Go (`allostasis`):**
+  - El código fuente, la arquitectura hexagonal, los RFCs/ADRs y las directrices de ingeniería (`AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`) residen de forma soberana en el repositorio del proyecto `allostasis`.
+  - *Regla de Aislamiento:* NUNCA busques, consultes ni crees tickets en Plane CE para bugs, deuda o refactorizaciones internas del propio CLI `alo`; esos temas pertenecen al repositorio de `allostasis`.
 
 ## 8. Orquestación de Git Worktrees Multi-Repo (`alo ws`)
 
@@ -123,5 +121,3 @@ alo ws prune --execute
 # Podar tickets cancelados/abandonados con respaldo comprimido .tar.gz
 alo ws prune [TARGET] --execute --include-stale
 ```
-
-Detalle procedural, resolución de conflictos y gestión de respaldos: 👉 [GUIA_OPERATIVA_WORKTREES.md](file:///home/johantv/Code/dotfiles/agents/skills/work/alo/references/GUIA_OPERATIVA_WORKTREES.md).
