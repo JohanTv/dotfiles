@@ -61,13 +61,14 @@ alo sync [--json]
 
 ## 3. Reglas Corporativas de Gobernanza (Zero-Hop)
 
-1. **Nomenclatura de Títulos (SDLC):**
+1. **Nomenclatura de Títulos (SDLC) & Responsabilidad Única:**
    - Formato obligatorio: `[{FASE}] {Acción concisa en español}`.
    - Fases canónicas: `[SPIKE]`, `[RFC]`, `[FEAT]`, `[FIX]`, `[INFRA]`, `[QA]`, `[REFACTOR]`.
+   - *Responsabilidad Única:* PROHIBIDO mezclar `[FIX]` con mejoras de UX/producto (`[FEAT]`). Un bug fix repara exclusivamente la regresión/defecto.
    - *Etiquetas:* Mínimo 2 (`alo ticket labels`): Capa técnica (`backend`, `frontend`, `bd`, `infra`) + Tipo/Módulo (`bug`, `seguridad`, `sms`, `whatsapp`).
-2. **Regla de los 15 Minutos & Tickets Paraguas (`OPS`):**
-   - **< 15 min (Toil / Soporte Rápido / Dailies):** NO crear ticket en OMNIFY. Imputar al ticket paraguas semanal de `OPS` (`Soporte y Mantenimiento Ad-Hoc - W{XX}` o `Sincronización de Equipo - W{XX}`) vía `alo log OPS-XX <MINUTOS> --bucket toil_support|coordination`.
-   - **> 15 min (Trabajo Estructurado):** Crear ticket formal en `OMNIFY` con descripción estructurada (Resumen, Causa, Solución y DoD `[ ]`).
+2. **Regla de los 15 Minutos & Transición desde `OPS`:**
+   - **< 15 min (Toil / Soporte Rápido / Dailies):** Imputar al ticket paraguas semanal de `OPS` (`Soporte y Mantenimiento Ad-Hoc - W{XX}` o `Sincronización de Equipo - W{XX}`) vía `alo log OPS-XX <MINUTOS> --bucket toil_support|coordination`.
+   - **> 15 min (Regla de Transición):** Si una tarea en `OPS` supera los 15m, detén la imputación en `OPS`, abre de inmediato el ticket formal en `OMNIFY` y transfiere el esfuerzo acumulado desde el minuto 0 al nuevo ticket vía `alo log <TICKET> <MINUTOS> --bucket deep_work`.
 3. **Pausa y Relevo Asíncrono (Handoff Snapshot):**
    - Al pausar o transferir: transicionar a `Pausado`, liberar foco (`alo ticket focus clear`) y publicar comentario con:
      ```bash
@@ -87,6 +88,7 @@ alo sync [--json]
      **Criterio de Cierre:** [DoD [ ] para FEAT/FIX; Checklist/Veredicto para SPIKE/RFC].
      ```
    - **Flexibilidad en Incertidumbre:** Si el ticket es un `[SPIKE]` o la causa no está aislada, NUNCA inventes una solución prematura; lista `**Opciones a Evaluar:**` o `**Hipótesis:**` (como en `OMNIFY-274`).
+   - **DoD Desacoplado de Entorno Local:** El DoD (`- [ ]`) debe validar entregables verificables, contratos y tests (`npm run check`, `go test`). PROHIBIDO incluir comandos efímeros locales (como `alo ws create`) en el DoD.
    - Cita siempre identificadores técnicos reales (`CampaignChipFloatingMenu`, `PR #265`, etc.).
    - Declara explícitamente cualquier evidencia visual o log en `**Evidencias & Adjuntos:**`. Prohibido obligar al lector a adivinar o solicitar archivos a ciegas. Detalle de plantillas en `references/GOBERNANZA.md`.
 

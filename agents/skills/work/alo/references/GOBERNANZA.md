@@ -56,9 +56,14 @@ Toda descripción de ticket en Plane CE (creada vía `alo ticket create --desc "
 **Criterios de Aceptación (DoD):**
 - [ ] Menú flotante no se corta en bordes de acordeón.
 - [ ] Selector muestra 2 líneas por ítem y botón Eye.
-- [ ] Entorno de trabajo multi-repo configurado vía `alo ws create`.
 - [ ] Tests unitarios / npm run check pasando sin errores.
+- [ ] Pruebas de integración o regresión pasando al 100%.
 ```
+
+> [!NOTE]
+> **Regla de Bifurcación de Spikes vs Bugs:**  
+> - En un `[FIX]`, la mutación in-place (actualizar causa y solución en el mismo ticket) es válida conforme se aísla el bug.  
+> - Un `[SPIKE]` o `[RFC]` **NUNCA DEBE MUTAR a `[FEAT]`**; debe cerrarse como `Completado` con su Veredicto Técnico/Decisión de Diseño, y dar origen a tickets hijos independientes `[FEAT]` para proteger las métricas de Lead Time y la trazabilidad de las hipótesis descartadas.
 
 ---
 
