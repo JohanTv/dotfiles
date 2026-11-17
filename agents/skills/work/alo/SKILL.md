@@ -84,8 +84,7 @@ Reglas:
 ## 7. Gobernanza Corporativa y Desarrollo del Core
 
 - **Gobernanza Operativa de Plane CE:**
-  - Directrices vivas en [`references/`](references/README.md): Living tickets y ciclo SDLC (`PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), taxonomía y tickets paraguas (`MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`), y estrategia de capacidad (`ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md`).
-  - Gobernanza y diseño del CLI: [`CLI_DESIGN_GUARD.md`](references/CLI_DESIGN_GUARD.md).
+  - Directrices vivas en [`references/`](references/README.md): Living tickets y ciclo SDLC (`PROTOCOLO_LIVING_TICKETS_Y_SDLC.md`), relevo asíncrono (`PROTOCOLO_RELEVO_ASINCRONO_HANDOFF.md`), y taxonomía y tickets paraguas (`MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md`).
 - **Desarrollo y Mantenimiento del Motor en Go (`allostasis`):**
   - El código fuente, la arquitectura hexagonal, los RFCs/ADRs y las directrices de ingeniería (`AGENTS.md`, `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`) residen de forma soberana en el repositorio del proyecto `allostasis`.
   - *Regla de Aislamiento:* NUNCA busques, consultes ni crees tickets en Plane CE para bugs, deuda o refactorizaciones internas del propio CLI `alo`; esos temas pertenecen al repositorio de `allostasis`.

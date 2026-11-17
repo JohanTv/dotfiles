@@ -12,10 +12,6 @@ Esta carpeta agrupa los protocolos operativos, taxonomías y directrices de gobe
    * Cómo tomar tickets iniciados por otra persona del equipo, destilar el contexto de comentarios previos, aislar telemetría y publicar Handoff Snapshots si se deja a medias.
 3. [🏷️ **Matriz de Taxonomía y Protocolo de Tickets Paraguas**](./MATRIZ_TAXONOMIA_Y_TICKETS_PARAGUAS.md)
    * Catálogo de etiquetas en Omnify y OPS, baldes de capacidad y ciclo de vida de tickets semanales para reuniones y toil.
-4. [📋 **Estrategia Integral de Gestión TI y Work Items**](./ESTRATEGIA_GESTION_TI_Y_WORKITEMS.md)
-   * Visión de alto rendimiento, arquetipos de ingeniería y diseño del dashboard personal.
-5. [🛡️ **Gobernanza y Principios de Diseño del CLI**](./CLI_DESIGN_GUARD.md)
-   * Los 6 invariantes arquitecturales (CQS, ortogonalidad, jerarquía sustantivo+verbo), protocolo de 5 filtros ("Antes de agregar un flag") y límites ratchet.
 
 ---
 
