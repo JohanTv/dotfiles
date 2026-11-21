@@ -243,20 +243,24 @@ if [[ "$ACTIVE_PROFILE" == "work" && -d "$DOTFILES_DIR/bin/work" ]]; then
     done
 
     # ------------------------------------------------------------------------------
-    # 6b. Garantizar Portabilidad de Binarios Allostasis en Máquinas Nuevas
+    # 6b. Garantizar Disponibilidad de Allostasis (alo) en Máquinas Nuevas
     # ------------------------------------------------------------------------------
-    if command -v go >/dev/null 2>&1; then
-        ALLOSTASIS_DIR="$HOME/Code/allostasis"
-        if [[ -d "$ALLOSTASIS_DIR" && -f "$ALLOSTASIS_DIR/Makefile" ]]; then
-            log_info "Compilando e instalando Allostasis desde $ALLOSTASIS_DIR..."
-            make -C "$ALLOSTASIS_DIR" install >/dev/null 2>&1 || log_warn "No se pudo compilar Allostasis automáticamente."
-        elif ! command -v alo >/dev/null 2>&1; then
-            log_info "Instalando Allostasis mediante 'go install github.com/allostasis/alo'..."
-            go install github.com/allostasis/alo/cmd/alo@latest 2>/dev/null || true
+    if ! command -v alo >/dev/null 2>&1; then
+        if [[ -n "${ALLOSTASIS_DIR:-}" && -f "$ALLOSTASIS_DIR/Makefile" ]]; then
+            log_info "Compilando Allostasis desde entorno local ($ALLOSTASIS_DIR)..."
+            make -C "$ALLOSTASIS_DIR" install >/dev/null 2>&1 || log_warn "No se pudo compilar Allostasis localmente."
+        elif command -v go >/dev/null 2>&1; then
+            log_info "Instalando Allostasis mediante 'go install github.com/JohanTv/allostasis/cmd/alo@main'..."
+            go install github.com/JohanTv/allostasis/cmd/alo@main 2>/dev/null || true
             if [[ -x "$HOME/go/bin/alo" ]]; then
+                mkdir -p "$HOME/.local/bin"
                 cp "$HOME/go/bin/alo" "$HOME/.local/bin/alo" 2>/dev/null || true
                 ln -sf "$HOME/.local/bin/alo" "$HOME/.local/bin/allostasis" 2>/dev/null || true
+                ln -sf "$HOME/.local/bin/alo" "$HOME/.local/bin/allo" 2>/dev/null || true
+                log_ok "Allostasis instalado en ~/.local/bin/alo"
             fi
+        else
+            log_warn "Allostasis (alo) no encontrado en PATH. Instálalo con: go install github.com/JohanTv/allostasis/cmd/alo@main"
         fi
     fi
 fi

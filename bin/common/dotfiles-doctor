@@ -480,6 +480,33 @@ def audit_ssh():
     return results
 
 
+def audit_work_tools(active_profile):
+    results = []
+    if active_profile != "work":
+        return results
+
+    alo_path = shutil.which("alo")
+    if alo_path:
+        try:
+            r = subprocess.run(["alo", "version", "--json"], capture_output=True, text=True, timeout=3)
+            if r.returncode == 0:
+                data = json.loads(r.stdout)
+                version = data.get("data", {}).get("version", "desconocida")
+                results.append({"name": "alo (Allostasis CLI)", "ok": True, "message": f"Instalado en {alo_path} (v{version})"})
+            else:
+                results.append({"name": "alo (Allostasis CLI)", "ok": True, "message": f"Instalado en {alo_path}"})
+        except Exception:
+            results.append({"name": "alo (Allostasis CLI)", "ok": True, "message": f"Instalado en {alo_path}"})
+    else:
+        results.append({
+            "name": "alo (Allostasis CLI)",
+            "ok": False,
+            "message": "No encontrado en PATH",
+            "fix": "go install github.com/JohanTv/allostasis/cmd/alo@main"
+        })
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="dotfiles-doctor - Diagnóstico y auditoría de configuraciones de dotfiles.",
@@ -518,6 +545,8 @@ def main():
     git_state = get_git_status()
     mcp_state = audit_mcp_servers()
     ssh_state = audit_ssh()
+    active_profile = get_active_profile()
+    work_tools = audit_work_tools(active_profile)
 
     # Apply fixes if requested
     fixed_count = 0
@@ -534,9 +563,11 @@ def main():
         payload = {
             "dotfiles_dir": DOTFILES_DIR,
             "wsl": wsl_active,
+            "profile": active_profile,
             "git": git_state,
             "mcp": mcp_state,
             "ssh": ssh_state,
+            "work_tools": work_tools,
             "targets": [item for sublist in results_by_cat.values() for item in sublist],
             "issues_count": len(issues_found),
             "fixed_count": fixed_count
@@ -545,7 +576,6 @@ def main():
         return
 
     # CLI Output
-    active_profile = get_active_profile()
     print(f"\n{BOLD}{CYAN}🩺 Dotfiles Doctor — Diagnóstico de Entorno y Configuraciones{RESET}")
     print(f"{DIM}Directorio del repositorio: {DOTFILES_DIR}{RESET}")
     print(f"{DIM}Entorno detectado: {'Windows Subsystem for Linux (WSL)' if wsl_active else 'Linux Nativo (Ubuntu/GNOME)'}{RESET}")
@@ -605,16 +635,26 @@ def main():
         if s_it.get("fix") and not s_it["ok"]:
             print(f"       {DIM}➔ {s_it['fix']}{RESET}")
 
+    # 5. Herramientas de Perfil Work (contrato de CLI en $PATH)
+    if work_tools:
+        print(f"\n{BOLD}5. Herramientas de Perfil {active_profile.upper()} (Contrato de CLI en $PATH):{RESET}")
+        for wt in work_tools:
+            mark = f"{GREEN}✔" if wt["ok"] else f"{YELLOW}⚠"
+            print(f"   {mark}{RESET} {BOLD}{wt['name']:24}{RESET} {DIM}➔ {wt['message']}{RESET}")
+            if not wt["ok"] and wt.get("fix"):
+                print(f"       {DIM}➔ Remediación: {wt['fix']}{RESET}")
+
     # Diffs
     if diff_outputs:
-        print(f"\n{BOLD}{YELLOW}5. Diferencias detectadas en archivos desconectados:{RESET}")
+        print(f"\n{BOLD}{YELLOW}6. Diferencias detectadas en archivos desconectados:{RESET}")
         for path, d_txt in diff_outputs:
             print(f"\n{CYAN}--- Diffs en {path} ---{RESET}")
             print(d_txt)
 
     print(f"\n{DIM}{'─' * 68}{RESET}")
     ssh_issues = [x for x in ssh_state if not x["ok"]]
-    if not issues_found and git_state.get("clean") and not ssh_issues:
+    work_issues = [x for x in work_tools if not x["ok"]]
+    if not issues_found and git_state.get("clean") and not ssh_issues and not work_issues:
         print(f"{GREEN}{BOLD}🎉 ¡Todo está en orden! Tu máquina y tu repositorio están 100% sincronizados.{RESET}\n")
     else:
         if fixed_count > 0:
@@ -624,6 +664,8 @@ def main():
             print(f"  {DIM}Ejecuta 'dotfiles-doctor --fix' o './install.sh' para restaurarlos.{RESET}")
         if ssh_issues:
             print(f"{YELLOW}{BOLD}⚠ {len(ssh_issues)} aviso(s) de SSH (sección 4).{RESET} {DIM}No se reparan con --fix: son manuales y no se versionan.{RESET}")
+        if work_issues:
+            print(f"{YELLOW}{BOLD}⚠ {len(work_issues)} aviso(s) de herramientas de perfil (sección 5).{RESET}")
         if not git_state.get("clean"):
             print(f"  {DIM}Hay cambios pendientes en Git. Revísalos con 'git diff' o haz commit.{RESET}")
         print("")
