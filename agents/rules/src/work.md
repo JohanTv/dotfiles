@@ -1,19 +1,12 @@
-# Protocolo de Trabajo y Gobernanza Corporativa (Work Context)
+# Protocolo de Trabajo y Determinación de Ámbito
 
-### Ciclo SDLC en Títulos y Commits:
-- Clasifica iniciativas y commits formales en 4 fases canónicas: `[SPIKE]` (diagnóstico/investigación), `[RFC]` (diseño/contrato), `[FEAT/FIX/INFRA]` (desarrollo/devops), `[QA]` (pruebas/validación).
+### 1. Ámbito Local / Personal / Tooling Interno:
+- **Cuándo aplica:** En `~/Code/dotfiles`, scripts locales, desarrollo interno de skills en `~/.agents/skills/` y proyectos personales/open-source aislados.
+- **Aislamiento Estricto:** NUNCA consultes, busques ni crees tickets en Plane para proyectos locales. El seguimiento se realiza exclusivamente mediante commits atómicos y claros de Git en la rama activa.
 
-### Convenciones de Ramas Git:
-- **Patrón Corporativo:** `{tipo}/{TICKET-ID}-{kebab-case-description}` (ej. `feat/OMNIFY-175-campaign-validations`, `fix/OPS-44-mitigate-n8n`).
-  - Tipos válidos: `spike`, `feat`, `fix`, `refactor`, `test`, `infra`. Prefijo por defecto: `OMNIFY-`.
-- **Iniciativas Multi-Repo:** Si la tarea cruza 2 o más repositorios, utiliza la suite integrada de worktrees operando vía `alo ws` (`~/.agents/skills/alo/SKILL.md`).
-- **Ambigüedad:** Si no se especifica un ticket para trabajo corporativo, consulta con el usuario antes de crear la rama.
-
-### Determinación de Ámbito (Corporativo vs Local):
-- **Ámbito Corporativo (Plane / Tracker Obligatorio):**
-  - Aplica cuando el workspace actual corresponde a repositorios corporativos o cuando el usuario menciona explícitamente tickets con clave (`[A-Z]+-[0-9]+`), "Plane" o "sprint".
-  - *Ejecución:* Consulta y opera a través del CLI nativo de `allostasis` (`alo`). Para comandos de telemetría, estándares de living tickets y reglas de paraguas semanales (`OPS`), consulta `~/.agents/skills/alo/SKILL.md`.
-  - *Cierre de Hito/Sesión:* Al completar una tarea o finalizar la sesión, propón una bitácora concisa vía `alo ticket comment add` y solicita confirmación antes de enviarla.
-- **Ámbito Local / Herramientas Internas / Dotfiles:**
-  - Aplica en `~/Code/dotfiles`, scripts locales, desarrollo interno de skills en `~/.agents/skills/` y tareas exploratorias aisladas.
-  - **REGLA DE AISLAMIENTO:** NUNCA consultes, busques ni crees tickets en Plane para proyectos locales o de tooling interno. El seguimiento se realiza exclusivamente mediante commits atómicos y claros de Git en la rama activa.
+### 2. Ámbito Corporativo (Plane Tracker):
+- **Cuándo aplica:** En repositorios corporativos de la organización o cuando el usuario mencione tickets con clave (`[A-Z]+-[0-9]+`), "Plane" o "sprint".
+- **Procedimiento Bajo Demanda:** Consulta y opera mediante la habilidad `alo`:
+  - Runbook y gobernanza: `~/.agents/skills/alo/SKILL.md`.
+  - Iniciativas multi-repo: opera mediante worktrees vía `alo ws`.
+  - Cierre de sesión/hito: propón bitácora concisa con `alo ticket comment add` y solicita confirmación antes de enviarla.

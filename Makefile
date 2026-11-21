@@ -42,31 +42,35 @@ compile-rules:
 	@echo "" >> $(ACTIVE_RULES)
 	@cat $(CORE_RULES) >> $(ACTIVE_RULES)
 	@echo "" >> $(ACTIVE_RULES)
-	@if [ -f "$(SKILLS_INDEX)" ]; then cat $(SKILLS_INDEX) >> $(ACTIVE_RULES); echo "" >> $(ACTIVE_RULES); fi
 	@cat $(PROFILE_RULES) >> $(ACTIVE_RULES)
 	@chmod 444 $(ACTIVE_RULES)
-	@echo "✔ Reglas compiladas en $(ACTIVE_RULES) [modo solo lectura]"
+	@echo "✔ Reglas compactas compiladas en $(ACTIVE_RULES) [modo solo lectura]"
 
 link-rules: compile-rules
-	@mkdir -p $$HOME/.gemini $$HOME/.claude $$HOME/.config/opencode
+	@mkdir -p $$HOME/.gemini/config $$HOME/.claude $$HOME/.config/opencode
 	@ln -sf $(ACTIVE_RULES) $$HOME/.gemini/GEMINI.md
 	@ln -sf $(ACTIVE_RULES) $$HOME/.claude/CLAUDE.md
 	@ln -sf $(ACTIVE_RULES) $$HOME/.config/opencode/AGENTS.md
-	@echo "✔ Symlinks de agentes actualizados a active-rules.md"
+	@ln -sf $(DOTFILES_DIR)/agents/config/gemini-skills.json $$HOME/.gemini/config/skills.json
+	@echo "✔ Symlinks de agentes y manifest de skills actualizados"
 
 sync-skills:
-	@mkdir -p $$HOME/.agents/skills
+	@mkdir -p $$HOME/.agents/skills $$HOME/.claude/skills
 	@# 1. Enlazar skills comunes
 	@for d in $(DOTFILES_DIR)/agents/skills/common/*; do \
 		if [ -d "$$d" ]; then \
-			ln -sfn "$$d" "$$HOME/.agents/skills/$$(basename "$$d")"; \
+			base=$$(basename "$$d"); \
+			ln -sfn "$$d" "$$HOME/.agents/skills/$$base"; \
+			ln -sfn "$$d" "$$HOME/.claude/skills/$$base"; \
 		fi \
 	done
 	@# 2. Enlazar desktop-linux (solo si no es WSL)
 	@if [ "$(IS_WSL)" = "false" ]; then \
 		for d in $(DOTFILES_DIR)/agents/skills/desktop-linux/*; do \
 			if [ -d "$$d" ]; then \
-				ln -sfn "$$d" "$$HOME/.agents/skills/$$(basename "$$d")"; \
+				base=$$(basename "$$d"); \
+				ln -sfn "$$d" "$$HOME/.agents/skills/$$base"; \
+				ln -sfn "$$d" "$$HOME/.claude/skills/$$base"; \
 			fi \
 		done \
 	fi
@@ -74,38 +78,39 @@ sync-skills:
 	@if [ "$(PROFILE)" = "work" ]; then \
 		for d in $(DOTFILES_DIR)/agents/skills/work/*; do \
 			if [ -d "$$d" ]; then \
-				ln -sfn "$$d" "$$HOME/.agents/skills/$$(basename "$$d")"; \
+				base=$$(basename "$$d"); \
+				ln -sfn "$$d" "$$HOME/.agents/skills/$$base"; \
+				ln -sfn "$$d" "$$HOME/.claude/skills/$$base"; \
 				if [ -d "$$HOME/Code/.agents/skills" ]; then \
-					ln -sfn "$$d" "$$HOME/Code/.agents/skills/$$(basename "$$d")"; \
+					ln -sfn "$$d" "$$HOME/Code/.agents/skills/$$base"; \
 				fi; \
 			fi \
 		done \
 	fi
 	@# 4. Poda segura: limpiar symlinks obsoletos o inactivos que apunten a dotfiles
-	@for link in $$HOME/.agents/skills/*; do \
-		if [ -L "$$link" ]; then \
-			target=$$(readlink -f "$$link" 2>/dev/null || true); \
-			base=$$(basename "$$link"); \
-			case "$$target" in \
-				$(DOTFILES_DIR)/agents/skills/*) \
-					# Si es de trabajo pero no estamos en work, remover \
-					if [ "$$target" = "$(DOTFILES_DIR)/agents/skills/work/$$base" ] && [ "$(PROFILE)" != "work" ]; then \
-						rm "$$link"; \
-						echo "○ Poda de skill de trabajo inactiva: $$base"; \
-					fi; \
-					# Si es desktop pero estamos en WSL, remover \
-					if [ "$$target" = "$(DOTFILES_DIR)/agents/skills/desktop-linux/$$base" ] && [ "$(IS_WSL)" = "true" ]; then \
-						rm "$$link"; \
-						echo "○ Poda de skill desktop en WSL: $$base"; \
-					fi; \
-					# Si el destino no existe (broken link post-migración), remover \
-					if [ ! -e "$$target" ]; then \
-						rm "$$link"; \
-						echo "○ Poda de symlink roto: $$base"; \
-					fi; \
-					;; \
-			esac \
-		fi \
+	@for dir in "$$HOME/.agents/skills" "$$HOME/.claude/skills"; do \
+		for link in $$dir/*; do \
+			if [ -L "$$link" ]; then \
+				target=$$(readlink -f "$$link" 2>/dev/null || true); \
+				base=$$(basename "$$link"); \
+				case "$$target" in \
+					$(DOTFILES_DIR)/agents/skills/*) \
+						if [ "$$target" = "$(DOTFILES_DIR)/agents/skills/work/$$base" ] && [ "$(PROFILE)" != "work" ]; then \
+							rm "$$link"; \
+							echo "○ Poda de skill de trabajo inactiva en $$(basename $$dir): $$base"; \
+						fi; \
+						if [ "$$target" = "$(DOTFILES_DIR)/agents/skills/desktop-linux/$$base" ] && [ "$(IS_WSL)" = "true" ]; then \
+							rm "$$link"; \
+							echo "○ Poda de skill desktop en WSL en $$(basename $$dir): $$base"; \
+						fi; \
+						if [ ! -e "$$target" ]; then \
+							rm "$$link"; \
+							echo "○ Poda de symlink roto en $$(basename $$dir): $$base"; \
+						fi; \
+						;; \
+				esac \
+			fi \
+		done; \
 	done
 	@echo "✔ Sincronización y conciliación de skills completada."
 

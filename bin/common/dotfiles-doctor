@@ -91,6 +91,7 @@ def build_managed_targets(wsl_active):
         ("Agents Rules", "~/.gemini/GEMINI.md", "agents/rules/dist/active-rules.md", "always"),
         ("Agents Rules", "~/.claude/CLAUDE.md", "agents/rules/dist/active-rules.md", "always"),
         ("Agents Rules", "~/.config/opencode/AGENTS.md", "agents/rules/dist/active-rules.md", "always"),
+        ("Agents Config", "~/.gemini/config/skills.json", "agents/config/gemini-skills.json", "always"),
         ("Agents MCP", "~/.config/opencode/opencode.json", "agents/mcp/opencode.json", "always"),
     ]
 
@@ -101,6 +102,7 @@ def build_managed_targets(wsl_active):
             full_p = os.path.join(common_skills, entry)
             if os.path.isdir(full_p):
                 targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/common/{entry}", "always"))
+                targets.append(("Claude Skills", f"~/.claude/skills/{entry}", f"agents/skills/common/{entry}", "always"))
 
     # Dynamic discovery for desktop-linux skills (GNOME/X11)
     desk_skills = os.path.join(DOTFILES_DIR, "agents/skills/desktop-linux")
@@ -109,6 +111,7 @@ def build_managed_targets(wsl_active):
             full_p = os.path.join(desk_skills, entry)
             if os.path.isdir(full_p):
                 targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/desktop-linux/{entry}", "desktop"))
+                targets.append(("Claude Skills", f"~/.claude/skills/{entry}", f"agents/skills/desktop-linux/{entry}", "desktop"))
 
     # Dynamic discovery for work skills (if active profile is 'work' or 'all')
     if active_profile in ("work", "all"):
@@ -118,6 +121,7 @@ def build_managed_targets(wsl_active):
                 full_p = os.path.join(work_skills, entry)
                 if os.path.isdir(full_p):
                     targets.append(("Agents Skills", f"~/.agents/skills/{entry}", f"agents/skills/work/{entry}", "always"))
+                    targets.append(("Claude Skills", f"~/.claude/skills/{entry}", f"agents/skills/work/{entry}", "always"))
 
     # Dynamic discovery for common binaries
     common_bin = os.path.join(DOTFILES_DIR, "bin/common")
