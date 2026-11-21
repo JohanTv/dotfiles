@@ -19,7 +19,7 @@ Procedimiento operativo para Plane CE v1.2.3 y telemetría de horas mediante All
 ## 1. Setup y Principios Innegociables
 
 - **Diagnóstico:** `alo ticket whoami [--json]`. Si faltan credenciales, solicita al usuario `PLANE_BASE_URL`, `PLANE_API_KEY` y `PLANE_WORKSPACE_SLUG`. Nunca expongas secretos.
-- **Principio de Caja Negra:** El motor gestiona SQLite y caché internamente. Queda prohibido inspeccionar o consultar bases de datos locales por CLI.
+- **Caja Negra & DBs:** Prohibido alterar DBs para puentear fallos. Consultas directas (`sqlite3`) permitidas para diagnóstico/auditoría bajo autorización, en solo lectura y sin exponer secretos.
 - **Salida Estructurada:** Usa siempre `--json` en automatizaciones para parseo determinista sin ruido en `stderr`.
 - **Aislamiento del Core:** NUNCA crees ni consultes tickets en Plane para bugs o refactorizaciones del propio CLI `alo` (pertenecen soberanamente al repositorio de `allostasis`).
 
