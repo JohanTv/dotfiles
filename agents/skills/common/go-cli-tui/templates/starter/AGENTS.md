@@ -27,7 +27,7 @@ make docs        # Sincroniza docs/INDEX.md tras crear o actualizar RFCs/ADRs
 3. **Blindaje Machine-to-Machine (`--json`):**
    - Cuando se activa el flag `--json`, `stderr` debe permanecer en **0 bytes**. Ningún log o texto plano puede contaminar `stderr`.
    - Toda salida debe emitirse por `stdout` serializada en JSON bajo el contrato `ResponseEnvelope`.
-   - Códigos de salida POSIX estándar: `0` (éxito), `1` (fallo interno/no clasificado), `2` (CLI usage / datos rechazados), `3` (auth/credenciales), `4` (not found), `5` (upstream transitorio/timeout), `70` (software crash / pánico interceptado).
+   - Códigos de salida POSIX: la matriz semántica normativa se define centralizadamente en [`internal/presentation/errors/envelope.go`](internal/presentation/errors/envelope.go) y en la especificación [`m2m-envelope.md`](file:///home/johantv/.agents/skills/go-cli-tui/references/m2m-envelope.md).
 4. **Terminal Firewall:** En ejecuciones no interactivas o bajo `--json`, los componentes de Charm TUI nunca deben inicializarse ni leer de `stdin`.
 
 ---
