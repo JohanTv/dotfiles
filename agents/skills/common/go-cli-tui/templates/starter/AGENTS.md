@@ -1,41 +1,22 @@
 # Directrices de Agentes: {{ .AppTitle }} (`{{ .AppName }}`)
 
-> **Propósito:** Inducción técnica inmediata y salvaguardas operativas de desarrollo para agentes de IA.  
-> **Guía Exhaustiva de Ingeniería:** Si vas a modificar adaptadores, persistencia SQLite, terminal firewall o crear RFCs/ADRs, es **OBLIGATORIO** leer [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) antes de editar código.
+> **Guía de Ingeniería:** Si vas a modificar adaptadores, persistencia SQLite, terminal firewall o crear RFCs/ADRs, consulta [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ---
 
-## ⚡ 1. Comandos Canónicos de Ciclo de Vida
+## 🛡️ 1. Invariantes Críticas
 
-Todo agente que opere en este repositorio debe validar su trabajo mediante el `Makefile`:
-
-```bash
-make test        # Suite de pruebas unitarias y de integración con race detector (-race)
-make build       # Compilación estática con CGO_ENABLED=0 en bin/{{ .AppName }}
-make docs-check  # Linter de consistencia de arquitectura y validación de enlaces relativos
-make docs        # Sincroniza docs/INDEX.md tras crear o actualizar RFCs/ADRs
-```
+1. **Pure-Go & Concurrencia:** Compilación estricta con `CGO_ENABLED=0` y `-race` obligatorio en pruebas.
+2. **Aislamiento Hexagonal:** `internal/domain/` tiene cero dependencias externas. Cero imports directos entre adaptadores.
+3. **Blindaje M2M (`--json`):** `stderr` en 0 bytes; `stdout` emite JSON `ResponseEnvelope`. Códigos POSIX en [`internal/presentation/errors/envelope.go`](internal/presentation/errors/envelope.go).
+4. **Terminal Firewall:** Bajo `--json` o modo no interactivo, los componentes TUI jamás deben inicializarse ni leer de `stdin`.
 
 ---
 
-## 🛡️ 2. Reglas de Oro Innegociables (Hard Invariants)
+## ✅ 2. Validación y Checklist Pre-Entrega
 
-1. **Pure-Go & Concurrencia:** Compilación estricta con `CGO_ENABLED=0`. Prohibido omitir el flag `-race` al ejecutar pruebas (`go test -race ./...`).
-2. **Aislamiento Hexagonal:**
-   - `internal/domain/` tiene **cero dependencias externas** (solo biblioteca estándar de Go).
-   - Queda terminantemente prohibido que un adaptador dependa o importe directamente a otro adaptador.
-3. **Blindaje Machine-to-Machine (`--json`):**
-   - Cuando se activa el flag `--json`, `stderr` debe permanecer en **0 bytes**. Ningún log o texto plano puede contaminar `stderr`.
-   - Toda salida debe emitirse por `stdout` serializada en JSON bajo el contrato `ResponseEnvelope`.
-   - Códigos de salida POSIX: la matriz semántica normativa se define centralizadamente en [`internal/presentation/errors/envelope.go`](internal/presentation/errors/envelope.go) y en la especificación [`m2m-envelope.md`](file:///home/johantv/.agents/skills/go-cli-tui/references/m2m-envelope.md).
-4. **Terminal Firewall:** En ejecuciones no interactivas o bajo `--json`, los componentes de Charm TUI nunca deben inicializarse ni leer de `stdin`.
-
----
-
-## ✅ 3. Checklist Pre-Entrega
-
-Antes de finalizar tu turno o entregar código en este repositorio:
+Valida todo cambio exclusivamente mediante el `Makefile`:
 1. [ ] **`make test`** pasa al 100% con `-race` (cero data races).
-2. [ ] **`make docs-check`** pasa sin enlaces rotos ni inconsistencias de índice.
+2. [ ] **`make docs-check`** pasa sin enlaces rotos ni inconsistencias de índice (`make docs` sincroniza índice tras RFCs/ADRs).
 3. [ ] **`make build`** compila limpiamente en `bin/{{ .AppName }}` con `CGO_ENABLED=0`.
-4. [ ] **`git status -s`** limpio de archivos temporales o no versionados.
+4. [ ] **`git status -s`** libre de artefactos temporales o logs (cambios de código en progreso no requieren commit).
