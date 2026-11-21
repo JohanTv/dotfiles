@@ -10,7 +10,6 @@ PROFILE ?= $(shell cat $(PROFILE_FILE) 2>/dev/null || echo $${DOTFILES_PROFILE:-
 DIST_DIR := $(DOTFILES_DIR)/agents/rules/dist
 ACTIVE_RULES := $(DIST_DIR)/active-rules.md
 CORE_RULES := $(DOTFILES_DIR)/agents/rules/src/core.md
-SKILLS_INDEX := $(DOTFILES_DIR)/agents/rules/src/skills-index.md
 PROFILE_RULES := $(DOTFILES_DIR)/agents/rules/src/$(PROFILE).md
 
 IS_WSL := $(shell grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null && echo true || echo false)
