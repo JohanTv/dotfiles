@@ -2,6 +2,8 @@
 
 Procedure to assess a long instruction file and choose the smallest useful change: leave it, reorganize in place, or split into a compact router plus focused docs. Treat the entry file as a router, not a rule warehouse.
 
+> For a Phase 1 audit read §2, §3 and §5. §6 to §8 apply only in Phase 2 after approval.
+
 ## 1. Identify the target
 - Default to the user's named file; else the file most broadly loaded by the current agent setup (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, rules).
 - Several candidates and unclear choice → list them and ask.
@@ -11,7 +13,7 @@ Procedure to assess a long instruction file and choose the smallest useful chang
 - Claude Code ≥ v2.1.283 documents `/doctor prompt-audit` (stale, conflicting or dangling-reference findings with proposed edits; read-only until you apply them). Use it as a pre-scan and treat its findings as hypotheses.
 
 ## 3. Detect contradictions first
-Scan for conflicting style rules, package managers, test commands, safety boundaries, precedence statements, and same-rule-different-wording duplicates. Resolve via SKILL.md principle 7. Do not restructure around an unresolved contradiction.
+Scan for conflicting style rules, package managers, test commands, safety boundaries, precedence statements, skill templates or examples that tell the agent to copy existing code or use a pattern the entrypoint forbids, docs that deny files that exist, and same-rule-different-wording duplicates. Resolve via SKILL.md principle 7. Do not restructure around an unresolved contradiction.
 
 ## 4. Choose the smallest useful change
 - Ask: does splitting solve a concrete problem? If the file is compact or its rules are normally needed together → keep unchanged or reorganize in place.

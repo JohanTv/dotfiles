@@ -3,7 +3,7 @@
 Peripheral noise (generated code, mocks, fixtures, snapshots, bundles) and blind exploration consume agent context. Raise exclusion walls and pin navigation.
 
 ## 1. Measure the noise first
-- `fd -t f | wc -l` vs `rg --files | wc -l` shows what current filters already hide.
+- Measure concentration, not file counts: `fd`/`rg` counts only show what ignore files already hide. List the largest tracked files (`git ls-files -z | xargs -0 du -b | sort -rn | head`), flag single-line or minified ones, and for one common term run `rg -c` per file; a file holding a large share of matches is noise.
 - For each candidate pattern, confirm it matches what you think: `rg --files | rg '<pattern>'` (or `fd`). Never add a pattern unverified.
 
 ## 2. Tool wall (ignore files)

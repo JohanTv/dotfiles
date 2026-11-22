@@ -10,6 +10,7 @@ Facts below were verified on 2026-11-21 against official docs; they drift, so re
 - Official guidance: keep each CLAUDE.md under about 200 lines; longer files cost context and may reduce adherence. Investigate, do not target the number. Files over 4 MiB are skipped.
 
 ## Measure it
+- Resolve the real config dir before looking for memory or user files: check `$CLAUDE_CONFIG_DIR` and the paths named in the loaded global instructions; `~/.claude` is only the default.
 - `/context all` → Memory files list; `/memory` to browse; an `InstructionsLoaded` hook logs which files load, when and why (observational, cannot block).
 - A CLAUDE.md alone misses the skill-description catalog, hook-injected text and `MEMORY.md`: count them.
 - When sectioning by heading, ignore `#` lines inside code fences (they create phantom sections). Bytes are not tokens: label any ratio `est.`.

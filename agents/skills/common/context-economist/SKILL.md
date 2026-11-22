@@ -12,9 +12,9 @@ Orchestrator for auditing and optimizing the context injected into agents. Goal:
 | Task | Read first |
 | :--- | :--- |
 | Split, reorganize or slim an instruction file (AGENTS.md, CLAUDE.md, GEMINI.md, rules) | `references/refactor-instruction-file.md` |
-| Large repo / monorepo, noisy searches, agent exploring blindly, `.ignore`, entrypoints | `references/large-codebase.md` |
+| Large repo / monorepo (several packages or searches dominated by a few huge generated, vendored, lock or data files), agent exploring blindly, `.ignore`, entrypoints | `references/large-codebase.md` |
 | What is really loaded, per-host limits, skill-description audit, real-host verification | `references/load-surface.md` |
-| Audit a skill or prompt | Principles 1-6, `references/refactor-instruction-file.md` §5 (cut candidates), `references/load-surface.md` (skill descriptions) |
+| Audit a skill or prompt, or a mixed audit (instruction file + skills + load) | Principles 1-6, `references/refactor-instruction-file.md` §3 and §5 only, `references/load-surface.md` |
 | Writing a full Phase 1 report | `references/report-template.md` |
 
 ## Principles
@@ -41,8 +41,8 @@ Orchestrator for auditing and optimizing the context injected into agents. Goal:
 - Open the Phase 1 report with scope, exclusions and assumptions.
 
 **Phase 1: Diagnose (read-only).**
-Map the context sources relevant to the task (global rules, project files, skills, docs, auto-memory index, skill-description catalog, hook-injected text) and measure the real load surface, not only the file (see load-surface reference). Measure: `wc -l`, plus tokens as an estimate (chars/4, labeled estimate). Detect duplicates, contradictions, orphans, noise. Check whether the target is generated and cite its source file in findings. Issue a verdict: `no change` | `local reorganization` | `split` | `+ repo walls`.
-Proportionality: if the file is compact and no symptom was named, do triage only (`wc -l`, litmus, contradictions). For `no change`, answer inline with scope, verdict, one surface row and what was not verified, without loading the report template. Otherwise report with `references/report-template.md`.
+Map the context sources relevant to the task (global rules, project files, skills, docs, auto-memory index, skill-description catalog, hook-injected text) and measure the real load surface, not only the file (see load-surface reference). Measure: `wc -l`, plus tokens as an estimate (chars/4, labeled estimate). Detect duplicates, contradictions, orphans, noise. Dangling references: for every path, script or command an instruction file or skill names, check that it exists (`ls`, `fd`, `jq '.scripts' package.json`); a missing target is a finding with `file:line`. Do not run the command. Classify each missing target: dangling, placeholder, generated/gitignored artifact, other repo's path, or planned. Dangling and planned-but-described-as-present are findings; the rest go under Reviewed, no change. Search hidden dirs too (`rg --hidden`, `fd -H`). Check whether the target is generated and cite its source file in findings. Issue a verdict: `no change` | `local reorganization` | `split` | `+ repo walls`.
+Proportionality: triage first (`wc -l`, litmus, contradictions) on the entrypoint and on skill descriptions. Per skill, read frontmatter and headings and `rg` its paths, commands and fenced templates against the entrypoint's hard rules. Read the body in full when the user named it, its description overlaps another surface, or that pass finds a conflict; list every other body under Not verified. If triage finds nothing and no symptom was named, answer inline (`no change`, with scope, one surface row and what was not verified) without loading the report template; otherwise report with `references/report-template.md`.
 
 **Approval gate.** Required before: deleting files or rules, editing global rules, splitting, adding repo-shared config (`.ignore`, etc.). Not required for a rule-preserving in-place edit of one non-global file. Do not re-ask decisions the user already settled in the thread.
 
