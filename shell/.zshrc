@@ -149,6 +149,9 @@ alias open='xdg-open'
 alias zj="zellij"
 alias zja="zellij attach"
 alias zjls="zellij list-sessions"
+alias docker-start="docker-start"
+alias vpn-start="vpn-start"
+alias vpn-stop="vpn-stop"
 # alias ag='antigravity --ignore-gpu-blacklist --enable-gpu-rasterization --enable-zero-copy --disable-gpu-driver-bug-workarounds --enable-native-gpu-memory-buffers'
 ag() {
     antigravity "$@" --ignore-gpu-blacklist --enable-gpu-rasterization --enable-zero-copy --disable-gpu-driver-bug-workarounds --enable-native-gpu-memory-buffers
@@ -184,19 +187,11 @@ alias agy="agy --dangerously-skip-permissions"
 # Cargar secretos y configuraciones locales privadas si existen
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
 
-# Auto-iniciar o adjuntar sesión de Zellij en shells interactivos
+# Auto-adjuntar directamente a la sesión fija 'main' de Zellij (sin menús ni selección de sesiones)
 if [[ -o interactive ]] && [[ -z "$ZELLIJ" ]] && [[ "${ZELLIJ_AUTO_START:-true}" == "true" ]] && [[ "$TERM" != "dumb" ]] && command -v zellij >/dev/null 2>&1; then
   # Evitar anidar en la terminal integrada de VS Code / Antigravity IDE a menos que se configure explícitamente
   if [[ "$TERM_PROGRAM" != "vscode" || "${ZELLIJ_AUTO_START_IDE:-false}" == "true" ]]; then
-    if [[ "${ZELLIJ_AUTO_ATTACH:-true}" == "true" ]]; then
-      zellij attach -c
-    else
-      zellij
-    fi
-
-    if [[ "${ZELLIJ_AUTO_EXIT:-true}" == "true" ]]; then
-      exit
-    fi
+    exec zellij attach -c main
   fi
 fi
 
